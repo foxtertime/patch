@@ -294,6 +294,37 @@ class LoggingTest(unittest.TestCase):
         self.assertTrue(any("os-9.2" in line and "3" in line
                             for line in caught.output), caught.output)
 
+    def test_tag_size_and_detail_count_are_both_logged(self):
+        # listTagged перечислил два билда, getBuild вернул один: прогресс
+        # дойдёт до 1/1, а в теге билдов два. Если в логе только одно из этих
+        # чисел, расхождение читается как молча выброшенный компонент —
+        # худшее, что может померещиться в дашборде патчей.
+        tagged = {"os-9.2": [{"build_id": 1, "name": "nginx"},
+                             {"build_id": 7, "name": "ghost"}]}
+        session = FakeKojiSession(tagged=tagged, builds={1: BUILDS[1]},
+                                  rpms={1: [], 7: []})
+        gitlab = GitlabClient(HOSTS, token=None,
+                              transport=FakeTransport(self.routes),
+                              sleeper=lambda _s: None)
+        with self.assertLogs("kojipatch.collect", level="INFO") as caught:
+            collect_tag("os-9.2", config(), KojiClient(session), gitlab,
+                        jobs=1, now="n")
+        opening = [line for line in caught.output
+                   if "в теге" in line and "деталей получено" in line]
+        self.assertTrue(opening, caught.output)
+        self.assertIn("2 билдов в теге", opening[0])
+        self.assertIn("деталей получено 1", opening[0])
+
+    def test_koji_batch_phase_is_announced_at_info(self):
+        # на 800 билдах между размером тега и первой строкой прогресса
+        # шестнадцать мультиколлов: без этой строки прогон выглядит зависшим
+        with self.assertLogs("kojipatch.collect", level="INFO") as caught:
+            self.collect()
+        # сверяемся с текстом записи, а не со строкой вывода: имя логгера
+        # kojipatch.collect само содержит «koji» и делало бы проверку слепой
+        self.assertTrue(any("спрашиваю у koji" in record.getMessage()
+                            for record in caught.records), caught.output)
+
     def test_build_problem_is_logged_as_warning_with_the_component(self):
         with self.assertLogs("kojipatch.collect", level="WARNING") as caught:
             self.collect()

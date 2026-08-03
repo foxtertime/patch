@@ -41,12 +41,21 @@ def collect_tag(tag: str, cfg, koji_client, gitlab_client, jobs: int = 8,
     started = time.monotonic()
     tagged = koji_client.tagged_builds(tag)
     build_ids = [item["build_id"] for item in tagged]
-    logger.info("%s: %d билдов в теге, сбор в %d поток(ов)", tag,
-                len(build_ids), max(1, int(jobs)))
+    workers = max(1, int(jobs))
+    # на 800 билдах это шестнадцать мультиколлов подряд: без строки прогон
+    # выглядит зависшим между размером тега и первой строкой прогресса
+    logger.info("%s: %d билдов в теге, спрашиваю у koji детали и RPM", tag,
+                len(build_ids))
     details = koji_client.build_details(build_ids)
     rpms = koji_client.rpms_for(build_ids)
 
     infos = [details[bid] for bid in build_ids if bid in details]
+    # оба числа в одной строке: прогресс считает полученные детали, а размер
+    # тега — то, что перечислил listTagged. Когда они расходятся, «4 билдов в
+    # теге» и остановившийся на «3/3» прогресс читаются как выброшенный билд;
+    # на деле такой билд обработан и о нём предупреждено отдельно.
+    logger.info("%s: %d билдов в теге, деталей получено %d, сбор в %d "
+                "поток(ов)", tag, len(build_ids), len(infos), workers)
     # getBuild мог не вернуть билд, который listTagged только что перечислил.
     # Молча выбросить строку нельзя: для дашборда патчей пропавший компонент —
     # худший из возможных исходов. Показываем его по данным listTagged.
@@ -89,7 +98,6 @@ def collect_tag(tag: str, cfg, koji_client, gitlab_client, jobs: int = 8,
         report_progress(build)
         return build
 
-    workers = max(1, int(jobs))
     if workers == 1 or total <= 1:
         builds = [handle(info) for info in infos]
     else:
