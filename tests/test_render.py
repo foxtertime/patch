@@ -150,5 +150,45 @@ class RenderHtmlTest(unittest.TestCase):
         self.assertIn('id="tab-diff"', html)
 
 
+class TemplateContractTest(unittest.TestCase):
+    def setUp(self):
+        self.classifier = Classifier(RULES)
+        old = snap("os-9.1", [build("nginx", "1.0")])
+        new = snap("os-9.2", [build("nginx", "1.1",
+                                    patches=[patch("CVE-2024-7347.patch", "CVE")])])
+        from kojipatch.diff import diff_chain as chain
+        self.html = render_html([old, new], chain([old, new]), self.classifier)
+
+    def test_has_tab_navigation(self):
+        self.assertIn('data-tab="state"', self.html)
+        self.assertIn('data-tab="diff"', self.html)
+
+    def test_has_search_and_expand_controls(self):
+        self.assertIn('id="q"', self.html)
+        self.assertIn('id="expand"', self.html)
+
+    def test_has_active_filter_chip_bar(self):
+        self.assertIn('id="chips"', self.html)
+
+    def test_has_copy_nvr_button(self):
+        self.assertIn('id="copy-nvr"', self.html)
+
+    def test_reuses_ref_html_css_variables(self):
+        for name in ("--bg", "--fg", "--muted", "--line", "--card",
+                     "--accent", "--added", "--removed", "--hit"):
+            self.assertIn(name, self.html, name)
+
+    def test_supports_dark_theme(self):
+        self.assertIn("prefers-color-scheme: dark", self.html)
+
+    def test_tooltip_container_present(self):
+        self.assertIn('id="tip"', self.html)
+
+    def test_no_external_resources(self):
+        for marker in ("<script src=", "<link rel=\"stylesheet\"", "https://cdn",
+                       "@import"):
+            self.assertNotIn(marker, self.html, marker)
+
+
 if __name__ == "__main__":
     unittest.main()
