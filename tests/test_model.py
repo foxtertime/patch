@@ -62,6 +62,28 @@ class SerialisationTest(unittest.TestCase):
         with self.assertRaises(SnapshotError):
             snapshot_from_dict(data)
 
+    def test_roundtrip_preserves_false_and_epoch(self):
+        build = sample_build()
+        build.patch_dir_present = False
+        build.epoch = 2
+        snap = Snapshot(tag="t", generated="g", koji_hub="h",
+                        koji_web=None, builds=[build])
+        again = snapshot_from_dict(snapshot_to_dict(snap))
+        self.assertIs(again.builds[0].patch_dir_present, False)
+        self.assertEqual(again.builds[0].epoch, 2)
+
+    def test_missing_raw_in_source_raises(self):
+        data = snapshot_to_dict(sample_snapshot())
+        del data["builds"][0]["source"]["raw"]
+        with self.assertRaises(SnapshotError):
+            snapshot_from_dict(data)
+
+    def test_missing_koji_hub_raises(self):
+        data = snapshot_to_dict(sample_snapshot())
+        del data["koji_hub"]
+        with self.assertRaises(SnapshotError):
+            snapshot_from_dict(data)
+
 
 class FileIoTest(unittest.TestCase):
     def path(self):

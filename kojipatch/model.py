@@ -45,7 +45,7 @@ class Source:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Source":
-        return cls(raw=data.get("raw", ""), host=data.get("host"),
+        return cls(raw=data["raw"], host=data.get("host"),
                    project=data.get("project"), ref=data.get("ref"),
                    ref_kind=data.get("ref_kind", "none"),
                    web_url=data.get("web_url"))
@@ -127,7 +127,7 @@ def snapshot_from_dict(data: Dict[str, Any]) -> Snapshot:
                             % (schema, SCHEMA))
     try:
         return Snapshot(tag=data["tag"], generated=data["generated"],
-                        koji_hub=data.get("koji_hub", ""),
+                        koji_hub=data["koji_hub"],
                         koji_web=data.get("koji_web"),
                         builds=[Build.from_dict(b)
                                 for b in data.get("builds") or []])
