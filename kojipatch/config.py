@@ -9,7 +9,7 @@ import yaml
 DEFAULT_PATCH_DIR = "PATCH"
 DEFAULT_TOKEN_ENV = "GITLAB_TOKEN"
 DEFAULT_PATCH_CLASSES = [
-    ("CVE", r"CVE-\d{4}-\d{4,}"),
+    ("CVE", r"(?i)CVE-\d{4}-\d{4,}"),
     ("SAST", r"(?i)^sast[-_]"),
     ("DAST", r"(?i)^dast[-_]"),
 ]

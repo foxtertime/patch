@@ -1,4 +1,5 @@
 import os
+import re
 import tempfile
 import unittest
 
@@ -94,6 +95,12 @@ class LoadConfigTest(unittest.TestCase):
         cfg = load_config(None, None, require_hub=False)
         self.assertEqual(cfg.koji_hub, "")
         self.assertEqual(cfg.patch_classes[-1], ("other", ".*"))
+
+    def test_default_cve_rule_is_case_insensitive(self):
+        cfg = load_config(write(MINIMAL))
+        name, pattern = cfg.patch_classes[0]
+        self.assertEqual(name, "CVE")
+        self.assertTrue(re.compile(pattern).search("cve-2024-1234.patch"))
 
 
 if __name__ == "__main__":
