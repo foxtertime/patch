@@ -4,8 +4,17 @@ from kojipatch.diff import diff_chain, diff_snapshots
 from kojipatch.model import Build, Patch, Snapshot, Source
 
 
+def nvra(sub, version, release, arch="x86_64"):
+    """RPM в том же виде, в каком его отдаёт koji: name-version-release.arch."""
+    return "%s-%s-%s.%s" % (sub, version, release, arch)
+
+
 def build(name, version="1.0", release="1.el9", patches=(), rpms=(),
-          ref="main", epoch=None):
+          ref="main", epoch=None, subpackages=None):
+    # подпакеты задаём именами, а NVRA собираем из версии билда — так же,
+    # как это делает koji: иначе тест сравнивал бы то, чего в жизни нет.
+    if subpackages is not None:
+        rpms = [nvra(sub, version, release) for sub in subpackages]
     return Build(nvr="%s-%s-%s" % (name, version, release), name=name,
                  version=version, release=release, epoch=epoch,
                  source=Source(raw="r", host="h", project="g/" + name, ref=ref,
@@ -74,12 +83,50 @@ class DetailsTest(unittest.TestCase):
         self.assertEqual(component.patches_removed, ["PATCH/old.patch"])
 
     def test_rpm_delta_sets_repackaged(self):
-        got = self.diff_of([build("nginx", rpms=["a.x86_64", "b.x86_64"])],
-                           [build("nginx", rpms=["a.x86_64", "c.x86_64"])])
+        got = self.diff_of(
+            [build("nginx", subpackages=["nginx", "nginx-mod"])],
+            [build("nginx", subpackages=["nginx", "nginx-core"])])
         component = got["nginx"]
-        self.assertEqual(component.rpms_added, ["c.x86_64"])
-        self.assertEqual(component.rpms_removed, ["b.x86_64"])
+        self.assertEqual(component.rpms_added,
+                         ["nginx-core-1.0-1.el9.x86_64"])
+        self.assertEqual(component.rpms_removed,
+                         ["nginx-mod-1.0-1.el9.x86_64"])
         self.assertTrue(component.repackaged)
+
+    def test_version_bump_alone_is_not_repackaged(self):
+        # чистая пересборка: подпакеты те же, поехала только версия
+        got = self.diff_of(
+            [build("nginx", "1.24.0", subpackages=["nginx", "nginx-core"])],
+            [build("nginx", "1.25.0", subpackages=["nginx", "nginx-core"])])
+        component = got["nginx"]
+        self.assertEqual(component.status, "upgraded")
+        self.assertFalse(component.repackaged)
+        self.assertEqual(component.rpms_added, [])
+        self.assertEqual(component.rpms_removed, [])
+
+    def test_new_subpackage_on_a_version_bump_is_repackaged(self):
+        got = self.diff_of(
+            [build("nginx", "1.24.0", subpackages=["nginx", "nginx-core"])],
+            [build("nginx", "1.25.0",
+                   subpackages=["nginx", "nginx-core", "nginx-mod-mail"])])
+        component = got["nginx"]
+        self.assertTrue(component.repackaged)
+        # наружу отдаём полный NVRA — по нему дашборд красит строку «стало»
+        self.assertEqual(component.rpms_added,
+                         ["nginx-mod-mail-1.25.0-1.el9.x86_64"])
+        self.assertEqual(component.rpms_removed, [])
+
+    def test_release_only_bump_is_not_repackaged(self):
+        got = self.diff_of(
+            [build("nginx", "1.24.0", "1.el9", subpackages=["nginx"])],
+            [build("nginx", "1.24.0", "2.el9", subpackages=["nginx"])])
+        self.assertFalse(got["nginx"].repackaged)
+
+    def test_arch_change_is_repackaged(self):
+        got = self.diff_of(
+            [build("nginx", rpms=[nvra("nginx", "1.0", "1.el9", "x86_64")])],
+            [build("nginx", rpms=[nvra("nginx", "1.0", "1.el9", "aarch64")])])
+        self.assertTrue(got["nginx"].repackaged)
 
     def test_branch_change_is_flagged(self):
         got = self.diff_of([build("nginx", ref="br-9.1")],
@@ -89,6 +136,11 @@ class DetailsTest(unittest.TestCase):
     def test_same_branch_is_not_flagged(self):
         got = self.diff_of([build("nginx")], [build("nginx")])
         self.assertFalse(got["nginx"].branch_changed)
+
+    def test_changed_returns_a_bool_not_a_list(self):
+        got = self.diff_of([build("nginx", patches=["a.patch"])],
+                           [build("nginx", patches=["a.patch", "b.patch"])])
+        self.assertIs(got["nginx"].changed(), True)
 
     def test_added_component_has_no_deltas(self):
         got = self.diff_of([], [build("nginx", patches=["a.patch"])])
