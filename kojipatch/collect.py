@@ -40,6 +40,11 @@ def collect_tag(tag: str, cfg, koji_client, gitlab_client, jobs: int = 8,
     rpms = koji_client.rpms_for(build_ids)
 
     infos = [details[bid] for bid in build_ids if bid in details]
+    # getBuild мог не вернуть билд, который listTagged только что перечислил.
+    # Молча выбросить строку нельзя: для дашборда патчей пропавший компонент —
+    # худший из возможных исходов. Показываем его по данным listTagged.
+    tagged_by_id = {item.get("build_id"): item for item in tagged}
+    missing = [tagged_by_id[bid] for bid in build_ids if bid not in details]
     total = len(infos)
     done = [0]
     progress_lock = threading.Lock()
@@ -72,7 +77,9 @@ def collect_tag(tag: str, cfg, koji_client, gitlab_client, jobs: int = 8,
         with ThreadPoolExecutor(max_workers=workers) as pool:
             builds = list(pool.map(handle, infos))
 
-    builds.sort(key=lambda b: b.name)
+    builds.extend(_placeholder_build(item, rpms.get(item.get("build_id"), []))
+                  for item in missing)
+    builds.sort(key=lambda b: b.name or "")
     return Snapshot(tag=tag, generated=now or _now_iso(),
                     koji_hub=cfg.koji_hub, koji_web=cfg.koji_web, builds=builds)
 
@@ -88,6 +95,18 @@ def _build_from_info(info: dict, rpms) -> Build:
         owner=info.get("owner_name"),
         completed=_completed(info.get("completion_time")),
         rpms=list(rpms), patches=[], problems=[])
+
+
+def _placeholder_build(info: dict, rpms) -> Build:
+    """Билд, по которому пришёл только ответ listTagged.
+
+    Строка остаётся в снапшоте — с проблемой и без сведений об источнике,
+    чтобы было видно: данные по ней неполные, а не «патчей нет».
+    """
+    build = _build_from_info(info, rpms)
+    build.patch_dir_present = None
+    build.problems.append("koji: нет деталей билда")
+    return build
 
 
 def _attach_patches(build: Build, info: dict, cfg, gitlab_client,

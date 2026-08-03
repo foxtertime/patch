@@ -197,6 +197,38 @@ class CollectTagTest(unittest.TestCase):
         curl = snap.by_name()["curl"]
         self.assertEqual(curl.problems, ["no source url"])
 
+    def test_build_without_details_survives_as_a_placeholder(self):
+        # listTagged перечислил билд, а getBuild по нему ничего не вернул:
+        # строка обязана остаться, но быть явно помеченной как неполная.
+        tagged = {"os-9.2": [
+            {"build_id": 1, "name": "nginx"},
+            {"build_id": 7, "name": "ghost", "version": "2.1",
+             "release": "4.el9", "nvr": "ghost-2.1-4.el9", "epoch": 1,
+             "task_id": 77, "owner_name": "builder",
+             "completion_time": "2026-02-02 10:00:00"},
+        ]}
+        session = FakeKojiSession(tagged=tagged, builds={1: BUILDS[1]},
+                                  rpms={1: RPMS[1], 7: []})
+        koji_client = KojiClient(session)
+        transport = FakeTransport(self.routes)
+        gitlab = GitlabClient(HOSTS, token=None, transport=transport,
+                              sleeper=lambda _s: None)
+        snap = collect_tag("os-9.2", config(), koji_client, gitlab, jobs=2,
+                           now="n")
+        self.assertEqual([b.name for b in snap.builds], ["ghost", "nginx"])
+        ghost = snap.by_name()["ghost"]
+        self.assertEqual(ghost.nvr, "ghost-2.1-4.el9")
+        self.assertEqual(ghost.version, "2.1")
+        self.assertEqual(ghost.release, "4.el9")
+        self.assertEqual(ghost.epoch, 1)
+        self.assertEqual(ghost.task_id, 77)
+        self.assertEqual(ghost.owner, "builder")
+        self.assertEqual(ghost.completed, "2026-02-02")
+        self.assertIsNone(ghost.source)
+        self.assertIsNone(ghost.patch_dir_present)
+        self.assertEqual(ghost.problems, ["koji: нет деталей билда"])
+        self.assertEqual(problem_summary(snap)["koji: нет деталей билда"], 1)
+
     def test_progress_reaches_total_under_concurrency(self):
         koji_client, gitlab, _ = make_clients(self.routes)
         seen = []
