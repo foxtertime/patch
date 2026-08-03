@@ -1,4 +1,5 @@
 import io
+import logging
 import os
 import shutil
 import tempfile
@@ -107,6 +108,67 @@ class CliRenderTest(TempDirTest):
         text = out.getvalue()
         for word in ("collect", "render", "run"):
             self.assertIn(word, text)
+
+
+class LogLevelTest(unittest.TestCase):
+    def out_path(self):
+        fd, path = tempfile.mkstemp(suffix=".html")
+        os.close(fd)
+        return path
+
+    def snapshots(self):
+        return [os.path.join(FIXTURES, "snapshot-os-9.1.json"),
+                os.path.join(FIXTURES, "snapshot-os-9.2.json")]
+
+    def test_written_file_is_logged_at_info(self):
+        out = self.out_path()
+        with self.assertLogs("kojipatch.cli", level="INFO") as caught:
+            code = main(["render"] + self.snapshots() + ["-o", out])
+        self.assertEqual(code, 0)
+        self.assertIn(out, "\n".join(caught.output))
+
+    def test_fatal_error_is_logged_at_error(self):
+        with self.assertLogs("kojipatch.cli", level="ERROR") as caught:
+            code = main(["render", "/nonexistent.json", "-o", self.out_path()])
+        self.assertEqual(code, 2)
+        self.assertIn("снапшот", "\n".join(caught.output).lower())
+
+    def test_error_carries_a_traceback_record_at_debug(self):
+        # пользователю — одна строка, разработчику — трейсбек, но только
+        # когда он его попросил уровнем
+        with self.assertLogs("kojipatch.cli", level="DEBUG") as caught:
+            main(["--config", "/nonexistent.yaml", "collect", "--tag", "t"])
+        self.assertIn(logging.ERROR, [r.levelno for r in caught.records])
+        with_traceback = [r for r in caught.records
+                          if r.levelno == logging.DEBUG and r.exc_info]
+        self.assertTrue(with_traceback, caught.output)
+
+    def test_error_alone_has_no_traceback_record(self):
+        with self.assertLogs("kojipatch.cli", level="ERROR") as caught:
+            main(["--config", "/nonexistent.yaml", "collect", "--tag", "t"])
+        for record in caught.records:
+            self.assertIsNone(record.exc_info)
+
+    def test_unknown_level_is_rejected_by_argparse(self):
+        err = io.StringIO()
+        with redirect_stderr(err):
+            with self.assertRaises(SystemExit):
+                main(["--log-level", "loud", "render", "x.json"])
+        self.assertIn("--log-level", err.getvalue())
+
+    def test_verbose_flag_is_gone(self):
+        err = io.StringIO()
+        with redirect_stderr(err):
+            with self.assertRaises(SystemExit):
+                main(["-v", "render", "x.json"])
+        self.assertIn("unrecognized", err.getvalue())
+
+    def test_help_mentions_log_level(self):
+        out = io.StringIO()
+        with redirect_stdout(out):
+            with self.assertRaises(SystemExit):
+                main(["--help"])
+        self.assertIn("--log-level", out.getvalue())
 
 
 class SnapshotFixtureTest(unittest.TestCase):
@@ -229,7 +291,8 @@ class RunCommandTest(TempDirTest):
         self.assertIn("nginx-1.25.0-1.el9", html)
         self.assertIn("CVE-2024-7347.patch", html)
         self.assertNotIn("/*__DATA__*/", html)
-        self.assertIn("os-9.2: 2 билдов, 1 проблемных", err)
+        self.assertIn("os-9.2", err)
+        self.assertIn("2 билдов, 1 проблемных", err)
 
     def test_run_returns_one_when_problems_exceed_the_limit(self):
         code, err = self.run_cli(self.argv("run", "--tag", "os-9.2",

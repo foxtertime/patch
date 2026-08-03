@@ -1,12 +1,13 @@
 """Точка входа: collect, render, run."""
 import argparse
+import logging
 import os
-import sys
-import traceback
+import time
 from typing import List, Optional
 
+from . import logs
 from .classify import Classifier
-from .collect import collect_tag, problem_summary
+from .collect import collect_tag
 from .config import ConfigError, load_config
 from .diff import diff_chain
 from .gitlabclient import GitlabClient
@@ -16,6 +17,8 @@ from .render import RenderError, render_html
 EXIT_OK = 0
 EXIT_PROBLEMS = 1
 EXIT_FATAL = 2
+
+logger = logging.getLogger(__name__)
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -31,8 +34,11 @@ def _parser() -> argparse.ArgumentParser:
                         help="параллельных запросов к GitLab (по умолчанию 8)")
     parser.add_argument("--max-problems", type=int, default=None,
                         help="вернуть код 1, если проблемных билдов больше")
-    parser.add_argument("-v", "--verbose", action="store_true",
-                        help="печатать прогресс сбора и трейсбек при фатальной ошибке")
+    parser.add_argument("--log-level", choices=sorted(logs.LEVELS),
+                        default=logs.DEFAULT_LEVEL,
+                        help="подробность лога (по умолчанию %s); на debug "
+                             "печатается каждый запрос к GitLab и koji"
+                             % logs.DEFAULT_LEVEL)
 
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -62,34 +68,15 @@ def _load_config(args):
 
 def _collect(args, cfg):
     from .kojiclient import connect  # импорт здесь: koji нужен только для сбора
+    logger.info("хаб %s, теги: %s, --jobs %d, токен %s", cfg.koji_hub,
+                ", ".join(args.tags), args.jobs,
+                "задан" if cfg.token() else "не задан")
     koji_client = connect(cfg.koji_hub)
     gitlab = GitlabClient(cfg.gitlab_hosts, token=cfg.token(),
                           patch_dir=cfg.patch_dir,
                           default_host=cfg.gitlab_default_host)
-    snapshots = []
-    for tag in args.tags:
-        progress = None
-        if args.verbose:
-            def progress(done, total, tag=tag):
-                sys.stderr.write("\r%s: %d/%d" % (tag, done, total))
-                sys.stderr.flush()
-        snapshot = collect_tag(tag, cfg, koji_client, gitlab, jobs=args.jobs,
-                               progress=progress)
-        if args.verbose:
-            sys.stderr.write("\n")
-        _report(snapshot)
-        snapshots.append(snapshot)
-    return snapshots
-
-
-def _report(snapshot) -> int:
-    summary = problem_summary(snapshot)
-    problem_builds = sum(1 for b in snapshot.builds if b.problems)
-    details = ", ".join("%s: %d" % item for item in sorted(summary.items()))
-    sys.stderr.write("%s: %d билдов, %d проблемных%s\n"
-                     % (snapshot.tag, len(snapshot.builds), problem_builds,
-                        (" (%s)" % details) if details else ""))
-    return problem_builds
+    return [collect_tag(tag, cfg, koji_client, gitlab, jobs=args.jobs)
+            for tag in args.tags]
 
 
 def _render(snapshots, cfg, output) -> None:
@@ -97,21 +84,27 @@ def _render(snapshots, cfg, output) -> None:
     html = render_html(snapshots, pairs, Classifier.from_config(cfg))
     with open(output, "w", encoding="utf-8") as handle:
         handle.write(html)
-    sys.stderr.write("написан %s\n" % output)
+    logger.info("написан %s", output)
+
+
+def _fatal(message, exc) -> int:
+    """Одна строка пользователю, трейсбек — только на debug."""
+    logger.error("%s: %s", message, exc)
+    logger.debug("трейсбек", exc_info=True)
+    return EXIT_FATAL
 
 
 def main(argv: Optional[List[str]] = None) -> int:
     args = _parser().parse_args(argv)
+    logs.configure(args.log_level)
+    started = time.monotonic()
+
     try:
         cfg = _load_config(args)
     except ConfigError as exc:
-        sys.stderr.write("ошибка конфига: %s\n" % exc)
-        return EXIT_FATAL
-    except Exception as exc:  # непредвиденная ошибка тоже не должна ронять CLI трейсбеком
-        if args.verbose:
-            traceback.print_exc()
-        sys.stderr.write("фатальная ошибка: %s\n" % exc)
-        return EXIT_FATAL
+        return _fatal("ошибка конфига", exc)
+    except Exception as exc:  # непредвиденная ошибка не должна ронять CLI трейсбеком
+        return _fatal("фатальная ошибка", exc)
 
     try:
         if args.command == "render":
@@ -119,32 +112,29 @@ def main(argv: Optional[List[str]] = None) -> int:
             for path in args.snapshots:
                 snapshots.extend(load_snapshots(path))
             _render(snapshots, cfg, args.output)
+            logger.info("всего за %.1f с", time.monotonic() - started)
             return EXIT_OK
 
         snapshots = _collect(args, cfg)
         if args.command == "collect":
             dump_snapshots(snapshots, args.output)
-            sys.stderr.write("написан %s\n" % args.output)
+            logger.info("написан %s", args.output)
         else:
             if args.save_snapshots:
                 dump_snapshots(snapshots, args.save_snapshots)
             _render(snapshots, cfg, args.output)
+        logger.info("всего за %.1f с", time.monotonic() - started)
 
         if args.max_problems is not None:
             problems = sum(1 for s in snapshots for b in s.builds if b.problems)
             if problems > args.max_problems:
-                sys.stderr.write("проблемных билдов %d > %d\n"
-                                 % (problems, args.max_problems))
+                logger.warning("проблемных билдов %d > %d", problems,
+                               args.max_problems)
                 return EXIT_PROBLEMS
         return EXIT_OK
     except (SnapshotError, RenderError) as exc:
-        sys.stderr.write("%s\n" % exc)
-        return EXIT_FATAL
+        return _fatal("ошибка", exc)
     except OSError as exc:
-        sys.stderr.write("ошибка ввода-вывода: %s\n" % exc)
-        return EXIT_FATAL
+        return _fatal("ошибка ввода-вывода", exc)
     except Exception as exc:  # koji недоступен и прочие фатальные случаи
-        if args.verbose:
-            traceback.print_exc()
-        sys.stderr.write("фатальная ошибка: %s\n" % exc)
-        return EXIT_FATAL
+        return _fatal("фатальная ошибка", exc)
