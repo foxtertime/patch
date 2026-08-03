@@ -441,6 +441,38 @@ class LoggingTest(unittest.TestCase):
         for line in caught.output:
             self.assertNotIn("  ", line)
 
+    def test_missing_patch_dir_verdict_is_logged_at_debug(self):
+        # ради этого случая всё и затевалось: 404 на дереве и 200 на ветке
+        # читаются как «всё в порядке» только если знать про доразбор
+        cli, _ = client({
+            TREE_URL: Response(404, {"message": "404 Tree Not Found"}, {}),
+            COMMITS_URL: Response(200, {"id": "abc123"}, {}),
+        })
+        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
+            cli.patch_files("gitlab.example.com", "g/r", "br")
+        line = "\n".join(caught.output)
+        self.assertIn("ветка br есть", line)
+        self.assertIn("PATCH", line)
+        self.assertIn("не ошибка", line)
+
+    def test_missing_ref_verdict_is_logged_at_debug(self):
+        cli, _ = client({
+            TREE_URL: Response(404, {"message": "404 Tree Not Found"}, {}),
+            COMMITS_URL: Response(404, {"message": "404 Commit Not Found"}, {}),
+        })
+        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
+            cli.patch_files("gitlab.example.com", "g/r", "br")
+        self.assertIn("ветки br нет", "\n".join(caught.output))
+
+    def test_undecided_verdict_is_logged_at_debug(self):
+        cli, _ = client({
+            TREE_URL: Response(404, {"message": "404 Tree Not Found"}, {}),
+            COMMITS_URL: Response(403, {"message": "403 Forbidden"}, {}),
+        })
+        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
+            cli.patch_files("gitlab.example.com", "g/r", "br")
+        self.assertIn("не удалось выяснить", "\n".join(caught.output))
+
     def test_cache_hit_is_logged_at_debug(self):
         cli, _ = client({TREE_URL: TWO_FILES})
         cli.patch_files("gitlab.example.com", "g/r", "br")

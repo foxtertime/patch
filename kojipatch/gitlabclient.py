@@ -178,12 +178,24 @@ class GitlabClient:
         url = "%s/projects/%s/repository/commits/%s" % (
             cfg.api.rstrip("/"), quote(project, safe=""), quote(ref, safe=""))
         response = self._get_with_retries(url, headers, {})
+        # вердикт пишем словами: без него в логе видны только 404 на дереве и
+        # 200 на ветке, и прочесть их как «всё в порядке» может лишь тот, кто
+        # и так знает про доразбор, — а разбирается в инциденте обычно другой
         if isinstance(response, str):
+            logger.debug("%s: ветка %s — не удалось выяснить, есть ли она: %s",
+                         project, ref, response)
             return TreeResult(None, [], response)
         if response.status == 404:
+            logger.debug("%s: ветки %s нет, поэтому и каталога %s не нашлось",
+                         project, ref, self._patch_dir)
             return TreeResult(None, [], "gitlab: ref not found")
         if 200 <= response.status < 300:
+            logger.debug("%s: ветка %s есть, каталога %s в ней нет — это не "
+                         "ошибка, патчей у сборки просто нет",
+                         project, ref, self._patch_dir)
             return TreeResult(False, [], None)
+        logger.debug("%s: ветка %s — не удалось выяснить, есть ли она: %s %s",
+                     project, ref, response.status, _message(response))
         return TreeResult(None, [],
                           "gitlab: %s %s" % (response.status, _message(response)))
 
