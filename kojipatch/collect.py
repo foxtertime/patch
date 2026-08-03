@@ -130,8 +130,10 @@ def _attach_patches(build: Build, info: dict, cfg, gitlab_client,
     result = gitlab_client.patch_files(parsed.host, parsed.project, parsed.ref)
     build.patch_dir_present = result.present
     if result.problem:
+        # проблема не обязательно означает, что читать нечего: подменённый
+        # хост отдаёт и заметку, и настоящее дерево патчей. У неудачных
+        # чтений paths и так пустой.
         build.problems.append(result.problem)
-        return
     for path in result.paths:
         name = os.path.basename(path)
         build.patches.append(Patch(

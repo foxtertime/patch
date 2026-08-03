@@ -96,6 +96,43 @@ class PatchFilesTest(unittest.TestCase):
         self.assertIsNone(result.present)
         self.assertIn("unknown host", result.problem)
 
+    def test_substituted_host_is_noted_but_still_read(self):
+        # хост не описан в конфиге: спрашиваем сервер по умолчанию, но
+        # помечаем, что данные, возможно, из чужого репозитория
+        cli, transport = client({TREE_URL: TWO_FILES},
+                                default_host="gitlab.example.com")
+        result = cli.patch_files("other.example.com", "g/r", "br")
+        self.assertIs(result.present, True)
+        self.assertEqual(result.paths,
+                         ["PATCH/CVE-2024-7347.patch", "PATCH/sub/sast-x.patch"])
+        self.assertIn("other.example.com", result.problem)
+        self.assertIn("gitlab.example.com", result.problem)
+        self.assertIn("не описан в конфиге", result.problem)
+
+    def test_substitution_note_keeps_the_real_problem(self):
+        cli, _ = client({TREE_URL: Response(403, {"message": "403 Forbidden"}, {})},
+                        default_host="gitlab.example.com")
+        result = cli.patch_files("other.example.com", "g/r", "br")
+        self.assertIsNone(result.present)
+        self.assertIn("не описан в конфиге", result.problem)
+        self.assertIn("403", result.problem)
+
+    def test_known_host_is_not_noted(self):
+        cli, _ = client({TREE_URL: TWO_FILES},
+                        default_host="gitlab.example.com")
+        result = cli.patch_files("gitlab.example.com", "g/r", "br")
+        self.assertIsNone(result.problem)
+
+    def test_wildcard_host_is_not_noted(self):
+        # «*» ставит --gitlab-api: это сознательное «ходить сюда за всем»
+        transport = FakeTransport({TREE_URL: TWO_FILES})
+        cli = GitlabClient({"*": HOSTS["gitlab.example.com"]}, token="t",
+                           transport=transport, sleeper=lambda _s: None,
+                           default_host="*")
+        result = cli.patch_files("whatever.example.com", "g/r", "br")
+        self.assertIs(result.present, True)
+        self.assertIsNone(result.problem)
+
     def test_forbidden_is_a_problem(self):
         cli, _ = client({TREE_URL: Response(403, {"message": "403 Forbidden"}, {})})
         result = cli.patch_files("gitlab.example.com", "g/r", "br")

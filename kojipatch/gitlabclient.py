@@ -57,14 +57,31 @@ class GitlabClient:
         self._lock = threading.Lock()
 
     # -- адреса -----------------------------------------------------------
-    def _host_config(self, host):
+    def _resolve_host(self, host):
+        """Конфиг хоста и, если хост подменён, заметка об этой подмене.
+
+        Незнакомый хост спрашиваем у сервера по умолчанию: чаще всего это
+        просто другое имя того же GitLab. Но если там окажется одноимённый
+        проект (зеркало, переезд), в дашборд уедут патчи чужого репозитория,
+        и отличить их от настоящих будет нельзя. Поэтому подстановку
+        выполняем, но записываем в проблемы билда.
+        """
         if host in self._hosts:
-            return self._hosts[host]
-        if self._default_host and self._default_host in self._hosts:
-            return self._hosts[self._default_host]
+            return self._hosts[host], None
+        default = self._default_host
+        if default and default in self._hosts:
+            # «*» ставит --gitlab-api: это осознанное «ходить сюда за всем»,
+            # и заметки оно не заслуживает.
+            note = None if default == "*" else (
+                "gitlab: host %s не описан в конфиге, запрошен %s"
+                % (host, default))
+            return self._hosts[default], note
         if "*" in self._hosts:
-            return self._hosts["*"]
-        return None
+            return self._hosts["*"], None
+        return None, None
+
+    def _host_config(self, host):
+        return self._resolve_host(host)[0]
 
     def tree_url(self, host, project, ref) -> Optional[str]:
         cfg = self._host_config(host)
@@ -93,9 +110,19 @@ class GitlabClient:
         return result
 
     def _fetch(self, host, project, ref) -> TreeResult:
-        cfg = self._host_config(host)
+        cfg, note = self._resolve_host(host)
         if cfg is None:
             return TreeResult(None, [], "gitlab: unknown host %s" % host)
+        result = self._fetch_tree(cfg, project, ref)
+        if not note:
+            return result
+        # заметка о подмене хоста не отменяет удачное чтение: present
+        # остаётся тем, что вернул сервер, — билд просто получает проблему.
+        problem = note if not result.problem else "%s; %s" % (note,
+                                                              result.problem)
+        return TreeResult(result.present, result.paths, problem)
+
+    def _fetch_tree(self, cfg, project, ref) -> TreeResult:
         url = "%s/projects/%s/repository/tree" % (
             cfg.api.rstrip("/"), quote(project, safe=""))
         headers = {"PRIVATE-TOKEN": self._token} if self._token else {}

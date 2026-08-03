@@ -229,6 +229,27 @@ class CollectTagTest(unittest.TestCase):
         self.assertEqual(ghost.problems, ["koji: нет деталей билда"])
         self.assertEqual(problem_summary(snap)["koji: нет деталей билда"], 1)
 
+    def test_substituted_host_gives_both_patches_and_a_problem(self):
+        # хост из original_url не описан в конфиге: патчи мы всё равно
+        # показываем, но билд получает проблему — данные не авторитетны
+        tagged = {"os-9.2": [{"build_id": 1, "name": "nginx"}]}
+        builds = {1: dict(BUILDS[1], extra={"source": {"original_url":
+                  "git+ssh://git@old.example.com/g/nginx?#origin/br"}})}
+        session = FakeKojiSession(tagged=tagged, builds=builds,
+                                  rpms={1: RPMS[1]})
+        gitlab = GitlabClient(HOSTS, token=None,
+                              transport=FakeTransport(self.routes),
+                              sleeper=lambda _s: None, default_host=HOST)
+        snap = collect_tag("os-9.2", config(), KojiClient(session), gitlab,
+                           jobs=1, now="n")
+        build = snap.by_name()["nginx"]
+        self.assertIs(build.patch_dir_present, True)
+        self.assertEqual([p.name for p in build.patches],
+                         ["CVE-2024-7347.patch", "sast-x.patch"])
+        self.assertEqual(len(build.problems), 1)
+        self.assertIn("old.example.com", build.problems[0])
+        self.assertIn(HOST, build.problems[0])
+
     def test_progress_reaches_total_under_concurrency(self):
         koji_client, gitlab, _ = make_clients(self.routes)
         seen = []
