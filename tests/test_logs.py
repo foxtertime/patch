@@ -6,12 +6,16 @@ from kojipatch import logs
 
 
 class ConfigureTest(unittest.TestCase):
+    def setUp(self):
+        self._propagate = logging.getLogger("kojipatch").propagate
+
     def tearDown(self):
         root = logging.getLogger("kojipatch")
         for handler in list(root.handlers):
             if not isinstance(handler, logging.NullHandler):
                 root.removeHandler(handler)
         root.setLevel(logging.NOTSET)
+        root.propagate = self._propagate
 
     def capture(self, level):
         stream = io.StringIO()
@@ -75,6 +79,22 @@ class ConfigureTest(unittest.TestCase):
     def test_unknown_level_raises(self):
         with self.assertRaises(ValueError):
             logs.configure("verbose")
+
+    def test_propagate_flag_is_restored_after_teardown(self):
+        # configure() безусловно ставит propagate = False; tearDown должен
+        # восстановить исходное значение для изоляции тестов
+        root = logging.getLogger("kojipatch")
+        original_propagate = root.propagate
+        logs.configure("info", stream=io.StringIO())
+        self.assertFalse(root.propagate)
+        # Имитируем tearDown
+        for handler in list(root.handlers):
+            if not isinstance(handler, logging.NullHandler):
+                root.removeHandler(handler)
+        root.setLevel(logging.NOTSET)
+        root.propagate = self._propagate
+        # Проверяем, что флаг восстановлен
+        self.assertEqual(root.propagate, original_propagate)
 
     def test_levels_table_is_complete(self):
         self.assertEqual(sorted(logs.LEVELS),
