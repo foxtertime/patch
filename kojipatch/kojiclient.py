@@ -14,6 +14,7 @@ class KojiClient:
     def __init__(self, session, batch: int = 100):
         self._session = session
         self._batch = max(1, int(batch))
+        self._multicall_warned = False
 
     def tagged_builds(self, tag: str) -> List[dict]:
         """Последние билды тега с учётом наследования."""
@@ -65,9 +66,16 @@ class KojiClient:
                 # multicall на хабе до koji 1.18 был обычным булевым
                 # атрибутом, а не вызываемым методом. Во всех случаях —
                 # фолбэк на последовательные вызовы.
-                logger.warning("хаб не поддерживает multicall, %s ×%d "
-                               "пойдёт последовательными вызовами",
-                               method, len(chunk))
+                if self._multicall_warned:
+                    # свойство хаба, а не пачки: на 800 билдах пачками по 100
+                    # одно и то же предупреждение вышло бы шестнадцать раз
+                    logger.debug("%s ×%d — последовательными вызовами",
+                                 method, len(chunk))
+                else:
+                    self._multicall_warned = True
+                    logger.warning("хаб не поддерживает multicall, %s ×%d "
+                                   "и остальные вызовы пойдут "
+                                   "последовательными", method, len(chunk))
                 result = self._sequential_chunk(method, chunk, keyword)
         except KojiError:
             raise

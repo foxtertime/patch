@@ -132,8 +132,10 @@ def main(argv: Optional[List[str]] = None) -> int:
                                args.max_problems)
                 return EXIT_PROBLEMS
         return EXIT_OK
-    except (SnapshotError, RenderError) as exc:
-        return _fatal("ошибка", exc)
+    except SnapshotError as exc:
+        return _fatal("ошибка снапшота", exc)
+    except RenderError as exc:
+        return _fatal("ошибка отрисовки", exc)
     except OSError as exc:
         return _fatal("ошибка ввода-вывода", exc)
     except Exception as exc:  # koji недоступен и прочие фатальные случаи

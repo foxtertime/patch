@@ -1,3 +1,4 @@
+import logging
 import unittest
 
 from kojipatch.kojiclient import KojiClient, KojiError
@@ -130,6 +131,19 @@ class LoggingTest(unittest.TestCase):
         with self.assertLogs("kojipatch.kojiclient", level="WARNING") as caught:
             client.build_details([1, 2])
         self.assertIn("multicall", "\n".join(caught.output))
+
+    def test_multicall_fallback_is_warned_about_once_per_client(self):
+        # факт статичный: на 800 билдах пачками по 100 одно и то же
+        # предупреждение вышло бы шестнадцать раз подряд
+        session = FakeKojiSession(tagged=TAGGED, builds=BUILDS, rpms=RPMS,
+                                  supports_multicall=False)
+        client = KojiClient(session, batch=1)
+        with self.assertLogs("kojipatch.kojiclient", level="DEBUG") as caught:
+            client.build_details([1, 2])
+            client.rpms_for([1, 2])
+        warnings = [r for r in caught.records if r.levelno == logging.WARNING]
+        self.assertEqual(len(warnings), 1,
+                         [r.getMessage() for r in warnings])
 
 
 if __name__ == "__main__":
