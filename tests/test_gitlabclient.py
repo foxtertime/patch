@@ -387,6 +387,60 @@ class LoggingTest(unittest.TestCase):
         self.assertIn("429", line)
         self.assertIn("повтор", line)
 
+    def test_retry_warning_is_written_before_the_pause(self):
+        # «повтор через 60 с» после самой паузы — рассказ о прошлом: при
+        # Retry-After 60 и --jobs 8 оператор видит минуту тишины, а потом
+        # строку о том, что пауза уже была
+        transport = FakeTransport({TREE_URL: [Response(429, {}, {"Retry-After": "0"}),
+                                              TWO_FILES]})
+        seen = []
+        with self.assertLogs("kojipatch.gitlabclient", level="WARNING") as caught:
+            cli = GitlabClient(HOSTS, token=TOKEN, transport=transport,
+                               sleeper=lambda _s: seen.append(list(caught.output)))
+            cli.patch_files("gitlab.example.com", "g/r", "br")
+        self.assertTrue(seen[0], "пауза началась раньше строки о ней")
+        self.assertIn("повтор", seen[0][-1])
+
+    def test_retry_warning_carries_ref_and_path(self):
+        # это единственная строка GitLab, видимая на уровне по умолчанию:
+        # без ref и path непонятно, какую именно ветку он не отдаёт
+        cli, _ = client({TREE_URL: [Response(429, {}, {"Retry-After": "0"}),
+                                    TWO_FILES]})
+        with self.assertLogs("kojipatch.gitlabclient", level="WARNING") as caught:
+            cli.patch_files("gitlab.example.com", "g/r", "br")
+        line = "\n".join(caught.output)
+        self.assertIn("ref=br", line)
+        self.assertIn("path=PATCH", line)
+
+    def test_final_transport_failure_is_not_warned_about(self):
+        # об окончательной неудаче один раз и с именем компонента напишет
+        # collect; здесь предупреждение только пообещало бы новую попытку
+        cli = GitlabClient(HOSTS, token=TOKEN, transport=_BrokenTransport(),
+                           sleeper=lambda _s: None, retries=1)
+        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
+            cli.patch_files("gitlab.example.com", "g/r", "br")
+        self.assertEqual([r.levelname for r in caught.records], ["DEBUG"])
+
+    def test_transport_failures_warn_only_while_attempts_remain(self):
+        cli = GitlabClient(HOSTS, token=TOKEN, transport=_BrokenTransport(),
+                           sleeper=lambda _s: None, retries=3)
+        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
+            cli.patch_files("gitlab.example.com", "g/r", "br")
+        warnings = [r for r in caught.records if r.levelno == logging.WARNING]
+        self.assertEqual(len(warnings), 2)
+
+    def test_disambiguation_line_has_no_double_space(self):
+        # у запроса к commits параметров нет, и пустая заметка о них
+        # оставляла в строке дырку: «commits/br  → 200»
+        cli, _ = client({
+            TREE_URL: Response(404, {"message": "404 Tree Not Found"}, {}),
+            COMMITS_URL: Response(200, {"id": "abc123"}, {}),
+        })
+        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
+            cli.patch_files("gitlab.example.com", "g/r", "br")
+        for line in caught.output:
+            self.assertNotIn("  ", line)
+
     def test_cache_hit_is_logged_at_debug(self):
         cli, _ = client({TREE_URL: TWO_FILES})
         cli.patch_files("gitlab.example.com", "g/r", "br")

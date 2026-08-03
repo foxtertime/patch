@@ -200,42 +200,58 @@ class GitlabClient:
                 # в снапшот и в HTML — очищаем до того, как он куда-то попал
                 text = self._scrub(exc)
                 last = "gitlab: %s" % text
-                logger.warning("GET %s %s → %s за %.2f с (попытка %d из %d)",
-                               url, _params_note(params), text, elapsed,
-                               attempt + 1, self._retries)
                 if attempt < self._retries - 1:
-                    self._backoff(attempt, None)
+                    delay = self._delay(attempt, None)
+                    logger.warning("GET %s%s → %s за %.2f с, повтор через "
+                                   "%.0f с (попытка %d из %d)", url,
+                                   _params_note(params), text, elapsed, delay,
+                                   attempt + 1, self._retries)
+                    self._sleep(delay)
+                else:
+                    # после последней попытки ждать незачем: с --jobs 8 против
+                    # приболевшего GitLab это секунды на каждый билд впустую.
+                    # Предупреждать тоже: об окончательной неудаче один раз и
+                    # с именем компонента напишет collect, а «попытка 3 из 3»
+                    # в WARNING обещала бы несуществующую следующую.
+                    logger.debug("GET %s%s → %s за %.2f с (попытка %d из %d, "
+                                 "последняя)", url, _params_note(params), text,
+                                 elapsed, attempt + 1, self._retries)
                 continue
 
             elapsed = time.monotonic() - started
             if response.status >= 400:
-                logger.debug("GET %s %s → %s за %.2f с: %s", url,
+                logger.debug("GET %s%s → %s за %.2f с: %s", url,
                              _params_note(params), response.status, elapsed,
                              _body_note(response))
             else:
-                logger.debug("GET %s %s → %s за %.2f с", url,
+                logger.debug("GET %s%s → %s за %.2f с", url,
                              _params_note(params), response.status, elapsed)
 
             if response.status in _RETRY_STATUSES and attempt < self._retries - 1:
-                delay = self._backoff(attempt,
-                                      (response.headers or {}).get("Retry-After"))
-                logger.warning("GET %s → %s, повтор через %.0f с "
-                               "(попытка %d из %d)", url, response.status,
-                               delay, attempt + 1, self._retries)
+                # сначала строка, потом пауза: при Retry-After 60 обратный
+                # порядок дал бы минуту тишины и рассказ о ней в прошедшем
+                # времени, а следить за долгим прогоном — половина смысла лога
+                delay = self._delay(attempt,
+                                    (response.headers or {}).get("Retry-After"))
+                logger.warning("GET %s%s → %s, повтор через %.0f с "
+                               "(попытка %d из %d)", url,
+                               _params_note(params), response.status, delay,
+                               attempt + 1, self._retries)
+                self._sleep(delay)
                 last = "gitlab: %s %s" % (response.status, _message(response))
                 continue
             return response
         return last or "gitlab: запрос не удался"
 
-    def _backoff(self, attempt, retry_after) -> float:
-        """Спит и возвращает длительность паузы — её пишет в лог вызывающий."""
+    def _delay(self, attempt, retry_after) -> float:
+        """Длительность паузы перед повтором; сон отдельно, чтобы строка о
+        паузе успела уйти в лог до самой паузы."""
         delay = 2 ** attempt
         if retry_after:
             try:
                 delay = float(retry_after)
             except (TypeError, ValueError):
                 pass
-        self._sleep(delay)
         return delay
 
 
@@ -253,11 +269,14 @@ def _message(response) -> str:
 
 
 def _params_note(params) -> str:
-    """Параметры запроса для лога: заголовки не логируем никогда — там токен."""
-    if not params:
-        return ""
+    """Параметры запроса для лога — вместе с ведущим пробелом, чтобы у
+    запроса без параметров в строке не оставалось дырки.
+
+    Заголовки не логируем никогда — там токен.
+    """
     keep = ("ref", "path", "page")
-    return " ".join("%s=%s" % (k, params[k]) for k in keep if k in params)
+    note = " ".join("%s=%s" % (k, params[k]) for k in keep if k in (params or {}))
+    return " " + note if note else ""
 
 
 def _body_note(response) -> str:
