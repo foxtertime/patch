@@ -7,6 +7,7 @@ from tests.fakes import FakeTransport, Response
 HOSTS = {"gitlab.example.com": GitlabHost(api="https://gitlab.example.com/api/v4",
                                           web="https://gitlab.example.com")}
 TREE_URL = "https://gitlab.example.com/api/v4/projects/g%2Fr/repository/tree"
+COMMITS_URL = "https://gitlab.example.com/api/v4/projects/g%2Fr/repository/commits/br"
 
 TWO_FILES = Response(200, [
     {"id": "1", "name": "CVE-2024-7347.patch", "type": "blob",
@@ -43,11 +44,45 @@ class PatchFilesTest(unittest.TestCase):
         self.assertEqual(headers["PRIVATE-TOKEN"], "t")
 
     def test_tree_not_found_means_no_patch_dir(self):
-        cli, _ = client({TREE_URL: Response(404, {"message": "404 Tree Not Found"}, {})})
+        cli, transport = client({
+            TREE_URL: Response(404, {"message": "404 Tree Not Found"}, {}),
+            COMMITS_URL: Response(200, {"id": "abc123"}, {}),
+        })
         result = cli.patch_files("gitlab.example.com", "g/r", "br")
         self.assertIs(result.present, False)
         self.assertEqual(result.paths, [])
         self.assertIsNone(result.problem)
+        self.assertEqual(len(transport.requests), 2)
+
+    def test_missing_ref_after_tree_not_found_is_a_problem(self):
+        cli, transport = client({
+            TREE_URL: Response(404, {"message": "404 Tree Not Found"}, {}),
+            COMMITS_URL: Response(404, {"message": "404 Commit Not Found"}, {}),
+        })
+        result = cli.patch_files("gitlab.example.com", "g/r", "br")
+        self.assertIsNone(result.present)
+        self.assertIn("ref not found", result.problem)
+        self.assertEqual(len(transport.requests), 2)
+
+    def test_disambiguation_failure_is_a_problem_not_a_missing_ref(self):
+        cli, transport = client({
+            TREE_URL: Response(404, {"message": "404 Tree Not Found"}, {}),
+            COMMITS_URL: Response(403, {"message": "403 Forbidden"}, {}),
+        })
+        result = cli.patch_files("gitlab.example.com", "g/r", "br")
+        self.assertIsNone(result.present)
+        self.assertIn("403", result.problem)
+        self.assertNotIn("ref not found", result.problem)
+        self.assertEqual(len(transport.requests), 2)
+
+    def test_missing_tree_disambiguation_is_memoized(self):
+        cli, transport = client({
+            TREE_URL: Response(404, {"message": "404 Tree Not Found"}, {}),
+            COMMITS_URL: Response(200, {"id": "abc123"}, {}),
+        })
+        cli.patch_files("gitlab.example.com", "g/r", "br")
+        cli.patch_files("gitlab.example.com", "g/r", "br")
+        self.assertEqual(len(transport.requests), 2)
 
     def test_project_not_found_is_a_problem(self):
         cli, _ = client({TREE_URL: Response(404, {"message": "404 Project Not Found"}, {})})

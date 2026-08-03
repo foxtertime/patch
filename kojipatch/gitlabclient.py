@@ -113,7 +113,7 @@ class GitlabClient:
             if response.status == 404:
                 message = _message(response)
                 if "tree not found" in message.lower():
-                    return TreeResult(False, [], None)
+                    return self._resolve_missing_tree(cfg, project, ref, headers)
                 return TreeResult(None, [], "gitlab: %s" % (message or "404"))
             if response.status >= 400:
                 return TreeResult(None, [],
@@ -126,6 +126,21 @@ class GitlabClient:
             if not page:
                 break
         return TreeResult(True, sorted(paths), None)
+
+    def _resolve_missing_tree(self, cfg, project, ref, headers) -> TreeResult:
+        """404 Tree Not Found неоднозначен: либо в ветке просто нет PATCH,
+        либо самой ветки уже нет. Уточняем через /repository/commits/<ref>."""
+        url = "%s/projects/%s/repository/commits/%s" % (
+            cfg.api.rstrip("/"), quote(project, safe=""), quote(ref, safe=""))
+        response = self._get_with_retries(url, headers, {})
+        if isinstance(response, str):
+            return TreeResult(None, [], response)
+        if response.status == 404:
+            return TreeResult(None, [], "gitlab: ref not found")
+        if 200 <= response.status < 300:
+            return TreeResult(False, [], None)
+        return TreeResult(None, [],
+                          "gitlab: %s %s" % (response.status, _message(response)))
 
     def _get_with_retries(self, url, headers, params):
         last = None
