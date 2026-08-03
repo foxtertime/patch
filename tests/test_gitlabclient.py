@@ -84,11 +84,62 @@ class PatchFilesTest(unittest.TestCase):
         cli.patch_files("gitlab.example.com", "g/r", "br")
         self.assertEqual(len(transport.requests), 2)
 
+    def test_invalid_revision_or_path_means_no_patch_dir(self):
+        # так отвечает GitLab на отсутствующий путь в существующей ветке:
+        # формулировка отличается от «404 Tree Not Found», а смысл тот же
+        cli, transport = client({
+            TREE_URL: Response(
+                404, {"message": "404 invalid revision or path Not Found"}, {}),
+            COMMITS_URL: Response(200, {"id": "abc123"}, {}),
+        })
+        result = cli.patch_files("gitlab.example.com", "g/r", "br")
+        self.assertIs(result.present, False)
+        self.assertEqual(result.paths, [])
+        self.assertIsNone(result.problem)
+        self.assertEqual(len(transport.requests), 2)
+
+    def test_invalid_revision_or_path_with_missing_ref_is_a_problem(self):
+        cli, _ = client({
+            TREE_URL: Response(
+                404, {"message": "404 invalid revision or path Not Found"}, {}),
+            COMMITS_URL: Response(404, {"message": "404 Commit Not Found"}, {}),
+        })
+        result = cli.patch_files("gitlab.example.com", "g/r", "br")
+        self.assertIsNone(result.present)
+        self.assertIn("ref not found", result.problem)
+
+    def test_error_key_404_is_disambiguated_too(self):
+        # часть версий кладёт причину в error, а не в message
+        cli, _ = client({
+            TREE_URL: Response(404, {"error": "invalid revision or path"}, {}),
+            COMMITS_URL: Response(200, {"id": "abc123"}, {}),
+        })
+        result = cli.patch_files("gitlab.example.com", "g/r", "br")
+        self.assertIs(result.present, False)
+        self.assertIsNone(result.problem)
+
+    def test_404_without_a_body_is_disambiguated_too(self):
+        cli, _ = client({
+            TREE_URL: Response(404, None, {}),
+            COMMITS_URL: Response(200, {"id": "abc123"}, {}),
+        })
+        result = cli.patch_files("gitlab.example.com", "g/r", "br")
+        self.assertIs(result.present, False)
+        self.assertIsNone(result.problem)
+
     def test_project_not_found_is_a_problem(self):
         cli, _ = client({TREE_URL: Response(404, {"message": "404 Project Not Found"}, {})})
         result = cli.patch_files("gitlab.example.com", "g/r", "br")
         self.assertIsNone(result.present)
         self.assertIn("project", result.problem.lower())
+
+    def test_project_not_found_makes_no_second_request(self):
+        # проект недоступен — уточнять ветку бессмысленно, лишний запрос
+        # на большом теге умножился бы на число сборок
+        cli, transport = client(
+            {TREE_URL: Response(404, {"message": "404 Project Not Found"}, {})})
+        cli.patch_files("gitlab.example.com", "g/r", "br")
+        self.assertEqual(len(transport.requests), 1)
 
     def test_unknown_host_is_a_problem(self):
         cli, _ = client({})

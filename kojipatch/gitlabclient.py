@@ -141,9 +141,14 @@ class GitlabClient:
                 return TreeResult(None, [], response)
             if response.status == 404:
                 message = _message(response)
-                if "tree not found" in message.lower():
-                    return self._resolve_missing_tree(cfg, project, ref, headers)
-                return TreeResult(None, [], "gitlab: %s" % (message or "404"))
+                if "project not found" in message.lower():
+                    return TreeResult(None, [], "gitlab: %s" % message)
+                # Остальные 404 неоднозначны: «в ветке нет каталога» и «нет
+                # самой ветки» приходят одинаковым кодом, а формулировка
+                # зависит от версии GitLab — «404 Tree Not Found», «404
+                # invalid revision or path Not Found», иногда пустое тело.
+                # Поэтому решает не текст, а отдельный запрос к ветке.
+                return self._resolve_missing_tree(cfg, project, ref, headers)
             if response.status >= 400:
                 return TreeResult(None, [],
                                   "gitlab: %s %s" % (response.status,
