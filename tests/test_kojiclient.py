@@ -104,5 +104,33 @@ class KojiClientTest(unittest.TestCase):
             client.build_details([1, 2])
 
 
+class LoggingTest(unittest.TestCase):
+    def setUp(self):
+        self.session = FakeKojiSession(tagged=TAGGED, builds=BUILDS, rpms=RPMS)
+        self.client = KojiClient(self.session, batch=10)
+
+    def test_tagged_builds_is_logged_at_debug(self):
+        with self.assertLogs("kojipatch.kojiclient", level="DEBUG") as caught:
+            self.client.tagged_builds("os-9.2")
+        line = "\n".join(caught.output)
+        self.assertIn("listTagged", line)
+        self.assertIn("os-9.2", line)
+
+    def test_batch_call_is_logged_with_its_size(self):
+        with self.assertLogs("kojipatch.kojiclient", level="DEBUG") as caught:
+            self.client.build_details([1, 2])
+        line = "\n".join(caught.output)
+        self.assertIn("getBuild", line)
+        self.assertIn("2", line)
+
+    def test_sequential_fallback_is_logged_as_warning(self):
+        session = FakeKojiSession(tagged=TAGGED, builds=BUILDS, rpms=RPMS,
+                                  supports_multicall=False)
+        client = KojiClient(session, batch=10)
+        with self.assertLogs("kojipatch.kojiclient", level="WARNING") as caught:
+            client.build_details([1, 2])
+        self.assertIn("multicall", "\n".join(caught.output))
+
+
 if __name__ == "__main__":
     unittest.main()

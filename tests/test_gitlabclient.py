@@ -1,3 +1,4 @@
+import logging
 import unittest
 
 from kojipatch.config import GitlabHost
@@ -292,6 +293,63 @@ class UrlTest(unittest.TestCase):
     def test_urls_are_none_for_unknown_host(self):
         cli, _ = client({})
         self.assertIsNone(cli.tree_url("nope", "g/r", "br"))
+
+
+class LoggingTest(unittest.TestCase):
+    def test_request_is_logged_at_debug(self):
+        cli, _ = client({TREE_URL: TWO_FILES})
+        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
+            cli.patch_files("gitlab.example.com", "g/r", "br")
+        line = "\n".join(caught.output)
+        self.assertIn("GET", line)
+        self.assertIn(TREE_URL, line)
+        self.assertIn("ref=br", line)
+        self.assertIn("200", line)
+
+    def test_token_never_reaches_the_log(self):
+        # утечка секрета в лог происходит молча, поэтому проверяем машиной
+        transport = FakeTransport({TREE_URL: TWO_FILES})
+        cli = GitlabClient(HOSTS, token="glpat-SECRET123", transport=transport,
+                           sleeper=lambda _s: None)
+        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
+            cli.patch_files("gitlab.example.com", "g/r", "br")
+        line = "\n".join(caught.output)
+        self.assertNotIn("glpat-SECRET123", line)
+        self.assertNotIn("PRIVATE-TOKEN", line)
+
+    def test_error_body_is_logged_at_debug(self):
+        cli, _ = client({TREE_URL: Response(403, {"message": "403 Forbidden"}, {})})
+        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
+            cli.patch_files("gitlab.example.com", "g/r", "br")
+        self.assertIn("403 Forbidden", "\n".join(caught.output))
+
+    def test_retry_is_logged_as_warning(self):
+        cli, _ = client({TREE_URL: [Response(429, {}, {"Retry-After": "0"}),
+                                    TWO_FILES]})
+        with self.assertLogs("kojipatch.gitlabclient", level="WARNING") as caught:
+            cli.patch_files("gitlab.example.com", "g/r", "br")
+        line = "\n".join(caught.output)
+        self.assertIn("429", line)
+        self.assertIn("повтор", line)
+
+    def test_cache_hit_is_logged_at_debug(self):
+        cli, _ = client({TREE_URL: TWO_FILES})
+        cli.patch_files("gitlab.example.com", "g/r", "br")
+        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
+            cli.patch_files("gitlab.example.com", "g/r", "br")
+        self.assertIn("кэш", "\n".join(caught.output))
+
+    def test_successful_request_logs_only_at_debug(self):
+        # обычный успешный запрос не должен шуметь на уровне по умолчанию:
+        # ни одной записи выше DEBUG он порождать не вправе
+        cli, _ = client({TREE_URL: TWO_FILES})
+        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
+            cli.patch_files("gitlab.example.com", "g/r", "br")
+        self.assertTrue(caught.records)
+        for record in caught.records:
+            self.assertEqual(record.levelno, logging.DEBUG,
+                             "лишняя запись уровня %s: %s"
+                             % (record.levelname, record.getMessage()))
 
 
 if __name__ == "__main__":

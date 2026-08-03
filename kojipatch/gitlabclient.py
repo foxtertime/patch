@@ -1,4 +1,5 @@
 """Чтение каталога патчей из GitLab через REST v4."""
+import logging
 import threading
 import time
 from collections import namedtuple
@@ -8,6 +9,10 @@ from urllib.parse import quote
 TreeResult = namedtuple("TreeResult", "present paths problem")
 
 _RETRY_STATUSES = (429, 500, 502, 503, 504)
+
+logger = logging.getLogger(__name__)
+
+_BODY_LIMIT = 200
 
 
 class HttpTransport:
@@ -105,6 +110,7 @@ class GitlabClient:
         key = (host, project, ref)
         with self._lock:
             if key in self._cache:
+                logger.debug("кэш: %s %s@%s", host, project, ref)
                 return self._cache[key]
         result = self._fetch(host, project, ref)
         with self._lock:
@@ -179,24 +185,42 @@ class GitlabClient:
     def _get_with_retries(self, url, headers, params):
         last = None
         for attempt in range(self._retries):
+            started = time.monotonic()
             try:
                 response = self._transport.get(url, headers=headers,
                                                params=params)
             except Exception as exc:  # сетевые ошибки транспорта
+                elapsed = time.monotonic() - started
                 last = "gitlab: %s" % exc
-                # после последней попытки ждать незачем: с --jobs 8 против
-                # приболевшего GitLab это секунды на каждый билд впустую
+                logger.warning("GET %s %s → %s за %.2f с (попытка %d из %d)",
+                               url, _params_note(params), exc, elapsed,
+                               attempt + 1, self._retries)
                 if attempt < self._retries - 1:
                     self._backoff(attempt, None)
                 continue
+
+            elapsed = time.monotonic() - started
+            if response.status >= 400:
+                logger.debug("GET %s %s → %s за %.2f с: %s", url,
+                             _params_note(params), response.status, elapsed,
+                             _body_note(response))
+            else:
+                logger.debug("GET %s %s → %s за %.2f с", url,
+                             _params_note(params), response.status, elapsed)
+
             if response.status in _RETRY_STATUSES and attempt < self._retries - 1:
-                self._backoff(attempt, (response.headers or {}).get("Retry-After"))
+                delay = self._backoff(attempt,
+                                      (response.headers or {}).get("Retry-After"))
+                logger.warning("GET %s → %s, повтор через %.0f с "
+                               "(попытка %d из %d)", url, response.status,
+                               delay, attempt + 1, self._retries)
                 last = "gitlab: %s %s" % (response.status, _message(response))
                 continue
             return response
         return last or "gitlab: запрос не удался"
 
-    def _backoff(self, attempt, retry_after):
+    def _backoff(self, attempt, retry_after) -> float:
+        """Спит и возвращает длительность паузы — её пишет в лог вызывающий."""
         delay = 2 ** attempt
         if retry_after:
             try:
@@ -204,6 +228,7 @@ class GitlabClient:
             except (TypeError, ValueError):
                 pass
         self._sleep(delay)
+        return delay
 
 
 def _path(value) -> str:
@@ -217,3 +242,19 @@ def _message(response) -> str:
     if isinstance(body, dict):
         return str(body.get("message") or body.get("error") or "")
     return ""
+
+
+def _params_note(params) -> str:
+    """Параметры запроса для лога: заголовки не логируем никогда — там токен."""
+    if not params:
+        return ""
+    keep = ("ref", "path", "page")
+    return " ".join("%s=%s" % (k, params[k]) for k in keep if k in params)
+
+
+def _body_note(response) -> str:
+    body = getattr(response, "body", None)
+    if body is None:
+        return "пустое тело"
+    text = str(body)
+    return text if len(text) <= _BODY_LIMIT else text[:_BODY_LIMIT] + "…"
