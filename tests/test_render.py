@@ -92,6 +92,16 @@ class PageDataTest(unittest.TestCase):
         rows = self.data([snap("t", [commit])])["snapshots"][0]["builds"]
         self.assertIn("from-commit", rows[0]["tags"])
 
+    def test_internal_error_tag(self):
+        broken = build("bad", problems=["internal error: boom"], present=None)
+        rows = self.data([snap("t", [broken])])["snapshots"][0]["builds"]
+        self.assertIn("internal-error", rows[0]["tags"])
+
+    def test_gitlab_error_does_not_imply_internal_error(self):
+        broken = build("bad", problems=["gitlab: 403 Forbidden"], present=None)
+        rows = self.data([snap("t", [broken])])["snapshots"][0]["builds"]
+        self.assertNotIn("internal-error", rows[0]["tags"])
+
     def test_pairs_are_rendered(self):
         old = snap("os-9.1", [build("nginx", "1.0"), build("gone")])
         new = snap("os-9.2", [build("nginx", "1.1"), build("fresh")])

@@ -40,6 +40,8 @@ def _build_tags(build) -> List[str]:
     if any(p.startswith("gitlab:") or p.startswith("bad source")
            for p in build.problems):
         tags.append("gitlab-error")
+    if any(p.startswith("internal error") for p in build.problems):
+        tags.append("internal-error")
     return tags
 
 
@@ -142,6 +144,8 @@ def build_page_data(snapshots, pairs, classifier) -> Dict[str, object]:
             "koji_web": snapshot.koji_web,
             "counts": _snapshot_counts(rows, class_names), "builds": rows})
 
+    # koji-ссылки для всех пар строим по хабу первого снапшота: за один
+    # прогон все теги собираются с одного хаба, так что это безопасно
     koji_web = snapshots[0].koji_web if snapshots else None
     pair_blocks = [{
         "old": pair.old_tag, "new": pair.new_tag, "summary": pair.is_summary,
