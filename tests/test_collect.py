@@ -155,6 +155,68 @@ class CollectTagTest(unittest.TestCase):
         summary = problem_summary(snap)
         self.assertEqual(summary["no source url"], 1)
 
+    def test_unparseable_source_url_gets_a_problem(self):
+        tagged = {"os-9.2": [{"build_id": 1, "name": "broken"}]}
+        builds = {
+            1: {"build_id": 1, "task_id": 1, "name": "broken", "version": "1.0",
+                "release": "1.el9", "epoch": None, "nvr": "broken-1.0-1.el9",
+                "owner_name": "builder", "completion_time": "2026-01-01 00:00:00",
+                "extra": {"source": {"original_url": "not a url"}}},
+        }
+        rpms = {1: []}
+        session = FakeKojiSession(tagged=tagged, builds=builds, rpms=rpms)
+        koji_client = KojiClient(session)
+        transport = FakeTransport({})
+        gitlab = GitlabClient(HOSTS, token=None, transport=transport,
+                              sleeper=lambda _s: None)
+        snap = collect_tag("os-9.2", config(), koji_client, gitlab, jobs=1,
+                           now="n")
+        build = snap.by_name()["broken"]
+        self.assertIsNotNone(build.source)
+        self.assertEqual(build.source.raw, "not a url")
+        self.assertTrue(build.problems)
+        self.assertTrue(build.problems[0].startswith("bad source url"))
+        self.assertIsNone(build.patch_dir_present)
+
+    def test_unexpected_gitlab_exception_does_not_abort_collection(self):
+        session = FakeKojiSession(tagged=TAGGED, builds=BUILDS, rpms=RPMS)
+        koji_client = KojiClient(session)
+        gitlab = _ExplodingGitlab()
+        snap = collect_tag("os-9.2", config(), koji_client, gitlab, jobs=2,
+                           now="n")
+        self.assertEqual([b.name for b in snap.builds], ["curl", "nginx", "vim"])
+        nginx = snap.by_name()["nginx"]
+        self.assertIsNone(nginx.patch_dir_present)
+        self.assertEqual(len(nginx.problems), 1)
+        self.assertIn("internal error", nginx.problems[0])
+        self.assertIn("boom", nginx.problems[0])
+        vim = snap.by_name()["vim"]
+        self.assertIn("internal error", vim.problems[0])
+        # у curl нет source url, до вызова gitlab дело не доходит — билд
+        # получает свою обычную проблему, а не "internal error".
+        curl = snap.by_name()["curl"]
+        self.assertEqual(curl.problems, ["no source url"])
+
+    def test_progress_reaches_total_under_concurrency(self):
+        koji_client, gitlab, _ = make_clients(self.routes)
+        seen = []
+        collect_tag("os-9.2", config(), koji_client, gitlab, jobs=4, now="n",
+                    progress=lambda done, total: seen.append((done, total)))
+        self.assertEqual(seen[-1], (3, 3))
+
+
+class _ExplodingGitlab:
+    """Заглушка GitlabClient: patch_files всегда падает неожиданной ошибкой."""
+
+    def tree_url(self, host, project, ref):
+        return None
+
+    def blob_url(self, host, project, ref, path):
+        return None
+
+    def patch_files(self, host, project, ref):
+        raise RuntimeError("boom")
+
 
 if __name__ == "__main__":
     unittest.main()

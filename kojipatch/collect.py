@@ -1,5 +1,6 @@
 """Сбор снапшота одного тега из koji и GitLab."""
 import os
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from typing import Dict, Optional
@@ -41,13 +42,27 @@ def collect_tag(tag: str, cfg, koji_client, gitlab_client, jobs: int = 8,
     infos = [details[bid] for bid in build_ids if bid in details]
     total = len(infos)
     done = [0]
+    progress_lock = threading.Lock()
+
+    def report_progress() -> None:
+        # increment/read под одним lock'ом, чтобы разные потоки пула не
+        # теряли инкременты; сам callback зовём уже вне лока, чтобы
+        # медленный progress не сериализовал пул.
+        with progress_lock:
+            done[0] += 1
+            current = done[0]
+        if progress:
+            progress(current, total)
 
     def handle(info) -> Build:
         build = _build_from_info(info, rpms.get(info.get("build_id"), []))
-        _attach_patches(build, info, cfg, gitlab_client, classifier)
-        done[0] += 1
-        if progress:
-            progress(done[0], total)
+        try:
+            _attach_patches(build, info, cfg, gitlab_client, classifier)
+        except Exception as exc:
+            # ни одна ошибка билда (в т.ч. неожиданная, не только
+            # SourceUrlError/проблема GitLab) не должна валить весь сбор.
+            build.problems.append("internal error: %s" % exc)
+        report_progress()
         return build
 
     workers = max(1, int(jobs))
