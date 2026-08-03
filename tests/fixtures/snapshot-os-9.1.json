@@ -23,7 +23,8 @@
     "problems": [],
     "release": "1.el9",
     "rpms": [
-     "a.x86_64"
+     "nginx-1.24.0-1.el9.x86_64",
+     "nginx-core-1.24.0-1.el9.x86_64"
     ],
     "source": {
      "host": "h",
@@ -48,7 +49,7 @@
     "problems": [],
     "release": "1.el9",
     "rpms": [
-     "a.x86_64"
+     "gone-1.0-1.el9.x86_64"
     ],
     "source": {
      "host": "h",
