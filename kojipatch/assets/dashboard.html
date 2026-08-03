@@ -389,7 +389,11 @@ var st = {
   filters: { state: {}, diff: {} },
   sort: { state: { key: 'name', asc: true }, diff: { key: 'name', asc: true } }
 };
-var expanded = {};       /* ключи вида "state:os-9.2:nginx" */
+/* Раскрытие строк: ключи вида "state:os-9.2:nginx", значения true/false.
+   Состояние трёхзначное — отсутствие ключа значит «решает поиск»: строку,
+   которая попала в выдачу только совпадением в деталях, разворачивает сам
+   поиск. Явный ключ всегда сильнее: иначе такую строку было бы не свернуть. */
+var expanded = {};
 var hashLock = false;
 
 /* ---------- вспомогательное ---------- */
@@ -596,6 +600,12 @@ function rowKey(row) {
   }
   var s = curSnap();
   return 'state:' + (s ? s.tag : '') + ':' + row.name;
+}
+
+/* Единственное место, где решается, раскрыта ли строка: явно выбранное
+   человеком состояние, а если его нет — то, что предложил поиск (deep). */
+function openOf(key, deep) {
+  return expanded.hasOwnProperty(key) ? expanded[key] : Boolean(deep);
 }
 
 /* ---------- сортировка ---------- */
@@ -806,7 +816,7 @@ function stateRowsHtml(items) {
   for (i = 0; i < items.length; i++) {
     var row = items[i].row;
     var key = rowKey(row);
-    var open = expanded[key] || items[i].open;
+    var open = openOf(key, items[i].open);
     var bad = row.problems.length || row.tags.indexOf('no-source') !== -1;
     var patches = row.patches.length
       ? row.patches.length + meterHtml(row, max)
@@ -878,7 +888,7 @@ function diffRowsHtml(items) {
   for (i = 0; i < items.length; i++) {
     var row = items[i].row;
     var key = rowKey(row);
-    var open = expanded[key] || items[i].open;
+    var open = openOf(key, items[i].open);
     html += '<tr class="main-row ' + esc(row.status) + '" data-row="' + esc(key) + '">'
          + '<td class="src"><span class="chev" role="button" tabindex="0"'
          + ' aria-expanded="' + (open ? 'true' : 'false') + '">'
@@ -1048,10 +1058,12 @@ function renderChips() {
 
 /* ---------- рендер ---------- */
 
+/* Считаем по тому же правилу, что и рендер, иначе подпись кнопки обещала бы
+   одно, а нажатие делало другое. */
 function allOpen(items) {
   if (!items.length) return false;
   for (var i = 0; i < items.length; i++) {
-    if (!expanded[rowKey(items[i].row)]) return false;
+    if (!openOf(rowKey(items[i].row), items[i].open)) return false;
   }
   return true;
 }
@@ -1136,6 +1148,33 @@ function writeHash() {
   setTimeout(function () { hashLock = false; }, 0);
 }
 
+/* Хеш правят руками и присылают в переписке, поэтому «100%», «%zz» и обрезанная
+   многобайтовая последовательность в нём — норма, а не исключение.
+   decodeURIComponent на таком бросает URIError; без этой обёртки он унёс бы
+   разбор целиком, а вместе с ним и первый рендер страницы. */
+function dec(s) {
+  try { return decodeURIComponent(s); } catch (e) { return null; }
+}
+
+/* Токен фильтра из хеша мог устареть (тег пересобрали, класс переименовали).
+   Свой мы узнаём по подписи, по классу патчей или по тегу живой строки;
+   чужой молча выбрасываем, чтобы страница не показывала пустую таблицу под
+   фильтр, которого не поставить и не снять — его нет ни на одной карточке. */
+function knownFilter(key) {
+  var i;
+  if (!key || key === 'all') return false;
+  if (LABELS.hasOwnProperty(key)) return true;
+  for (i = 0; i < CLASSES.length; i++) {
+    if (slug(CLASSES[i]) === key) return true;
+  }
+  var host = st.tab === 'diff' ? curPair() : curSnap();
+  var rows = host ? (st.tab === 'diff' ? host.rows : host.builds) : [];
+  for (i = 0; i < rows.length; i++) {
+    if (rows[i].tags.indexOf(key) !== -1) return true;
+  }
+  return false;
+}
+
 function readHash() {
   var raw = location.hash.replace(/^#/, '');
   if (!raw) return false;
@@ -1144,9 +1183,12 @@ function readHash() {
   for (i = 0; i < parts.length; i++) {
     kvp = parts[i].split('=');
     key = kvp[0];
-    val = decodeURIComponent(kvp.slice(1).join('=') || '');
-    if (key === 'tab') tab = val === 'diff' ? 'diff' : 'state';
-    else if (key === 'tag') {
+    val = dec(kvp.slice(1).join('=') || '');
+    if (val === null) continue;   /* битый кусок пропускаем, остальные читаем */
+    if (key === 'tab') {
+      /* Пар нет — вкладки «Изменения» на странице тоже нет. */
+      tab = (val === 'diff' && PAIRS.length) ? 'diff' : 'state';
+    } else if (key === 'tag') {
       for (var j = 0; j < SNAPS.length; j++) {
         if (SNAPS[j].tag === val) st.tag = j;
       }
@@ -1158,7 +1200,13 @@ function readHash() {
     else if (key === 'sort') sort = val.split(':');
   }
   if (tab) st.tab = tab;
-  if (filters) st.filters[st.tab] = setFrom(filters);
+  if (filters) {
+    var live = [];
+    for (i = 0; i < filters.length; i++) {
+      if (knownFilter(filters[i])) live.push(filters[i]);
+    }
+    st.filters[st.tab] = setFrom(live);
+  }
   if (sort && sort[0]) {
     st.sort[st.tab] = { key: sort[0], asc: sort[1] !== 'desc' };
   }
@@ -1212,9 +1260,14 @@ function copyNvr() {
 
 /* ---------- события ---------- */
 
+/* Переключаем от того состояния, которое человек видит на экране, а не от
+   наличия ключа: строку, раскрытую поиском, иначе не свернуть. */
 function toggleRow(key) {
-  if (expanded[key]) delete expanded[key];
-  else expanded[key] = 1;
+  var items = visibleRows(), deep = false, i;
+  for (i = 0; i < items.length; i++) {
+    if (rowKey(items[i].row) === key) { deep = items[i].open; break; }
+  }
+  expanded[key] = !openOf(key, deep);
   render();
 }
 
@@ -1302,10 +1355,10 @@ search.addEventListener('input', function () {
 expandBtn.addEventListener('click', function () {
   var items = visibleRows();
   var collapse = allOpen(items);
+  /* Пишем явное false, а не удаляем ключ: иначе строки, раскрытые поиском,
+     остались бы раскрытыми, а подпись кнопки уже сменилась бы. */
   for (var i = 0; i < items.length; i++) {
-    var key = rowKey(items[i].row);
-    if (collapse) delete expanded[key];
-    else expanded[key] = 1;
+    expanded[rowKey(items[i].row)] = !collapse;
   }
   render();
 });
