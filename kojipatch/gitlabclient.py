@@ -1,0 +1,161 @@
+"""Чтение каталога патчей из GitLab через REST v4."""
+import threading
+import time
+from collections import namedtuple
+from typing import Dict, Optional
+from urllib.parse import quote
+
+TreeResult = namedtuple("TreeResult", "present paths problem")
+
+_RETRY_STATUSES = (429, 500, 502, 503, 504)
+
+
+class HttpTransport:
+    """requests поверх пула сессий: по одной сессии на поток."""
+
+    def __init__(self, timeout: int = 30):
+        self._timeout = timeout
+        self._local = threading.local()
+
+    def _session(self):
+        session = getattr(self._local, "session", None)
+        if session is None:
+            import requests
+            session = requests.Session()
+            self._local.session = session
+        return session
+
+    def get(self, url, headers=None, params=None):
+        response = self._session().get(url, headers=headers, params=params,
+                                       timeout=self._timeout)
+        try:
+            body = response.json()
+        except ValueError:
+            body = None
+        return _Response(response.status_code, body, response.headers)
+
+
+class _Response:
+    def __init__(self, status, body, headers):
+        self.status = status
+        self.body = body
+        self.headers = headers
+
+
+class GitlabClient:
+    def __init__(self, hosts: Dict[str, object], token: Optional[str] = None,
+                 patch_dir: str = "PATCH", transport=None, retries: int = 3,
+                 sleeper=time.sleep, default_host: Optional[str] = None):
+        self._hosts = hosts or {}
+        self._token = token
+        self._patch_dir = patch_dir
+        self._transport = transport or HttpTransport()
+        self._retries = max(1, int(retries))
+        self._sleep = sleeper
+        self._default_host = default_host
+        self._cache = {}
+        self._lock = threading.Lock()
+
+    # -- адреса -----------------------------------------------------------
+    def _host_config(self, host):
+        if host in self._hosts:
+            return self._hosts[host]
+        if self._default_host and self._default_host in self._hosts:
+            return self._hosts[self._default_host]
+        if "*" in self._hosts:
+            return self._hosts["*"]
+        return None
+
+    def tree_url(self, host, project, ref) -> Optional[str]:
+        cfg = self._host_config(host)
+        if not cfg or not ref:
+            return None
+        return "%s/%s/-/tree/%s" % (cfg.web.rstrip("/"), project, ref)
+
+    def blob_url(self, host, project, ref, path) -> Optional[str]:
+        cfg = self._host_config(host)
+        if not cfg or not ref:
+            return None
+        return "%s/%s/-/blob/%s/%s" % (cfg.web.rstrip("/"), project, ref, path)
+
+    # -- дерево патчей ----------------------------------------------------
+    def patch_files(self, host, project, ref) -> TreeResult:
+        """Пути файлов внутри каталога патчей ветки; результат мемоизируется."""
+        if not ref:
+            return TreeResult(None, [], "gitlab: no ref in source url")
+        key = (host, project, ref)
+        with self._lock:
+            if key in self._cache:
+                return self._cache[key]
+        result = self._fetch(host, project, ref)
+        with self._lock:
+            self._cache[key] = result
+        return result
+
+    def _fetch(self, host, project, ref) -> TreeResult:
+        cfg = self._host_config(host)
+        if cfg is None:
+            return TreeResult(None, [], "gitlab: unknown host %s" % host)
+        url = "%s/projects/%s/repository/tree" % (
+            cfg.api.rstrip("/"), quote(project, safe=""))
+        headers = {"PRIVATE-TOKEN": self._token} if self._token else {}
+
+        paths = []
+        page = None
+        while True:
+            params = {"ref": ref, "path": self._patch_dir,
+                      "recursive": "true", "per_page": "100"}
+            if page:
+                params["page"] = page
+            response = self._get_with_retries(url, headers, params)
+            if isinstance(response, str):
+                return TreeResult(None, [], response)
+            if response.status == 404:
+                message = _message(response)
+                if "tree not found" in message.lower():
+                    return TreeResult(False, [], None)
+                return TreeResult(None, [], "gitlab: %s" % (message or "404"))
+            if response.status >= 400:
+                return TreeResult(None, [],
+                                  "gitlab: %s %s" % (response.status,
+                                                     _message(response)))
+            for item in response.body or []:
+                if item.get("type") == "blob":
+                    paths.append(item["path"])
+            page = (response.headers or {}).get("x-next-page") or ""
+            if not page:
+                break
+        return TreeResult(True, sorted(paths), None)
+
+    def _get_with_retries(self, url, headers, params):
+        last = None
+        for attempt in range(self._retries):
+            try:
+                response = self._transport.get(url, headers=headers,
+                                               params=params)
+            except Exception as exc:  # сетевые ошибки транспорта
+                last = "gitlab: %s" % exc
+                self._backoff(attempt, None)
+                continue
+            if response.status in _RETRY_STATUSES and attempt < self._retries - 1:
+                self._backoff(attempt, (response.headers or {}).get("Retry-After"))
+                last = "gitlab: %s %s" % (response.status, _message(response))
+                continue
+            return response
+        return last or "gitlab: запрос не удался"
+
+    def _backoff(self, attempt, retry_after):
+        delay = 2 ** attempt
+        if retry_after:
+            try:
+                delay = float(retry_after)
+            except (TypeError, ValueError):
+                pass
+        self._sleep(delay)
+
+
+def _message(response) -> str:
+    body = getattr(response, "body", None)
+    if isinstance(body, dict):
+        return str(body.get("message") or body.get("error") or "")
+    return ""
