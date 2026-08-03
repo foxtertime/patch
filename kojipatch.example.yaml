@@ -1,0 +1,20 @@
+koji:
+  hub: https://kojihub.example.com/kojihub
+  web: https://kojihub.example.com/koji
+
+gitlab:
+  default_host: gitlab.example.com
+  token_env: GITLAB_TOKEN
+  hosts:
+    gitlab.example.com:
+      api: https://gitlab.example.com/api/v4
+      web: https://gitlab.example.com
+
+patch_dir: PATCH
+
+# Правила применяются по порядку, побеждает первое совпадение.
+# Последнее всеохватное правило добавляется автоматически, если его нет.
+patch_classes:
+  - { name: CVE,  pattern: 'CVE-\d{4}-\d{4,}' }
+  - { name: SAST, pattern: '(?i)^sast[-_]' }
+  - { name: DAST, pattern: '(?i)^dast[-_]' }
