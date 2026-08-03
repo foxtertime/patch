@@ -9,6 +9,10 @@ HOSTS = {"gitlab.example.com": GitlabHost(api="https://gitlab.example.com/api/v4
                                           web="https://gitlab.example.com")}
 TREE_URL = "https://gitlab.example.com/api/v4/projects/g%2Fr/repository/tree"
 COMMITS_URL = "https://gitlab.example.com/api/v4/projects/g%2Fr/repository/commits/br"
+# токен в тестах непременно должен быть похож на настоящий: односимвольный
+# затирался бы очисткой в любом постороннем тексте и прятал бы её ошибки
+TOKEN = "glpat-t0ken"
+SECRET = "glpat-SECRET123"
 
 TWO_FILES = Response(200, [
     {"id": "1", "name": "CVE-2024-7347.patch", "type": "blob",
@@ -21,7 +25,7 @@ TWO_FILES = Response(200, [
 
 def client(routes, **kwargs):
     transport = FakeTransport(routes)
-    return GitlabClient(HOSTS, token="t", transport=transport,
+    return GitlabClient(HOSTS, token=TOKEN, transport=transport,
                         sleeper=lambda _s: None, **kwargs), transport
 
 
@@ -42,7 +46,7 @@ class PatchFilesTest(unittest.TestCase):
         self.assertEqual(params["ref"], "feat/x")
         self.assertEqual(params["path"], "PATCH")
         self.assertTrue(params["recursive"])
-        self.assertEqual(headers["PRIVATE-TOKEN"], "t")
+        self.assertEqual(headers["PRIVATE-TOKEN"], TOKEN)
 
     def test_tree_not_found_means_no_patch_dir(self):
         cli, transport = client({
@@ -178,7 +182,7 @@ class PatchFilesTest(unittest.TestCase):
     def test_wildcard_host_is_not_noted(self):
         # «*» ставит --gitlab-api: это сознательное «ходить сюда за всем»
         transport = FakeTransport({TREE_URL: TWO_FILES})
-        cli = GitlabClient({"*": HOSTS["gitlab.example.com"]}, token="t",
+        cli = GitlabClient({"*": HOSTS["gitlab.example.com"]}, token=TOKEN,
                            transport=transport, sleeper=lambda _s: None,
                            default_host="*")
         result = cli.patch_files("whatever.example.com", "g/r", "br")
@@ -237,7 +241,7 @@ class PatchFilesTest(unittest.TestCase):
 class RetrySleepTest(unittest.TestCase):
     def sleeps_for(self, transport, **kwargs):
         slept = []
-        cli = GitlabClient(HOSTS, token="t", transport=transport,
+        cli = GitlabClient(HOSTS, token=TOKEN, transport=transport,
                            sleeper=slept.append, **kwargs)
         result = cli.patch_files("gitlab.example.com", "g/r", "br")
         return result, slept
@@ -269,6 +273,20 @@ class _BrokenTransport:
     def get(self, url, headers=None, params=None):
         self.requests.append(url)
         raise IOError("connection reset")
+
+
+
+class _TokenLeakingTransport:
+    """Транспорт, повторяющий поведение requests на кривом заголовке: значение
+    PRIVATE-TOKEN попадает в текст исключения."""
+
+    def __init__(self, token):
+        self._token = token
+        self.requests = []
+
+    def get(self, url, headers=None, params=None):
+        self.requests.append(url)
+        raise ValueError("Invalid header value b'%s\\n'" % self._token)
 
 
 class UrlTest(unittest.TestCase):
@@ -309,13 +327,50 @@ class LoggingTest(unittest.TestCase):
     def test_token_never_reaches_the_log(self):
         # утечка секрета в лог происходит молча, поэтому проверяем машиной
         transport = FakeTransport({TREE_URL: TWO_FILES})
-        cli = GitlabClient(HOSTS, token="glpat-SECRET123", transport=transport,
+        cli = GitlabClient(HOSTS, token=SECRET, transport=transport,
                            sleeper=lambda _s: None)
         with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
             cli.patch_files("gitlab.example.com", "g/r", "br")
         line = "\n".join(caught.output)
-        self.assertNotIn("glpat-SECRET123", line)
+        self.assertNotIn(SECRET, line)
         self.assertNotIn("PRIVATE-TOKEN", line)
+
+    def test_token_is_scrubbed_from_a_transport_exception(self):
+        # requests кладёт ЗНАЧЕНИЕ заголовка в текст исключения, если заголовок
+        # неправильный, а токен с завершающим переводом строки (классическое
+        # GITLAB_TOKEN=$(cat token.txt)) — именно такой. Текст исключения
+        # уходит и в лог, и в проблемы билда, то есть в снапшот и в HTML.
+        transport = _TokenLeakingTransport(SECRET)
+        cli = GitlabClient(HOSTS, token=SECRET, transport=transport,
+                           sleeper=lambda _s: None, retries=3)
+        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
+            result = cli.patch_files("gitlab.example.com", "g/r", "br")
+        self.assertNotIn(SECRET, "\n".join(caught.output))
+        self.assertNotIn(SECRET, result.problem)
+        self.assertIn("Invalid header value", result.problem)
+
+    def test_token_is_scrubbed_after_the_retries_are_exhausted(self):
+        # последняя попытка формирует итоговый problem — он тоже без токена
+        transport = _TokenLeakingTransport(SECRET)
+        cli = GitlabClient(HOSTS, token=SECRET, transport=transport,
+                           sleeper=lambda _s: None, retries=3)
+        result = cli.patch_files("gitlab.example.com", "g/r", "br")
+        self.assertEqual(len(transport.requests), 3)
+        self.assertIsNone(result.present)
+        self.assertNotIn(SECRET, result.problem)
+
+    def test_token_is_scrubbed_on_the_substituted_host_path(self):
+        # заметка о подмене хоста склеивается с проблемой запроса: склейка
+        # не должна протащить токен мимо очистки
+        transport = _TokenLeakingTransport(SECRET)
+        cli = GitlabClient(HOSTS, token=SECRET, transport=transport,
+                           sleeper=lambda _s: None, retries=3,
+                           default_host="gitlab.example.com")
+        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
+            result = cli.patch_files("other.example.com", "g/r", "br")
+        self.assertIn("не описан в конфиге", result.problem)
+        self.assertNotIn(SECRET, result.problem)
+        self.assertNotIn(SECRET, "\n".join(caught.output))
 
     def test_error_body_is_logged_at_debug(self):
         cli, _ = client({TREE_URL: Response(403, {"message": "403 Forbidden"}, {})})

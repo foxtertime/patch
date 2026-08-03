@@ -61,6 +61,11 @@ class GitlabClient:
         self._cache = {}
         self._lock = threading.Lock()
 
+    def _scrub(self, text) -> str:
+        """Текст исключения транспорта может нести заголовки — там токен."""
+        text = str(text)
+        return text.replace(self._token, "***") if self._token else text
+
     # -- адреса -----------------------------------------------------------
     def _resolve_host(self, host):
         """Конфиг хоста и, если хост подменён, заметка об этой подмене.
@@ -191,9 +196,12 @@ class GitlabClient:
                                                params=params)
             except Exception as exc:  # сетевые ошибки транспорта
                 elapsed = time.monotonic() - started
-                last = "gitlab: %s" % exc
+                # текст исключения идёт и в лог, и в проблемы билда, а оттуда
+                # в снапшот и в HTML — очищаем до того, как он куда-то попал
+                text = self._scrub(exc)
+                last = "gitlab: %s" % text
                 logger.warning("GET %s %s → %s за %.2f с (попытка %d из %d)",
-                               url, _params_note(params), exc, elapsed,
+                               url, _params_note(params), text, elapsed,
                                attempt + 1, self._retries)
                 if attempt < self._retries - 1:
                     self._backoff(attempt, None)
