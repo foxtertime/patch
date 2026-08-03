@@ -1,0 +1,1522 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Koji patch dashboard</title>
+<style>
+:root {
+  --bg: #ffffff; --fg: #1a1a1a; --muted: #6b7280; --line: #e5e7eb;
+  --card: #f9fafb; --accent: #2563eb; --up: #15803d; --down: #b91c1c;
+  --major: #b45309; --added: #15803d; --removed: #b91c1c; --repack: #7c3aed;
+  --hit: #fde68a; --hitfg: #1a1a1a;
+  /* Цвета классов патчей. Они же красят «полоску состава» в колонке
+     патчей, теги строк и полосы групп в развёрнутой строке: один и тот же
+     класс всюду одного цвета, иначе полоска ничего не сообщает. */
+  --cve: #be123c; --sast: #6d28d9; --dast: #0e7490; --other: #6b7280;
+  /* высоту панели фильтров проставляет JS — от неё зависит смещение
+     «липкой» шапки таблицы. Значение здесь — запасное, до первого замера. */
+  --controls-h: 3.4rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1115; --fg: #e6e6e6; --muted: #9ca3af; --line: #262a33;
+    --card: #171a21; --accent: #60a5fa; --up: #4ade80; --down: #f87171;
+    --major: #fbbf24; --added: #4ade80; --removed: #f87171; --repack: #c4b5fd;
+    --hit: #78350f; --hitfg: #fef3c7;
+    --cve: #fb7185; --sast: #a78bfa; --dast: #22d3ee; --other: #9ca3af;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; padding: 2rem 1.25rem 4rem; background: var(--bg); color: var(--fg);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+.wrap { max-width: 1400px; margin: 0 auto; }
+h1 { font-size: 1.5rem; margin: 0 0 .75rem; }
+.meta { color: var(--muted); font-size: .875rem; margin-bottom: 1.25rem; }
+.meta div { overflow-wrap: anywhere; }
+.meta b { color: var(--fg); font-weight: 600; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+/* Вкладки: не «кнопки приложения», а закладки документа — активная
+   подчёркнута той же линией, что и шапка таблицы под ней. */
+.tabs { display: flex; gap: .25rem; border-bottom: 1px solid var(--line);
+  margin-bottom: 1rem; }
+.tab { appearance: none; background: none; border: 0; border-radius: 0;
+  padding: .5rem .9rem; margin-bottom: -1px; color: var(--muted);
+  font: inherit; font-size: .95rem; font-weight: 600; cursor: pointer;
+  border-bottom: 2px solid transparent; }
+.tab:hover { color: var(--fg); }
+.tab[aria-selected=true] { color: var(--fg); border-bottom-color: var(--accent); }
+.tab[hidden] { display: none; }
+
+/* Селектор тега или пары тегов. Всегда виден, даже когда выбор один:
+   он подписывает, на что именно смотрит страница. */
+.selector { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .9rem; }
+.pick { display: flex; align-items: baseline; gap: .45rem; padding: .35rem .75rem;
+  border-radius: 999px; border: 1px solid var(--line); background: var(--card);
+  color: var(--fg); font: inherit; font-size: .85rem; cursor: pointer; }
+.pick:hover { border-color: var(--accent); }
+.pick .sub { color: var(--muted); font-size: .75rem; }
+.pick[aria-pressed=true] { border-color: var(--accent); color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent); }
+.pick[aria-pressed=true] .sub { color: var(--accent); }
+.pick .sum { font-size: .68rem; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--major); }
+
+.cards { display: grid; gap: .6rem; }
+/* Итоги тега — крупно; разрезы по классам и статусам — плотной сеткой. */
+.cards.global { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  margin-bottom: .6rem; }
+.cards.diff { grid-template-columns: repeat(auto-fit, minmax(122px, 1fr));
+  margin-bottom: 1.5rem; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+  padding: .55rem .65rem; }
+.card .n { font-size: 1.2rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+.card .unit { font-size: .72rem; font-weight: 500; color: var(--muted);
+  letter-spacing: .02em; }
+.card .rpm { font-size: .74rem; font-weight: 500; color: var(--muted);
+  font-variant-numeric: tabular-nums; margin-bottom: .15rem; min-height: 1em; }
+.card .l { font-size: .7rem; color: var(--muted); text-transform: uppercase;
+  letter-spacing: .03em; }
+.card.big { padding: .85rem 1rem; }
+.card.big .l { font-size: .74rem; font-weight: 700; color: var(--fg);
+  margin-bottom: .35rem; }
+.card.big .n { font-size: 2rem; line-height: 1.1; }
+.card.big .rpm { margin: .3rem 0 0; }
+.card.clickable { cursor: pointer; text-align: left; font: inherit;
+  color: var(--fg); width: 100%; }
+.card.clickable:hover { border-color: var(--accent); }
+.card.clickable:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.card[aria-pressed=true] { border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent); }
+.card[aria-pressed=true] .n { color: var(--accent); }
+/* Класс патчей — цветной, поэтому карточка класса красит только подпись:
+   номер остаётся нейтральным и колонки чисел читаются как одна сетка. */
+.card .l.c-cve, .tag.c-cve, .pgroup.c-cve, .meter i.c-cve { color: var(--cve); }
+.card .l.c-sast, .tag.c-sast, .pgroup.c-sast, .meter i.c-sast { color: var(--sast); }
+.card .l.c-dast, .tag.c-dast, .pgroup.c-dast, .meter i.c-dast { color: var(--dast); }
+.card .l.c-other, .tag.c-other, .pgroup.c-other, .meter i.c-other { color: var(--other); }
+.card .l.c-x, .tag.c-x, .pgroup.c-x, .meter i.c-x { color: var(--accent); }
+
+.controls { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center;
+  position: sticky; top: 0; background: var(--bg); padding: .6rem 0; z-index: 20;
+  border-bottom: 1px solid var(--line); }
+input[type=search] {
+  flex: 1 1 auto; min-width: 200px; padding: .5rem .75rem; border-radius: 6px;
+  border: 1px solid var(--line); background: var(--card); color: var(--fg); font: inherit;
+}
+input[type=search]:focus { outline: 2px solid var(--accent); outline-offset: -1px;
+  border-color: var(--accent); }
+button {
+  padding: .4rem .7rem; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--card); color: var(--fg); font: inherit; font-size: .85rem;
+  cursor: pointer;
+}
+button:hover { border-color: var(--accent); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.toggle { flex: 0 0 auto; white-space: nowrap; }
+.toggle[disabled] { opacity: .5; cursor: default; }
+.count { color: var(--muted); font-size: .85rem; margin-left: auto;
+  font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* Чипы активных фильтров: карточки уезжают при прокрутке, а фильтры
+   складываются по И — без этой строки непонятно, почему таблица пуста. */
+.chips { display: flex; flex-wrap: wrap; gap: .35rem; padding: .5rem 0 0; }
+.chips:empty { padding: 0; }
+.chip { display: inline-flex; align-items: center; gap: .35rem; padding: .18rem .5rem;
+  border-radius: 999px; border: 1px solid var(--accent); background: var(--card);
+  color: var(--accent); font-size: .78rem; cursor: pointer; }
+.chip:hover { background: var(--accent); color: #fff; }
+.chip.clear { border-color: var(--line); color: var(--muted); }
+.chip.clear:hover { background: var(--line); color: var(--fg); }
+
+/* Никакого overflow на обёртке: он сделал бы её скролл-контейнером,
+   и sticky-шапка стала бы отсчитываться от неё, а не от окна. */
+.tablewrap { border-top: 1px solid var(--line); }
+table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+th, td { text-align: left; padding: .45rem .7rem; border-bottom: 1px solid var(--line);
+  vertical-align: top; }
+thead th {
+  position: sticky; top: var(--controls-h); background: var(--card); z-index: 10;
+  user-select: none; white-space: nowrap;
+  /* border-bottom у sticky-ячейки при border-collapse не рисуется */
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+thead th[data-sort] { cursor: pointer; }
+thead th[data-sort]:hover { color: var(--accent); }
+thead th .arrow { color: var(--muted); font-size: .75rem; }
+tr.main-row { cursor: pointer; }
+tr.main-row:hover > td { background: var(--card); }
+/* Проблемные сборки помечены полосой у левого края: это ответ на вопрос
+   «где смотреть» ещё до того, как строка развёрнута. */
+tr.main-row.bad > td:first-child { box-shadow: inset 3px 0 0 var(--removed); }
+/* break-word, а не anywhere: последний рвёт версию посередине, и 'el10'
+   превращается в 'el1 0'. */
+td.src { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 600;
+  overflow-wrap: break-word; }
+td.ver { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted);
+  overflow-wrap: break-word; }
+td.ver.new { color: var(--fg); }
+td.branch { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .85em; overflow-wrap: break-word; }
+td.dir { text-align: center; font-weight: 700; white-space: nowrap; }
+tr.upgraded td.dir { color: var(--up); }
+tr.downgraded td.dir { color: var(--down); }
+tr.added td.dir { color: var(--added); }
+tr.removed td.dir { color: var(--removed); }
+td.num, td.built { text-align: right; font-variant-numeric: tabular-nums;
+  color: var(--muted); white-space: nowrap; }
+td.built { font-size: .82rem; }
+td.pat { white-space: nowrap; font-variant-numeric: tabular-nums; }
+td.pat .zero { color: var(--muted); }
+td.links { text-align: right; white-space: nowrap; }
+td.tags { white-space: nowrap; }
+.plus { color: var(--added); }
+.minus { color: var(--removed); }
+/* На узком экране восемь колонок не помещаются. Пусть скроллится таблица,
+   а не вся страница вместе с панелью поиска; sticky-шапкой жертвуем. */
+@media (max-width: 900px) {
+  .tablewrap { overflow-x: auto; }
+  thead th { position: static; }
+  td.src, td.ver, td.branch { overflow-wrap: anywhere; }
+  td.tags { white-space: normal; }
+}
+a.link { display: inline-block; padding: .12rem .5rem; border-radius: 999px;
+  border: 1px solid var(--line); color: var(--accent); text-decoration: none;
+  font-size: .72rem; font-weight: 500; margin-left: .2rem; }
+a.link:hover { border-color: var(--accent); background: var(--bg); }
+.chev { display: inline-block; width: 1em; color: var(--muted); font-size: .8em; }
+.tag { display: inline-block; font-size: .72rem; padding: .1rem .45rem; border-radius: 999px;
+  border: 1px solid currentColor; white-space: nowrap; margin-right: .2rem; }
+/* Теги в строках — те же фильтры, что и карточки: клик включает. */
+.tag[data-filter] { cursor: pointer; }
+.tag[data-filter]:hover { box-shadow: 0 0 0 1px currentColor; }
+.tag.added { color: var(--added); }
+.tag.removed { color: var(--removed); }
+.tag.upgraded { color: var(--up); }
+.tag.downgraded { color: var(--down); }
+.tag.unchanged { color: var(--muted); }
+.tag.repackaged { color: var(--repack); }
+.tag.bad { color: var(--removed); }
+.tag.warn { color: var(--major); }
+.tag.calm { color: var(--muted); }
+
+/* Полоска состава патчей: доли классов в одной сборке. В колонке из сотен
+   строк по ней видно, где стек патчей — это CVE, а где — «прочее». */
+.meter { display: inline-flex; height: 6px; border-radius: 999px;
+  overflow: hidden; margin-left: .45rem; vertical-align: middle;
+  background: var(--line); }
+.meter i { display: block; height: 100%; background: currentColor; }
+
+.hit { background: var(--hit); color: var(--hitfg); border-radius: 2px; }
+
+/* Развёрнутая строка. Один и тот же скелет для обеих вкладок:
+   подписанные блоки, внутри — пары «ключ — значение» и списки. */
+tr.detail-row > td { background: var(--card); padding: .85rem .7rem 1.1rem 2.2rem; }
+.detail { display: grid; gap: 1rem 1.6rem;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); align-items: start; }
+.block { min-width: 0; }
+.bl { font-size: .68rem; text-transform: uppercase; letter-spacing: .07em;
+  color: var(--muted); font-weight: 700; padding-bottom: .3rem; margin-bottom: .45rem;
+  border-bottom: 1px solid var(--line); }
+.kv { display: flex; gap: .5rem; font-size: .82rem; padding: .08rem 0; }
+.kv .k { color: var(--muted); flex: 0 0 6.2rem; }
+.kv .v { min-width: 0; overflow-wrap: anywhere; }
+.pgroup { margin-bottom: .5rem; }
+.pgroup .pclass { font-size: .7rem; font-weight: 700; letter-spacing: .05em;
+  text-transform: uppercase; }
+.pgroup .pclass .n { color: var(--muted); font-weight: 600; }
+.plist { list-style: none; margin: .2rem 0 0; padding: .1rem 0 .1rem .6rem;
+  border-left: 2px solid currentColor; }
+.plist li { color: var(--fg); font-size: .82rem; padding: .1rem 0;
+  overflow-wrap: anywhere; }
+.plist li.is-added { color: var(--added); }
+.plist li.is-removed { color: var(--removed); }
+.plist a { color: var(--accent); text-decoration: none;
+  border-bottom: 1px solid transparent; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.plist a:hover { border-bottom-color: var(--accent); }
+/* Пришедший и ушедший патч должны читаться и по ссылке тоже: иначе синий
+   цвет ссылки съедает единственный сигнал «что изменилось». */
+.plist li.is-added a { color: var(--added); }
+.plist li.is-removed a { color: var(--removed); text-decoration: line-through; }
+.plist .ppath { color: var(--muted); font-size: .74rem; }
+/* Знак дублирует цвет — на случай, если цвет не различим. */
+.sign { font-weight: 700; margin-right: .15rem; }
+.cveid { display: inline-block; font-size: .68rem; padding: .02rem .3rem;
+  border-radius: 3px; border: 1px solid var(--cve); color: var(--cve);
+  margin-left: .25rem; white-space: nowrap; }
+.rpms { display: grid; gap: .1rem .8rem;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+.rpms span { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .78rem; overflow-wrap: anywhere; }
+.rpms span.is-added { color: var(--added); }
+.rpms span.is-removed { color: var(--removed); text-decoration: line-through; }
+/* Ветка, сменившаяся между тегами, красится тем же цветом, что и уехавший
+   или приехавший патч: «эта сторона потеряла» / «эта сторона получила». */
+.is-added { color: var(--added); }
+.is-removed { color: var(--removed); }
+.problems { list-style: none; margin: 0; padding: 0; }
+.problems li { color: var(--removed); font-size: .82rem; padding: .1rem 0;
+  overflow-wrap: anywhere; }
+.none { color: var(--muted); font-size: .82rem; }
+/* «Было / стало» — две колонки одинаковой ширины, чтобы взгляд сравнивал
+   строки по горизонтали, а не искал соответствие. */
+.sides { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem 1.6rem; }
+@media (max-width: 760px) { .sides { grid-template-columns: 1fr; } }
+.side { min-width: 0; }
+.side .bl b { color: var(--fg); }
+
+.empty { padding: 2rem; text-align: center; color: var(--muted); }
+/* Подсказка живёт одна на всю страницу и позиционируется скриптом,
+   иначе у крайних карточек она вылезала бы за край окна. */
+#tip { position: fixed; display: none; z-index: 100; max-width: 320px;
+  background: var(--fg); color: var(--bg); font-size: .78rem; line-height: 1.45;
+  padding: .5rem .65rem; border-radius: 6px; pointer-events: none;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .28); }
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Koji patch dashboard</h1>
+  <div class="meta" id="meta"></div>
+  <nav class="tabs">
+    <button class="tab" data-tab="state" aria-selected="true">Состояние</button>
+    <button class="tab" data-tab="diff" data-tip="Что изменилось между двумя тегами: компоненты, версии, патчи, состав RPM, ветки.">Изменения</button>
+  </nav>
+  <section id="tab-state">
+    <div class="selector" id="tag-select"></div>
+    <div class="cards global" id="state-cards"></div>
+    <div class="cards diff" id="class-cards"></div>
+    <div class="controls" id="controls">
+      <input type="search" id="q" placeholder="Компонент, ветка, патч, CVE, RPM…" autocomplete="off">
+      <button id="expand" class="toggle" data-tip="Развернуть или свернуть все строки, которые сейчас видны. Фильтры и поиск учитываются.">Expand all</button>
+      <button id="copy-nvr" class="toggle" data-tip="Скопировать NVR отфильтрованных строк">Copy NVR</button>
+      <span class="count" id="count"></span>
+    </div>
+    <div class="chips" id="chips"></div>
+    <div class="tablewrap"><table id="state-table">
+      <thead><tr>
+        <th data-sort="name">компонент <span class="arrow">▲</span></th>
+        <th data-sort="evr" data-tip="Сортировка лексикографическая: 1.10 встанет выше 1.9. Так и задумано — в соседних строках версии принадлежат разным компонентам, и сравнивать их по правилам rpm было бы не осмысленнее.">version-release <span class="arrow"></span></th>
+        <th data-sort="branch" data-tip="Ветка GitLab, из которой собран билд. Если сборка шла с коммита, а не с ветки, рядом стоит тег from-commit.">ветка <span class="arrow"></span></th>
+        <th data-sort="patches" data-tip="Сколько файлов лежит в каталоге PATCH ветки. Полоска показывает доли классов патчей в этой сборке.">патчи <span class="arrow"></span></th>
+        <th data-sort="rpms">RPM <span class="arrow"></span></th>
+        <th data-sort="completed" data-tip="Когда koji завершил сборку. Сортировка показывает самые залежавшиеся.">собран <span class="arrow"></span></th>
+        <th>теги</th>
+        <th>ссылки</th>
+      </tr></thead>
+      <tbody id="state-rows"></tbody>
+    </table></div>
+  </section>
+  <section id="tab-diff" hidden>
+    <div class="selector" id="pair-select"></div>
+    <div class="cards diff" id="diff-cards"></div>
+    <div class="tablewrap"><table id="diff-table">
+      <thead><tr>
+        <th data-sort="name">компонент <span class="arrow">▲</span></th>
+        <th data-sort="old" data-tip="Сортировка лексикографическая: 1.10 встанет выше 1.9. Так и задумано — в соседних строках версии принадлежат разным компонентам.">было <span class="arrow"></span></th>
+        <th></th>
+        <th data-sort="new" data-tip="Сортировка лексикографическая: 1.10 встанет выше 1.9. Так и задумано — в соседних строках версии принадлежат разным компонентам.">стало <span class="arrow"></span></th>
+        <th data-sort="dpatch" data-tip="Сколько файлов патчей пришло и ушло. Сортировка — по сумме пришедших и ушедших: сверху компоненты, у которых стек патчей менялся сильнее всего.">Δ патчей <span class="arrow"></span></th>
+        <th data-sort="drpm" data-tip="Сколько бинарных пакетов появилось и исчезло. Сортировка — по сумме появившихся и исчезнувших.">Δ RPM <span class="arrow"></span></th>
+        <th>теги</th>
+        <th>ссылки</th>
+      </tr></thead>
+      <tbody id="diff-rows"></tbody>
+    </table></div>
+  </section>
+</div>
+<div id="tip" role="tooltip"></div>
+<script>
+var DATA = /*__DATA__*/;
+
+var SNAPS = (DATA && DATA.snapshots) || [];
+var PAIRS = (DATA && DATA.pairs) || [];
+var CLASSES = (DATA && DATA.patch_classes) || [];
+
+/* Подписи фильтров: ключ приходит из данных (теги строк, статусы диффа),
+   а по-русски он должен читаться и в чипе, и в подсказке. */
+var LABELS = {
+  "all": "все",
+  "has-patch": "с патчами", "problem": "с проблемами",
+  "no-patch": "нет каталога PATCH", "no-source": "нет источника",
+  "from-commit": "собран с коммита", "gitlab-error": "ошибка GitLab",
+  "internal-error": "внутренняя ошибка",
+  "added": "появился", "removed": "исчез", "unchanged": "версия та же",
+  "upgraded": "версия выросла", "downgraded": "версия упала",
+  "repackaged": "состав RPM изменился", "patches+": "патчи пришли",
+  "patches-": "патчи ушли", "branch-changed": "сменил ветку",
+  "changed": "что-то изменилось"
+};
+/* Классы патчей задаются конфигом, поэтому подписи для них берём из данных.
+   Ключ — тот же slug(), что стоит в теге строки и в карточке класса: имя
+   вроде «C++» иначе дало бы три разных ключа и карточку без строк. */
+for (var ci = 0; ci < CLASSES.length; ci++) {
+  LABELS[slug(CLASSES[ci])] = "патчи " + CLASSES[ci];
+}
+
+var ARROW = { added: "+", removed: "−", upgraded: "↑",
+              downgraded: "↓", unchanged: "=" };
+var KNOWN_CLASS = { "cve": 1, "sast": 1, "dast": 1, "other": 1 };
+var CALM_TAGS = { "from-commit": "warn", "no-patch": "calm",
+                  "no-source": "bad", "gitlab-error": "bad",
+                  "internal-error": "bad" };
+var STATUS_TAGS = { "added": 1, "removed": 1, "unchanged": 1, "upgraded": 1,
+                    "downgraded": 1, "repackaged": 1 };
+
+var stateSection = document.getElementById('tab-state');
+var diffSection = document.getElementById('tab-diff');
+var controls = document.getElementById('controls');
+var chipsBox = document.getElementById('chips');
+var search = document.getElementById('q');
+var counter = document.getElementById('count');
+var expandBtn = document.getElementById('expand');
+var copyBtn = document.getElementById('copy-nvr');
+var tabBtns = Array.prototype.slice.call(document.querySelectorAll('.tab'));
+var stateBody = document.getElementById('state-rows');
+var diffBody = document.getElementById('diff-rows');
+
+/* Всё состояние страницы в одном месте: отсюда же оно уезжает в
+   location.hash и оттуда же восстанавливается при перезагрузке. */
+var st = {
+  tab: 'state',
+  tag: SNAPS.length ? SNAPS.length - 1 : 0,   /* по умолчанию — свежий тег */
+  pair: PAIRS.length ? PAIRS.length - 1 : 0,  /* и самая широкая пара */
+  q: '',
+  /* «Изменения» открываются на изменившихся компонентах: неизменившиеся
+     строки в этой таблице — шум, из-за которого не видно изменившихся.
+     Фильтр обычный, он виден чипом и снимается как любой другой. */
+  filters: { state: {}, diff: { 'changed': 1 } },
+  sort: { state: { key: 'name', asc: true }, diff: { key: 'name', asc: true } }
+};
+/* Раскрытие строк: ключи вида "state:os-9.2:nginx", значения true/false.
+   Состояние трёхзначное — отсутствие ключа значит «решает поиск»: строку,
+   которая попала в выдачу только совпадением в деталях, разворачивает сам
+   поиск. Явный ключ всегда сильнее: иначе такую строку было бы не свернуть. */
+var expanded = {};
+var hashLock = false;
+
+/* ---------- вспомогательное ---------- */
+
+function esc(s) {
+  return String(s === null || s === undefined ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+/* Экранирует и подсвечивает вхождения текущего запроса. Всё, что попадает
+   в DOM из DATA, проходит либо через esc(), либо через hl(). */
+function hl(s, q) {
+  s = String(s === null || s === undefined ? '' : s);
+  if (!q) return esc(s);
+  var low = s.toLowerCase(), out = '', from = 0, at;
+  while ((at = low.indexOf(q, from)) !== -1) {
+    out += esc(s.slice(from, at)) + '<span class="hit">'
+        + esc(s.slice(at, at + q.length)) + '</span>';
+    from = at + q.length;
+  }
+  return out + esc(s.slice(from));
+}
+
+function has(value, q) {
+  return String(value === null || value === undefined ? '' : value)
+    .toLowerCase().indexOf(q) !== -1;
+}
+
+function slug(s) {
+  return String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-');
+}
+
+/* Класс патчей задаётся конфигом, а цвета в CSS перечислены поимённо.
+   Незнакомый класс не должен остаться бесцветным — уводим его в c-x. */
+function classCls(name) {
+  var key = slug(name);
+  return KNOWN_CLASS[key] ? 'c-' + key : 'c-x';
+}
+
+function label(key) {
+  return LABELS[key] || key;
+}
+
+function plural(n, one, few, many) {
+  var a = Math.abs(n) % 100, b = a % 10;
+  if (a > 10 && a < 20) return many;
+  if (b > 1 && b < 5) return few;
+  if (b === 1) return one;
+  return many;
+}
+
+function keys(obj) {
+  var out = [];
+  for (var k in obj) { if (obj.hasOwnProperty(k)) out.push(k); }
+  return out;
+}
+
+function setFrom(list) {
+  var out = {};
+  for (var i = 0; i < (list || []).length; i++) out[list[i]] = 1;
+  return out;
+}
+
+/* Порядок классов: сначала как их перечислил классификатор, потом всё,
+   что встретилось в данных, но в списке классов отсутствует. */
+function classOrder(counts) {
+  var out = [], i;
+  for (i = 0; i < CLASSES.length; i++) {
+    if (counts[CLASSES[i]]) out.push(CLASSES[i]);
+  }
+  var extra = keys(counts).sort();
+  for (i = 0; i < extra.length; i++) {
+    if (out.indexOf(extra[i]) === -1) out.push(extra[i]);
+  }
+  return out;
+}
+
+/* ---------- фильтры ---------- */
+
+function activeFilters() { return st.filters[st.tab]; }
+
+function toggleFilter(key) {
+  var set = activeFilters();
+  if (key === 'all') { st.filters[st.tab] = {}; }
+  else if (set[key]) { delete set[key]; }
+  else {
+    /* «версия та же» — не уточнение к «что-то изменилось», а другой срез
+       той же таблицы. Складывать их по И значит показать «версия не
+       менялась, но что-то другое поехало» — не то, что просит карточка. */
+    if (key === 'unchanged') delete set['changed'];
+    set[key] = 1;
+  }
+  render();
+}
+
+function stateMatches(row) {
+  var set = st.filters.state, key;
+  for (key in set) {
+    if (!set.hasOwnProperty(key)) continue;
+    if (key === 'has-patch') { if (!row.patches.length) return false; }
+    else if (key === 'problem') { if (!row.problems.length) return false; }
+    else if (row.tags.indexOf(key) === -1) return false;
+  }
+  return true;
+}
+
+function diffMatches(row) {
+  var set = st.filters.diff, key;
+  for (key in set) {
+    if (!set.hasOwnProperty(key)) continue;
+    if (key === 'changed') { if (!row.changed) return false; }
+    else if (row.tags.indexOf(key) === -1) return false;
+  }
+  return true;
+}
+
+/* ---------- поиск ---------- */
+
+/* Поиск идёт и по видимым полям строки, и по её деталям. Если совпало
+   только в деталях, строка не просто остаётся — она сразу разворачивается,
+   иначе непонятно, почему она в выдаче. */
+function scanState(row, q) {
+  if (!q) return { show: true, deep: false };
+  var shallow = has(row.name, q) || has(row.nvr, q) || has(row.branch, q)
+             || has(row.evr, q);
+  var deep = has(row.project, q) || has(row.completed, q) || has(row.owner, q);
+  var i, j, p;
+  for (i = 0; !deep && i < row.patches.length; i++) {
+    p = row.patches[i];
+    if (has(p.name, q) || has(p.path, q) || has(p['class'], q)) deep = true;
+    for (j = 0; !deep && j < (p.cves || []).length; j++) {
+      if (has(p.cves[j], q)) deep = true;
+    }
+  }
+  for (i = 0; !deep && i < row.rpms.length; i++) {
+    if (has(row.rpms[i], q)) deep = true;
+  }
+  for (i = 0; !deep && i < row.problems.length; i++) {
+    if (has(row.problems[i], q)) deep = true;
+  }
+  return { show: shallow || deep, deep: !shallow && deep };
+}
+
+function scanDiff(row, q) {
+  if (!q) return { show: true, deep: false };
+  var shallow = has(row.name, q) || has(row.old_evr, q) || has(row.new_evr, q);
+  var deep = has(row.old_branch, q) || has(row.new_branch, q);
+  var lists = [row.old_patches, row.new_patches];
+  var i, j, k, p;
+  for (i = 0; !deep && i < lists.length; i++) {
+    for (j = 0; !deep && j < lists[i].length; j++) {
+      p = lists[i][j];
+      if (has(p.name, q) || has(p.path, q) || has(p['class'], q)) deep = true;
+      for (k = 0; !deep && k < (p.cves || []).length; k++) {
+        if (has(p.cves[k], q)) deep = true;
+      }
+    }
+  }
+  var rpms = [row.old_rpms, row.new_rpms];
+  for (i = 0; !deep && i < rpms.length; i++) {
+    for (j = 0; !deep && j < rpms[i].length; j++) {
+      if (has(rpms[i][j], q)) deep = true;
+    }
+  }
+  return { show: shallow || deep, deep: !shallow && deep };
+}
+
+/* ---------- какие строки видны ---------- */
+
+function curSnap() { return SNAPS[st.tag] || null; }
+function curPair() { return PAIRS[st.pair] || null; }
+
+/* Имя перехода для адресной строки: «старый..новый». */
+function pairKey(pair) { return pair ? pair.old + '..' + pair.new : ''; }
+
+function visibleRows() {
+  var q = st.q, out = [], i, row, scan;
+  if (st.tab === 'diff') {
+    var pair = curPair();
+    var rows = pair ? pair.rows : [];
+    for (i = 0; i < rows.length; i++) {
+      row = rows[i];
+      if (!diffMatches(row)) continue;
+      scan = scanDiff(row, q);
+      if (!scan.show) continue;
+      out.push({ row: row, open: scan.deep });
+    }
+    return out;
+  }
+  var snap = curSnap();
+  var builds = snap ? snap.builds : [];
+  for (i = 0; i < builds.length; i++) {
+    row = builds[i];
+    if (!stateMatches(row)) continue;
+    scan = scanState(row, q);
+    if (!scan.show) continue;
+    out.push({ row: row, open: scan.deep });
+  }
+  return out;
+}
+
+function totalRows() {
+  if (st.tab === 'diff') { var p = curPair(); return p ? p.rows.length : 0; }
+  var s = curSnap();
+  return s ? s.builds.length : 0;
+}
+
+function rowKey(row) {
+  if (st.tab === 'diff') {
+    var p = curPair();
+    return 'diff:' + (p ? p.old + '→' + p.new : '') + ':' + row.name;
+  }
+  var s = curSnap();
+  return 'state:' + (s ? s.tag : '') + ':' + row.name;
+}
+
+/* Единственное место, где решается, раскрыта ли строка: явно выбранное
+   человеком состояние, а если его нет — то, что предложил поиск (deep). */
+function openOf(key, deep) {
+  return expanded.hasOwnProperty(key) ? expanded[key] : Boolean(deep);
+}
+
+/* ---------- сортировка ---------- */
+
+/* Версии сравниваются как строки, а не по правилам rpm, и это осознанно:
+   в соседних строках стоят версии разных компонентов, так что «правильный»
+   порядок между ними всё равно ничего не значит. Про 1.10 выше 1.9
+   предупреждает подсказка на заголовке колонки. */
+function sortValue(row, key) {
+  if (st.tab === 'diff') {
+    if (key === 'old') return row.old_evr || '';
+    if (key === 'new') return row.new_evr || '';
+    if (key === 'dpatch') return row.patches_added.length + row.patches_removed.length;
+    if (key === 'drpm') return row.rpms_added.length + row.rpms_removed.length;
+    return row.name || '';
+  }
+  if (key === 'patches') return row.patches.length;
+  if (key === 'rpms') return row.rpms.length;
+  return row[key] || '';
+}
+
+function sortRows(items) {
+  var cfg = st.sort[st.tab];
+  items.sort(function (a, b) {
+    var x = sortValue(a.row, cfg.key), y = sortValue(b.row, cfg.key), res;
+    if (typeof x === 'number' || typeof y === 'number') res = (x || 0) - (y || 0);
+    else res = x < y ? -1 : (x > y ? 1 : 0);
+    if (res === 0) res = a.row.name < b.row.name ? -1 : (a.row.name > b.row.name ? 1 : 0);
+    return cfg.asc ? res : -res;
+  });
+  return items;
+}
+
+function syncArrows() {
+  var table = document.getElementById(st.tab === 'diff' ? 'diff-table' : 'state-table');
+  var cfg = st.sort[st.tab];
+  var ths = Array.prototype.slice.call(table.querySelectorAll('th[data-sort]'));
+  for (var i = 0; i < ths.length; i++) {
+    var span = ths[i].querySelector('.arrow');
+    if (!span) continue;
+    span.textContent = ths[i].getAttribute('data-sort') === cfg.key
+      ? (cfg.asc ? '▲' : '▼') : '';
+  }
+}
+
+/* ---------- кусочки разметки ---------- */
+
+function tagHtml(key) {
+  var cls = 'tag';
+  if (key === 'patches+') cls += ' added';
+  else if (key === 'patches-') cls += ' removed';
+  else if (key === 'branch-changed') cls += ' warn';
+  else if (CALM_TAGS[key]) cls += ' ' + CALM_TAGS[key];
+  else if (STATUS_TAGS[key]) cls += ' ' + key;
+  else cls += ' ' + classCls(key);   /* остаётся класс патчей */
+  return '<span class="' + cls + '" data-filter="' + esc(key) + '" role="button"'
+       + ' tabindex="0" data-tip="' + esc(label(key)) + '. Клик — фильтр.">'
+       + esc(key) + '</span>';
+}
+
+function tagsHtml(tags) {
+  var out = '';
+  for (var i = 0; i < tags.length; i++) out += tagHtml(tags[i]);
+  return out || '<span class="none">—</span>';
+}
+
+/* Адреса приходят из koji и GitLab, то есть снаружи. В href пускаем только
+   http(s) и относительный путь: javascript: в ссылке нам ни к чему.
+   «//host/x» — не относительный путь, а ссылка на чужой хост по текущей
+   схеме, поэтому её тоже не пускаем. */
+function safeUrl(url) {
+  if (!url) return null;
+  return /^(https?:\/\/|\/(?!\/))/i.test(String(url)) ? String(url) : null;
+}
+
+function linkHtml(url, text) {
+  var safe = safeUrl(url);
+  if (!safe) return '';
+  return '<a class="link" href="' + esc(safe) + '" target="_blank" rel="noopener">'
+       + esc(text) + ' ↗</a>';
+}
+
+/* Полоска патчей: длина — размер стека относительно самого большого в
+   выдаче, доли внутри — классы. Одна метка отвечает сразу на «много ли» и
+   «чего именно», а точные числа даёт подсказка. */
+function meterHtml(row, max) {
+  var total = row.patches.length;
+  if (!total) return '';
+  var order = classOrder(row.patch_counts), parts = [], bars = '', i, n;
+  for (i = 0; i < order.length; i++) {
+    n = row.patch_counts[order[i]];
+    parts.push(order[i] + ' ' + n);
+    bars += '<i class="' + classCls(order[i]) + '" style="width:'
+         + (100 * n / total).toFixed(2) + '%"></i>';
+  }
+  var width = 12 + 52 * (total / (max || total));
+  return '<span class="meter" style="width:' + width.toFixed(1) + 'px"'
+       + ' data-tip="' + esc(parts.join(' · ')) + ', всего ' + total + '">'
+       + bars + '</span>';
+}
+
+function kv(k, v) {
+  return '<div class="kv"><span class="k">' + esc(k) + '</span><span class="v">'
+       + v + '</span></div>';
+}
+
+function signHtml(markCls) {
+  return '<span class="sign">' + (markCls === 'is-added' ? '+' : '−') + '</span>';
+}
+
+function cveHtml(list, q) {
+  var out = '';
+  for (var i = 0; i < (list || []).length; i++) {
+    out += '<span class="cveid">' + hl(list[i], q) + '</span>';
+  }
+  return out;
+}
+
+/* Патчи одной стороны, сгруппированные по классам. mark — множество путей,
+   которые нужно выделить как пришедшие или ушедшие. */
+function patchesHtml(patches, q, mark, markCls) {
+  if (!patches.length) return '<div class="none">патчей нет</div>';
+  var counts = {}, i, p;
+  for (i = 0; i < patches.length; i++) {
+    p = patches[i];
+    counts[p['class']] = (counts[p['class']] || 0) + 1;
+  }
+  var order = classOrder(counts), out = '', ci, name;
+  for (ci = 0; ci < order.length; ci++) {
+    name = order[ci];
+    out += '<div class="pgroup ' + classCls(name) + '">'
+        + '<div class="pclass">' + esc(name) + ' <span class="n">'
+        + counts[name] + '</span></div><ul class="plist">';
+    for (i = 0; i < patches.length; i++) {
+      p = patches[i];
+      if (p['class'] !== name) continue;
+      var hot = mark && mark[p.path];
+      var li = hot ? ' class="' + markCls + '"' : '';
+      var href = safeUrl(p.url);
+      var title = href
+        ? '<a href="' + esc(href) + '" target="_blank" rel="noopener">'
+          + hl(p.name, q) + '</a>'
+        : '<span class="mono">' + hl(p.name, q) + '</span>';
+      out += '<li' + li + '>' + (hot ? signHtml(markCls) : '') + title
+          + cveHtml(p.cves, q)
+          + '<div class="ppath">' + hl(p.path, q) + '</div></li>';
+    }
+    out += '</ul></div>';
+  }
+  return out;
+}
+
+function rpmsHtml(list, q, mark, markCls) {
+  if (!list.length) return '<div class="none">пакетов нет</div>';
+  var out = '<div class="rpms">';
+  for (var i = 0; i < list.length; i++) {
+    var hot = mark && mark[list[i]];
+    out += '<span' + (hot ? ' class="' + markCls + '"' : '') + '>'
+        + (hot ? signHtml(markCls) : '') + hl(list[i], q) + '</span>';
+  }
+  return out + '</div>';
+}
+
+/* ---------- вкладка «Состояние» ---------- */
+
+function stateDetail(row, q) {
+  var out = '<div class="detail">';
+
+  out += '<div class="block"><div class="bl">koji</div>'
+      + kv('NVR', '<span class="mono">' + hl(row.nvr, q) + '</span>')
+      + kv('собран', hl(row.completed || '—', q))
+      + kv('владелец', hl(row.owner || '—', q))
+      + kv('build id', esc(row.build_id === null ? '—' : row.build_id))
+      + kv('task id', esc(row.task_id === null ? '—' : row.task_id))
+      + '</div>';
+
+  var branch = row.branch
+    ? '<span class="mono">' + hl(row.branch, q) + '</span>'
+      + (row.ref_kind === 'commit' ? ' ' + tagHtml('from-commit') : '')
+    : '<span class="none">источник неизвестен</span>';
+  var dir = row.patch_dir_present === true ? 'есть'
+          : (row.patch_dir_present === false ? 'нет' : 'не проверялся');
+  out += '<div class="block"><div class="bl">gitlab</div>'
+      + kv('проект', row.project
+            ? '<span class="mono">' + hl(row.project, q) + '</span>'
+            : '<span class="none">—</span>')
+      + kv('ветка', branch)
+      + kv('каталог PATCH', esc(dir))
+      + kv('ссылка', row.source_url
+            ? linkHtml(row.source_url, 'gitlab') : '<span class="none">—</span>')
+      + '</div>';
+
+  out += '<div class="block"><div class="bl">патчи · ' + row.patches.length
+      + '</div>' + patchesHtml(row.patches, q, null, '') + '</div>';
+
+  out += '<div class="block"><div class="bl">RPM · ' + row.rpms.length
+      + '</div>' + rpmsHtml(row.rpms, q, null, '') + '</div>';
+
+  if (row.problems.length) {
+    out += '<div class="block"><div class="bl">проблемы</div><ul class="problems">';
+    for (var i = 0; i < row.problems.length; i++) {
+      out += '<li>' + hl(row.problems[i], q) + '</li>';
+    }
+    out += '</ul></div>';
+  }
+  return out + '</div>';
+}
+
+function stateRowsHtml(items) {
+  var q = st.q, html = '', i, max = 0;
+  for (i = 0; i < items.length; i++) {
+    if (items[i].row.patches.length > max) max = items[i].row.patches.length;
+  }
+  for (i = 0; i < items.length; i++) {
+    var row = items[i].row;
+    var key = rowKey(row);
+    var open = openOf(key, items[i].open);
+    var bad = row.problems.length || row.tags.indexOf('no-source') !== -1;
+    var patches = row.patches.length
+      ? row.patches.length + meterHtml(row, max)
+      : '<span class="zero">0</span>';
+    html += '<tr class="main-row' + (bad ? ' bad' : '') + '" data-row="' + esc(key) + '">'
+         + '<td class="src"><span class="chev" role="button" tabindex="0"'
+         + ' aria-expanded="' + (open ? 'true' : 'false') + '">'
+         + (open ? '▾' : '▸') + '</span> ' + hl(row.name, q) + '</td>'
+         + '<td class="ver">' + hl(row.evr, q) + '</td>'
+         + '<td class="branch">' + (row.branch ? hl(row.branch, q)
+              : '<span class="none">—</span>') + '</td>'
+         + '<td class="pat">' + patches + '</td>'
+         + '<td class="num">' + row.rpms.length + '</td>'
+         + '<td class="built">' + hl(row.completed || '', q) + '</td>'
+         + '<td class="tags">' + tagsHtml(row.tags) + '</td>'
+         + '<td class="links">' + linkHtml(row.koji_url, 'koji')
+         + linkHtml(row.source_url, 'git') + '</td></tr>';
+    if (open) {
+      html += '<tr class="detail-row"><td colspan="8">' + stateDetail(row, q)
+           + '</td></tr>';
+    }
+  }
+  return html;
+}
+
+/* ---------- вкладка «Изменения» ---------- */
+
+function side(title, tag, evr, branch, patches, rpms, q, mark, markCls,
+              rpmMark, branchChanged) {
+  var out = '<div class="side"><div class="bl">' + esc(title) + ' · <b>'
+          + esc(tag) + '</b></div>';
+  out += kv('версия', evr ? '<span class="mono">' + hl(evr, q) + '</span>'
+                          : '<span class="none">—</span>');
+  out += kv('ветка', branch
+    ? '<span class="mono' + (branchChanged ? ' ' + markCls : '') + '">'
+      + hl(branch, q) + '</span>'
+    : '<span class="none">—</span>');
+  out += '<div class="bl" style="margin-top:.7rem">патчи · ' + patches.length
+      + '</div>' + patchesHtml(patches, q, mark, markCls);
+  out += '<div class="bl" style="margin-top:.7rem">RPM · ' + rpms.length
+      + '</div>' + rpmsHtml(rpms, q, rpmMark, markCls);
+  return out + '</div>';
+}
+
+function diffDetail(row, q) {
+  var pair = curPair();
+  var oldTag = pair ? pair.old : 'было', newTag = pair ? pair.new : 'стало';
+  var changed = row.tags.indexOf('branch-changed') !== -1;
+  return '<div class="sides">'
+    + side('было', oldTag, row.old_evr, row.old_branch, row.old_patches,
+           row.old_rpms, q, setFrom(row.patches_removed), 'is-removed',
+           setFrom(row.rpms_removed), changed)
+    + side('стало', newTag, row.new_evr, row.new_branch, row.new_patches,
+           row.new_rpms, q, setFrom(row.patches_added), 'is-added',
+           setFrom(row.rpms_added), changed)
+    + '</div>';
+}
+
+function delta(added, removed) {
+  if (!added && !removed) return '<span class="zero">—</span>';
+  var out = '';
+  if (added) out += '<span class="plus">+' + added + '</span> ';
+  if (removed) out += '<span class="minus">−' + removed + '</span>';
+  return out;
+}
+
+function diffRowsHtml(items) {
+  var q = st.q, html = '', i;
+  for (i = 0; i < items.length; i++) {
+    var row = items[i].row;
+    var key = rowKey(row);
+    var open = openOf(key, items[i].open);
+    html += '<tr class="main-row ' + esc(row.status) + '" data-row="' + esc(key) + '">'
+         + '<td class="src"><span class="chev" role="button" tabindex="0"'
+         + ' aria-expanded="' + (open ? 'true' : 'false') + '">'
+         + (open ? '▾' : '▸') + '</span> ' + hl(row.name, q) + '</td>'
+         + '<td class="ver">' + (row.old_evr ? hl(row.old_evr, q) : '—') + '</td>'
+         + '<td class="dir">' + (ARROW[row.status] || '') + '</td>'
+         + '<td class="ver new">' + (row.new_evr ? hl(row.new_evr, q) : '—') + '</td>'
+         + '<td class="pat">' + delta(row.patches_added.length,
+                                      row.patches_removed.length) + '</td>'
+         + '<td class="pat">' + delta(row.rpms_added.length,
+                                      row.rpms_removed.length) + '</td>'
+         + '<td class="tags">' + tagsHtml(row.tags) + '</td>'
+         + '<td class="links">' + linkHtml(row.koji_url, 'koji')
+         + linkHtml(row.source_url, 'git') + '</td></tr>';
+    if (open) {
+      html += '<tr class="detail-row"><td colspan="8">' + diffDetail(row, q)
+           + '</td></tr>';
+    }
+  }
+  return html;
+}
+
+/* ---------- карточки, селекторы, чипы ---------- */
+
+function cardHtml(filter, big, number, unit, sub, text, tip, labelCls) {
+  var cls = 'card' + (big ? ' big' : '') + (filter ? ' clickable' : '');
+  var open = filter
+    ? '<button type="button" class="' + cls + '" data-filter="' + esc(filter)
+      + '" aria-pressed="false"'
+    : '<div class="' + cls + '"';
+  return open + ' data-tip="' + esc(tip) + '">'
+    + (big ? '<div class="l' + (labelCls ? ' ' + labelCls : '') + '">' + esc(text) + '</div>' : '')
+    + '<div class="n">' + esc(number)
+    + (unit ? ' <span class="unit">' + esc(unit) + '</span>' : '') + '</div>'
+    + '<div class="rpm">' + esc(sub || '') + '</div>'
+    + (big ? '' : '<div class="l' + (labelCls ? ' ' + labelCls : '') + '">'
+             + esc(text) + '</div>')
+    + (filter ? '</button>' : '</div>');
+}
+
+function renderTagSelect() {
+  var box = document.getElementById('tag-select'), out = '', i;
+  for (i = 0; i < SNAPS.length; i++) {
+    var s = SNAPS[i];
+    out += '<button type="button" class="pick" data-tag="' + i + '" aria-pressed="'
+        + (i === st.tag ? 'true' : 'false') + '" data-tip="Снимок тега '
+        + esc(s.tag) + ' от ' + esc(s.generated) + '">' + esc(s.tag)
+        + '<span class="sub">' + s.counts.builds + ' '
+        + plural(s.counts.builds, 'сборка', 'сборки', 'сборок') + '</span></button>';
+  }
+  box.innerHTML = out || '<span class="none">снимков нет</span>';
+}
+
+function renderPairSelect() {
+  var box = document.getElementById('pair-select'), out = '', i;
+  for (i = 0; i < PAIRS.length; i++) {
+    var p = PAIRS[i];
+    out += '<button type="button" class="pick" data-pair="' + i + '" aria-pressed="'
+        + (i === st.pair ? 'true' : 'false')
+        + '" data-tip="' + (p.summary
+            ? 'Сводная пара: первый тег прогона против последнего.'
+            : 'Соседние теги прогона.')
+        + ' Изменилось компонентов: ' + p.counts.changed + ' из ' + p.rows.length + '.">'
+        + esc(p.old) + ' → ' + esc(p.new)
+        + (p.summary ? '<span class="sum">итог</span>' : '')
+        + '<span class="sub">' + p.counts.changed + ' изм.</span></button>';
+  }
+  box.innerHTML = out || '<span class="none">сравнивать нечего</span>';
+}
+
+function renderStateCards() {
+  var snap = curSnap();
+  var big = document.getElementById('state-cards');
+  var small = document.getElementById('class-cards');
+  if (!snap) { big.innerHTML = ''; small.innerHTML = ''; return; }
+  var c = snap.counts, rpms = 0, i;
+  for (i = 0; i < snap.builds.length; i++) rpms += snap.builds[i].rpms.length;
+
+  big.innerHTML =
+      cardHtml('all', true, c.builds, plural(c.builds, 'сборка', 'сборки', 'сборок'),
+        rpms + ' RPM', 'в теге',
+        'Все последние сборки тега ' + snap.tag + ' и собранные из них бинарные '
+        + 'пакеты. Клик снимает все фильтры.')
+    + cardHtml('has-patch', true, c.with_patches,
+        plural(c.with_patches, 'сборка', 'сборки', 'сборок'),
+        c.patch_files + ' ' + plural(c.patch_files, 'файл', 'файла', 'файлов')
+        + ' патчей', 'с патчами',
+        'Сборки, у которых в каталоге PATCH ветки лежит хотя бы один файл. '
+        + 'Клик оставит в таблице только их.')
+    + cardHtml('problem', true, c.problems,
+        plural(c.problems, 'сборка', 'сборки', 'сборок'),
+        c.without_patches + ' без каталога PATCH', 'с проблемами',
+        'Сборки, при сборе данных по которым что-то пошло не так: нет исходника, '
+        + 'GitLab ответил ошибкой, ветка исчезла. Клик оставит только их.');
+
+  var order = classOrder(c.by_class), out = '';
+  for (i = 0; i < order.length; i++) {
+    var name = order[i], b = c.by_class[name];
+    out += cardHtml(slug(name), false, b.builds,
+      plural(b.builds, 'сборка', 'сборки', 'сборок'),
+      b.files + ' ' + plural(b.files, 'файл', 'файла', 'файлов'),
+      name, 'Сборки, где есть хотя бы один патч класса ' + name + ', и сколько '
+      + 'таких файлов всего. Клик оставит в таблице только их.', classCls(name));
+  }
+  small.innerHTML = out;
+}
+
+function renderDiffCards() {
+  var pair = curPair();
+  var box = document.getElementById('diff-cards');
+  if (!pair) { box.innerHTML = ''; return; }
+  var c = pair.counts;
+  var spec = [
+    ['changed', c.changed, 'изменились',
+     'Компоненты, у которых изменилось хоть что-нибудь: версия, набор патчей, '
+     + 'состав RPM или ветка.'],
+    ['added', c.added, 'появились', 'Компонентов не было в старом теге.'],
+    ['removed', c.removed, 'исчезли', 'Компонентов нет в новом теге.'],
+    ['upgraded', c.upgraded, 'версия выросла',
+     'Сравнение version-release по правилам rpm.'],
+    ['downgraded', c.downgraded, 'версия упала',
+     'Версия в новом теге ниже, чем в старом. Обычно это откат.'],
+    ['unchanged', c.unchanged, 'версия та же',
+     'Version-release совпал. Патчи и состав RPM при этом могли измениться.'],
+    ['patches+', c.patches_added, 'патчи пришли',
+     'В каталоге PATCH появились новые файлы.'],
+    ['patches-', c.patches_removed, 'патчи ушли',
+     'Из каталога PATCH исчезли файлы. Стоит проверить, не потеряно ли исправление.'],
+    ['repackaged', c.repackaged, 'состав RPM',
+     'Компонент остался, но набор его бинарных пакетов изменился.'],
+    ['branch-changed', c.branch_changed, 'сменили ветку',
+     'Сборка приехала из другой ветки GitLab, чем в старом теге.']
+  ];
+  var out = '';
+  for (var i = 0; i < spec.length; i++) {
+    out += cardHtml(spec[i][0], false, spec[i][1], 'из ' + pair.rows.length, '',
+                    spec[i][2], spec[i][3] + ' Клик — фильтр.');
+  }
+  box.innerHTML = out;
+}
+
+function syncCards() {
+  var set = activeFilters();
+  var host = st.tab === 'diff' ? diffSection : stateSection;
+  var nodes = Array.prototype.slice.call(host.querySelectorAll('.card[data-filter]'));
+  var empty = !keys(set).length;
+  for (var i = 0; i < nodes.length; i++) {
+    var key = nodes[i].getAttribute('data-filter');
+    nodes[i].setAttribute('aria-pressed',
+      String(key === 'all' ? empty : Boolean(set[key])));
+  }
+}
+
+function renderChips() {
+  var set = activeFilters(), list = keys(set).sort(), out = '';
+  for (var i = 0; i < list.length; i++) {
+    out += '<button type="button" class="chip" data-chip="' + esc(list[i]) + '"'
+        + ' data-tip="Снять фильтр">' + esc(list[i]) + ' · '
+        + esc(label(list[i])) + ' ✕</button>';
+  }
+  if (list.length > 1) {
+    out += '<button type="button" class="chip clear" data-chip="all"'
+        + ' data-tip="Снять все фильтры">сбросить всё</button>';
+  }
+  chipsBox.innerHTML = out;
+}
+
+/* ---------- рендер ---------- */
+
+/* Считаем по тому же правилу, что и рендер, иначе подпись кнопки обещала бы
+   одно, а нажатие делало другое. */
+function allOpen(items) {
+  if (!items.length) return false;
+  for (var i = 0; i < items.length; i++) {
+    if (!openOf(rowKey(items[i].row), items[i].open)) return false;
+  }
+  return true;
+}
+
+function render() {
+  /* Подсказка привязана к узлу, а таблица сейчас будет перерисована:
+     без этого она пережила бы свой якорь и висела бы над пустым местом. */
+  hideTip();
+  var items = sortRows(visibleRows());
+  var total = totalRows();
+  var body = st.tab === 'diff' ? diffBody : stateBody;
+  var word = st.tab === 'diff'
+    ? plural(total, 'компонент', 'компонента', 'компонентов')
+    : plural(total, 'сборка', 'сборки', 'сборок');
+
+  counter.textContent = items.length + ' / ' + total + ' ' + word;
+  expandBtn.textContent = allOpen(items) ? 'Collapse all' : 'Expand all';
+  expandBtn.disabled = !items.length;
+  copyBtn.disabled = !items.length;
+
+  syncCards();
+  renderChips();
+  syncArrows();
+
+  if (!items.length) {
+    body.innerHTML = '<tr><td class="empty" colspan="8">'
+      + (total ? 'Под фильтры и запрос ничего не подходит'
+               : 'В этой выборке нет строк') + '</td></tr>';
+  } else {
+    body.innerHTML = st.tab === 'diff' ? diffRowsHtml(items) : stateRowsHtml(items);
+  }
+  writeHash();
+}
+
+/* Карточки и селекторы перерисовываются только при смене вкладки, тега или
+   пары: иначе клик по карточке уничтожал бы её же вместе с фокусом. */
+function rebuild() {
+  renderTagSelect();
+  renderPairSelect();
+  renderStateCards();
+  renderDiffCards();
+  render();
+}
+
+function showTab(name) {
+  if (name === 'diff' && !PAIRS.length) name = 'state';
+  st.tab = name;
+  for (var i = 0; i < tabBtns.length; i++) {
+    var on = tabBtns[i].getAttribute('data-tab') === name;
+    tabBtns[i].setAttribute('aria-selected', String(on));
+  }
+  stateSection.hidden = name !== 'state';
+  diffSection.hidden = name !== 'diff';
+  /* Панель поиска одна на страницу и переезжает к активной таблице:
+     два одинаковых поля с разными id путали бы и пользователя, и hash. */
+  var host = name === 'diff' ? diffSection : stateSection;
+  var anchor = host.querySelector('.tablewrap');
+  host.insertBefore(controls, anchor);
+  host.insertBefore(chipsBox, anchor);
+  search.placeholder = name === 'diff'
+    ? 'Компонент, версия, ветка, патч, CVE, RPM…'
+    : 'Компонент, ветка, патч, CVE, RPM…';
+}
+
+/* ---------- состояние в адресной строке ---------- */
+
+function writeHash() {
+  var parts = ['tab=' + st.tab];
+  if (SNAPS.length) parts.push('tag=' + encodeURIComponent(SNAPS[st.tag] ? SNAPS[st.tag].tag : ''));
+  /* Пару храним именами тегов, а не номером: набор тегов от прогона к
+     прогону меняется, и присланная ссылка «pair=1» показала бы другой
+     переход, ничем не выдав подмены. */
+  if (PAIRS.length) parts.push('pair=' + encodeURIComponent(pairKey(curPair())));
+  /* f= пишем всегда, в том числе пустой: у вкладки «Изменения» фильтр по
+     умолчанию непустой, и без явного «фильтров нет» ссылка на таблицу со
+     снятым фильтром при открытии снова показывала бы только изменившиеся. */
+  var f = keys(activeFilters()).sort();
+  parts.push('f=' + encodeURIComponent(f.join(',')));
+  if (st.q) parts.push('q=' + encodeURIComponent(st.q));
+  var cfg = st.sort[st.tab];
+  parts.push('sort=' + cfg.key + (cfg.asc ? '' : ':desc'));
+  var next = '#' + parts.join('&');
+  if (location.hash === next) return;
+  hashLock = true;
+  try {
+    if (history && history.replaceState) history.replaceState(null, '', next);
+    else location.hash = next;
+  } catch (e) {
+    location.hash = next;
+  }
+  setTimeout(function () { hashLock = false; }, 0);
+}
+
+/* Хеш правят руками и присылают в переписке, поэтому «100%», «%zz» и обрезанная
+   многобайтовая последовательность в нём — норма, а не исключение.
+   decodeURIComponent на таком бросает URIError; без этой обёртки он унёс бы
+   разбор целиком, а вместе с ним и первый рендер страницы. */
+function dec(s) {
+  try { return decodeURIComponent(s); } catch (e) { return null; }
+}
+
+/* Токен фильтра из хеша мог устареть (тег пересобрали, класс переименовали).
+   Свой мы узнаём по подписи, по классу патчей или по тегу живой строки;
+   чужой молча выбрасываем, чтобы страница не показывала пустую таблицу под
+   фильтр, которого не поставить и не снять — его нет ни на одной карточке. */
+function knownFilter(key) {
+  var i;
+  if (!key || key === 'all') return false;
+  if (LABELS.hasOwnProperty(key)) return true;
+  for (i = 0; i < CLASSES.length; i++) {
+    if (slug(CLASSES[i]) === key) return true;
+  }
+  var host = st.tab === 'diff' ? curPair() : curSnap();
+  var rows = host ? (st.tab === 'diff' ? host.rows : host.builds) : [];
+  for (i = 0; i < rows.length; i++) {
+    if (rows[i].tags.indexOf(key) !== -1) return true;
+  }
+  return false;
+}
+
+function readHash() {
+  var raw = location.hash.replace(/^#/, '');
+  if (!raw) return false;
+  var parts = raw.split('&'), i, kvp, key, val;
+  var tab = null, filters = null, sort = null, dropped = false;
+  for (i = 0; i < parts.length; i++) {
+    kvp = parts[i].split('=');
+    key = kvp[0];
+    val = dec(kvp.slice(1).join('=') || '');
+    if (val === null) continue;   /* битый кусок пропускаем, остальные читаем */
+    if (key === 'tab') {
+      /* Пар нет — вкладки «Изменения» на странице тоже нет. */
+      tab = (val === 'diff' && PAIRS.length) ? 'diff' : 'state';
+      if (val === 'diff' && !PAIRS.length) dropped = true;
+    } else if (key === 'tag') {
+      for (var j = 0; j < SNAPS.length; j++) {
+        if (SNAPS[j].tag === val) st.tag = j;
+      }
+    } else if (key === 'pair') {
+      /* Не нашли перехода с такими тегами — остаёмся на паре по умолчанию. */
+      for (var p = 0; p < PAIRS.length; p++) {
+        if (pairKey(PAIRS[p]) === val) st.pair = p;
+      }
+    } else if (key === 'f') filters = val ? val.split(',') : [];
+    else if (key === 'q') st.q = val.trim().toLowerCase();
+    else if (key === 'sort') sort = val.split(':');
+  }
+  if (tab) st.tab = tab;
+  /* Ссылка вела на «Изменения», но сравнивать в этом прогоне нечего. Фильтры
+     из неё — диффовые; на вкладке состояния они дали бы пустую таблицу без
+     единого намёка почему. */
+  if (dropped) filters = null;
+  if (filters) {
+    var live = [];
+    for (i = 0; i < filters.length; i++) {
+      if (knownFilter(filters[i])) live.push(filters[i]);
+    }
+    st.filters[st.tab] = setFrom(live);
+  }
+  if (sort && sort[0]) {
+    st.sort[st.tab] = { key: sort[0], asc: sort[1] !== 'desc' };
+  }
+  search.value = st.q;
+  return true;
+}
+
+/* ---------- копирование ---------- */
+
+/* NVR диффа собирается из имени и evr: evr — это «epoch:version-release»,
+   а в NVR эпохи нет, поэтому ведущее «N:» отбрасываем. */
+function nvrOf(row) {
+  if (row.nvr) return row.nvr;
+  var evr = row.new_evr || row.old_evr;
+  return evr ? row.name + '-' + String(evr).replace(/^[0-9]+:/, '') : row.name;
+}
+
+/* Подпись кнопки берём один раз при загрузке: если запомнить текущую, то
+   второй клик подряд запомнит «Скопировано» и вернёт кнопку к нему навсегда. */
+var COPY_LABEL = copyBtn.textContent;
+var flashTimer = null;
+
+function flash(text) {
+  copyBtn.textContent = text;
+  if (flashTimer) clearTimeout(flashTimer);
+  flashTimer = setTimeout(function () {
+    flashTimer = null;
+    copyBtn.textContent = COPY_LABEL;
+  }, 1400);
+}
+
+function copyFallback(text) {
+  var area = document.createElement('textarea');
+  area.value = text;
+  area.setAttribute('readonly', 'readonly');
+  area.style.position = 'fixed';
+  area.style.left = '-9999px';
+  document.body.appendChild(area);
+  area.select();
+  var ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+  document.body.removeChild(area);
+  flash(ok ? 'Скопировано' : 'Не вышло');
+}
+
+function copyNvr() {
+  var items = sortRows(visibleRows()), lines = [], i;
+  for (i = 0; i < items.length; i++) lines.push(nvrOf(items[i].row));
+  var text = lines.join('\n');
+  if (!text) return;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(
+      function () { flash('Скопировано ' + lines.length); },
+      function () { copyFallback(text); });
+  } else {
+    copyFallback(text);
+  }
+}
+
+/* ---------- события ---------- */
+
+/* Переключаем от того состояния, которое человек видит на экране, а не от
+   наличия ключа: строку, раскрытую поиском, иначе не свернуть. */
+function toggleRow(key) {
+  var items = visibleRows(), deep = false, i;
+  for (i = 0; i < items.length; i++) {
+    if (rowKey(items[i].row) === key) { deep = items[i].open; break; }
+  }
+  expanded[key] = !openOf(key, deep);
+  render();
+}
+
+function bodyHandler(e) {
+  var node = e.target, body = e.currentTarget;
+  while (node && node !== body) {
+    /* Ссылка внутри строки ведёт наружу и не должна разворачивать строку. */
+    if (node.tagName === 'A') return;
+    if (node.getAttribute) {
+      var filter = node.getAttribute('data-filter');
+      if (filter) { e.preventDefault(); toggleFilter(filter); return; }
+      var key = node.getAttribute('data-row');
+      if (key) { e.preventDefault(); toggleRow(key); return; }
+    }
+    node = node.parentNode;
+  }
+}
+
+function bindBody(body) {
+  body.addEventListener('click', bodyHandler);
+  body.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') bodyHandler(e);
+  });
+}
+bindBody(stateBody);
+bindBody(diffBody);
+
+/* Карточки, чипы и селекторы — делегированием: их разметка перерисовывается. */
+document.addEventListener('click', function (e) {
+  var node = e.target;
+  while (node && node !== document) {
+    if (node.getAttribute) {
+      var chip = node.getAttribute('data-chip');
+      if (chip !== null && chip !== undefined) { toggleFilter(chip); return; }
+      if (node.className && String(node.className).indexOf('card') !== -1) {
+        var f = node.getAttribute('data-filter');
+        if (f) { toggleFilter(f); return; }
+      }
+      var tag = node.getAttribute('data-tag');
+      if (tag !== null && tag !== undefined && node.className
+          && String(node.className).indexOf('pick') !== -1) {
+        st.tag = parseInt(tag, 10);
+        renderTagSelect(); renderStateCards(); render();
+        return;
+      }
+      var pair = node.getAttribute('data-pair');
+      if (pair !== null && pair !== undefined) {
+        st.pair = parseInt(pair, 10);
+        renderPairSelect(); renderDiffCards(); render();
+        return;
+      }
+      var tab = node.getAttribute('data-tab');
+      if (tab) { showTab(tab); render(); return; }
+    }
+    node = node.parentNode;
+  }
+});
+
+/* Сортировка. Шапки статичны, поэтому обработчики можно навесить один раз. */
+var sortHeads = Array.prototype.slice.call(document.querySelectorAll('th[data-sort]'));
+for (var hi = 0; hi < sortHeads.length; hi++) {
+  (function (th) {
+    function fire() {
+      var key = th.getAttribute('data-sort');
+      var cfg = st.sort[st.tab];
+      if (cfg.key === key) cfg.asc = !cfg.asc;
+      else { cfg.key = key; cfg.asc = true; }
+      render();
+    }
+    th.setAttribute('tabindex', '0');
+    th.addEventListener('click', fire);
+    th.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+        e.preventDefault(); fire();
+      }
+    });
+  }(sortHeads[hi]));
+}
+
+/* Каждое нажатие перестраивает весь tbody вместе с раскрытыми деталями, а
+   тег — это тысячи сборок. Ждём паузы в наборе. */
+var SEARCH_DELAY = 120;
+var searchTimer = null;
+
+search.addEventListener('input', function () {
+  if (searchTimer) clearTimeout(searchTimer);
+  searchTimer = setTimeout(function () {
+    searchTimer = null;
+    st.q = search.value.trim().toLowerCase();
+    render();
+  }, SEARCH_DELAY);
+});
+
+expandBtn.addEventListener('click', function () {
+  var items = visibleRows();
+  var collapse = allOpen(items);
+  /* Пишем явное false, а не удаляем ключ: иначе строки, раскрытые поиском,
+     остались бы раскрытыми, а подпись кнопки уже сменилась бы. */
+  for (var i = 0; i < items.length; i++) {
+    expanded[rowKey(items[i].row)] = !collapse;
+  }
+  render();
+});
+
+copyBtn.addEventListener('click', copyNvr);
+
+window.addEventListener('hashchange', function () {
+  if (hashLock) return;
+  if (readHash()) { showTab(st.tab); rebuild(); }
+});
+
+/* ---------- подсказки ---------- */
+
+var TIP_DELAY = 450;
+var tip = document.getElementById('tip');
+var tipTimer = null;
+var tipNode = null;
+
+function tipAnchor(node) {
+  while (node && node.getAttribute) {
+    if (node.getAttribute('data-tip')) return node;
+    node = node.parentNode;
+  }
+  return null;
+}
+
+function placeTip(el) {
+  tip.textContent = el.getAttribute('data-tip');
+  tip.style.visibility = 'hidden';
+  tip.style.display = 'block';
+  var anchor = el.getBoundingClientRect();
+  var box = tip.getBoundingClientRect();
+  var left = Math.min(Math.max(8, anchor.left + (anchor.width - box.width) / 2),
+                      window.innerWidth - box.width - 8);
+  var top = anchor.bottom + 8;
+  if (top + box.height > window.innerHeight - 8) top = anchor.top - box.height - 8;
+  tip.style.left = Math.round(left) + 'px';
+  tip.style.top = Math.round(Math.max(8, top)) + 'px';
+  tip.style.visibility = 'visible';
+}
+
+function hideTip() {
+  if (tipTimer) { clearTimeout(tipTimer); tipTimer = null; }
+  tipNode = null;
+  tip.style.display = 'none';
+}
+
+/* Делегирование, а не обход всех [data-tip]: строки таблицы и карточки
+   перерисовываются, и навешенные обработчики умирали бы вместе с ними. */
+document.addEventListener('mouseover', function (e) {
+  var el = tipAnchor(e.target);
+  if (el === tipNode) return;
+  hideTip();
+  tipNode = el;
+  if (el) {
+    tipTimer = setTimeout(function () {
+      if (tipNode === el) placeTip(el);
+    }, TIP_DELAY);
+  }
+});
+document.addEventListener('mouseleave', hideTip);
+/* С клавиатуры ждать незачем — показываем сразу. */
+document.addEventListener('focusin', function (e) {
+  var el = tipAnchor(e.target);
+  hideTip();
+  if (el) { tipNode = el; placeTip(el); }
+});
+document.addEventListener('focusout', hideTip);
+window.addEventListener('scroll', hideTip, true);
+
+/* ---------- «липкая» шапка ---------- */
+
+function syncStickyOffset() {
+  if (!controls || !document.documentElement.style.setProperty) return;
+  document.documentElement.style.setProperty(
+    '--controls-h', controls.getBoundingClientRect().height + 'px');
+}
+if (typeof ResizeObserver === 'function') {
+  new ResizeObserver(syncStickyOffset).observe(controls);
+} else {
+  window.addEventListener('resize', syncStickyOffset);
+}
+
+/* ---------- старт ---------- */
+
+(function start() {
+  var meta = document.getElementById('meta');
+  var tags = [];
+  for (var i = 0; i < SNAPS.length; i++) tags.push(SNAPS[i].tag);
+  meta.innerHTML =
+      '<div><b>теги:</b> ' + (tags.length ? esc(tags.join(', ')) : '—') + '</div>'
+    + '<div><b>собрано:</b> ' + esc(DATA.generated || '—') + '</div>'
+    + '<div><b>классы патчей:</b> ' + esc(CLASSES.join(', ') || '—') + '</div>';
+
+  /* Сравнивать нечего — вкладка «Изменения» не появляется вовсе. */
+  for (var t = 0; t < tabBtns.length; t++) {
+    if (tabBtns[t].getAttribute('data-tab') === 'diff' && !PAIRS.length) {
+      tabBtns[t].hidden = true;
+    }
+  }
+  readHash();
+  showTab(st.tab);
+  rebuild();
+  syncStickyOffset();
+}());
+</script>
+</body>
+</html>
