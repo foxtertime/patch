@@ -3,7 +3,7 @@ import re
 import tempfile
 import unittest
 
-from kojipatch.classify import CVE_RE
+from kojipatch.classify import CVE_RE, Classifier, find_cves
 from kojipatch.config import Config, ConfigError, GitlabHost, load_config
 
 MINIMAL = """
@@ -119,6 +119,53 @@ class LoadConfigTest(unittest.TestCase):
         self.assertEqual(
             re.compile(cfg.patch_classes[0][1]).findall("CVE-2024-1234"),
             CVE_RE.findall("CVE-2024-1234"))
+
+
+class DefaultRulesOnRealNamesTest(unittest.TestCase):
+    """Правила по умолчанию на именах файлов, как их называют в PATCH."""
+
+    def setUp(self):
+        self.classifier = Classifier.from_config(load_config(write(MINIMAL)))
+
+    def test_cve_id_in_the_middle_of_the_name(self):
+        self.assertEqual(
+            self.classifier.classify("httpd-2.4.62-cve-2024-42516.patch.new"),
+            "CVE")
+
+    def test_cve_id_is_extracted_from_such_a_name(self):
+        self.assertEqual(find_cves("httpd-2.4.62-cve-2024-42516.patch.new"),
+                         ["CVE-2024-42516"])
+
+    def test_sast_at_the_start(self):
+        self.assertEqual(
+            self.classifier.classify("SAST-src.core.ngx_file.c.patch.new"),
+            "SAST")
+
+    def test_sast_in_the_middle(self):
+        self.assertEqual(
+            self.classifier.classify("httpd-2.4.62-sast-src.core.c.patch.new"),
+            "SAST")
+
+    def test_dast_in_the_middle(self):
+        self.assertEqual(
+            self.classifier.classify("httpd-2.4.62-dast-scan.patch.new"),
+            "DAST")
+
+    def test_sast_after_an_underscore(self):
+        self.assertEqual(self.classifier.classify("httpd_sast_fix.patch.new"),
+                         "SAST")
+
+    def test_cve_wins_over_sast_in_one_name(self):
+        # порядок правил: CVE стоит первым, и имя с обоими маркерами
+        # должно попасть в CVE — иначе уедет в отчёт не той категорией
+        self.assertEqual(
+            self.classifier.classify("sast-cve-2024-42516-fix.patch.new"),
+            "CVE")
+
+    def test_plain_patch_is_other(self):
+        self.assertEqual(
+            self.classifier.classify("httpd-2.4.62-fix-build.patch.new"),
+            "other")
 
 
 if __name__ == "__main__":

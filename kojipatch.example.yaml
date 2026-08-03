@@ -16,5 +16,10 @@ patch_dir: PATCH
 # Последнее всеохватное правило добавляется автоматически, если его нет.
 patch_classes:
   - { name: CVE,  pattern: '(?i)CVE-\d{4}-\d{4,}' }
-  - { name: SAST, pattern: '(?i)^sast[-_]' }
-  - { name: DAST, pattern: '(?i)^dast[-_]' }
+  # SAST и DAST — по вхождению в любом месте имени: маркер бывает и в начале
+  # (SAST-src.core.ngx_file.c.patch.new), и в середине
+  # (httpd-2.4.62-sast-src.core.c.patch.new).
+  # Если понадобится строже — чтобы маркер не ловился внутри слова, — возьмите
+  # '(?i)(?:^|[^a-z0-9])sast(?:[^a-z0-9]|$)'
+  - { name: SAST, pattern: '(?i)sast' }
+  - { name: DAST, pattern: '(?i)dast' }

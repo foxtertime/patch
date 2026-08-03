@@ -15,8 +15,11 @@ DEFAULT_PATCH_CLASSES = [
     # идентификаторы в именах файлов; здесь оно только получает флаг
     # регистронезависимости в виде, пригодном для строки правила
     ("CVE", "(?i)" + CVE_RE.pattern),
-    ("SAST", r"(?i)^sast[-_]"),
-    ("DAST", r"(?i)^dast[-_]"),
+    # SAST и DAST ищутся вхождением в любом месте имени: маркер встречается
+    # и в начале (SAST-src.core.ngx_file.c.patch.new), и в середине
+    # (httpd-2.4.62-sast-src.core.c.patch.new)
+    ("SAST", r"(?i)sast"),
+    ("DAST", r"(?i)dast"),
 ]
 CATCH_ALL = ("other", ".*")
 
