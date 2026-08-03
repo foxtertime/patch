@@ -46,8 +46,17 @@ class Config:
         default_factory=lambda: list(DEFAULT_PATCH_CLASSES) + [CATCH_ALL])
 
     def token(self) -> Optional[str]:
-        """Токен GitLab из окружения; None означает анонимный доступ."""
-        return os.environ.get(self.gitlab_token_env) or None
+        """Токен GitLab из окружения; None означает анонимный доступ.
+
+        Пробелы по краям срезаем, и это не косметика: GITLAB_TOKEN=$(cat
+        token.txt) и копипаста из вебморды приносят токен с переводом строки,
+        а requests такой заголовок отправлять отказывается — и кладёт ЗНАЧЕНИЕ
+        заголовка в текст исключения. Дальше этот текст уходит в лог, в
+        проблемы билда, в снапшот и в HTML, который люди вставляют в тикеты.
+        Срезка убирает саму причину: запрос с чистым токеном просто удаётся.
+        Строка из одних пробелов — тот же «токена нет», что и пустая.
+        """
+        return (os.environ.get(self.gitlab_token_env) or "").strip() or None
 
 
 def _read_yaml(path: str) -> dict:

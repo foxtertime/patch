@@ -2,8 +2,14 @@ import logging
 import unittest
 
 from kojipatch.config import GitlabHost
-from kojipatch.gitlabclient import GitlabClient
+from kojipatch.gitlabclient import GitlabClient, HttpTransport
 from tests.fakes import FakeTransport, Response
+
+try:  # requests нужен только collect/run, весь остальной набор без него живёт
+    import requests as _requests  # noqa: F401
+    _HAS_REQUESTS = True
+except ImportError:  # pragma: no cover
+    _HAS_REQUESTS = False
 
 HOSTS = {"gitlab.example.com": GitlabHost(api="https://gitlab.example.com/api/v4",
                                           web="https://gitlab.example.com")}
@@ -491,6 +497,88 @@ class LoggingTest(unittest.TestCase):
             self.assertEqual(record.levelno, logging.DEBUG,
                              "лишняя запись уровня %s: %s"
                              % (record.levelname, record.getMessage()))
+
+
+class ScrubTest(unittest.TestCase):
+    """Очистка текста исключения от токена во всех формах, в которых он туда
+    попадает."""
+
+    def scrub(self, token, text):
+        cli = GitlabClient(HOSTS, token=token, transport=FakeTransport({}),
+                           sleeper=lambda _s: None)
+        return cli._scrub(text)
+
+    def test_raw_token_is_scrubbed(self):
+        self.assertEqual(self.scrub(SECRET, "заголовок %s тут" % SECRET),
+                         "заголовок *** тут")
+
+    def test_token_with_a_newline_is_scrubbed_in_its_raw_form(self):
+        # если текст несёт настоящий перевод строки, а не его запись
+        self.assertNotIn(SECRET, self.scrub(SECRET + "\n", SECRET + "\n"))
+
+    def test_repr_escaped_token_is_scrubbed(self):
+        # requests печатает значение заголовка через repr: настоящий перевод
+        # строки становится двумя символами «\» и «n», и замена по сырому
+        # токену не находит ничего
+        token = SECRET + "\n"
+        text = "Invalid header value b'%s'" % (
+            token.encode("unicode_escape").decode("ascii"))
+        self.assertEqual(self.scrub(token, text), "Invalid header value b'***'")
+
+    def test_stripped_token_is_scrubbed(self):
+        # после срезки пробелов на провод уходит именно этот вид токена,
+        # и в чужом сообщении может оказаться он
+        token = SECRET + "\n"
+        self.assertEqual(self.scrub(token, "хвост %s хвост" % SECRET),
+                         "хвост *** хвост")
+
+    def test_short_token_is_not_scrubbed(self):
+        # настоящий PAT GitLab — около 26 символов; слепая замена короткого
+        # «токена» испортила бы обычный текст ошибки, а он идёт в проблемы
+        # билда, в снапшот и в дашборд
+        text = "connection reset by peer"
+        self.assertEqual(self.scrub("t", text), text)
+        self.assertEqual(self.scrub("connect", text), text)
+
+    def test_token_at_the_threshold_is_scrubbed(self):
+        self.assertEqual(self.scrub("abcdefgh", "x abcdefgh y"), "x *** y")
+
+    def test_whitespace_only_token_is_not_scrubbed(self):
+        text = "connection reset by peer"
+        self.assertEqual(self.scrub("        ", text), text)
+
+    def test_no_token_leaves_the_text_alone(self):
+        text = "connection reset by peer"
+        self.assertEqual(self.scrub(None, text), text)
+        self.assertEqual(self.scrub("", text), text)
+
+    def test_non_string_input_is_converted(self):
+        self.assertEqual(self.scrub(SECRET, ValueError("ой %s" % SECRET)),
+                         "ой ***")
+
+
+@unittest.skipUnless(_HAS_REQUESTS,
+                     "requests не установлен: он нужен только collect/run")
+class RealRequestsTest(unittest.TestCase):
+    """Единственный тест, который проходит через настоящий requests. Сети он
+    не касается: requests проверяет заголовки при подготовке запроса и падает
+    до открытия сокета, поэтому адрес нужен только синтаксически."""
+
+    HOSTS = {"h": GitlabHost(api="http://127.0.0.1:1/api/v4",
+                             web="http://127.0.0.1:1")}
+
+    def test_newline_token_does_not_leak_through_requests(self):
+        cli = GitlabClient(self.HOSTS, token=SECRET + "\n",
+                           transport=HttpTransport(timeout=1),
+                           sleeper=lambda _s: None, retries=1)
+        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
+            result = cli.patch_files("h", "g/r", "br")
+        # «***» подтверждает, что чистить было что: requests действительно
+        # вложил значение заголовка в текст. Если однажды перестанет — тест
+        # упадёт, и это повод перепроверить механизм, а не ослабить проверку.
+        self.assertIn("***", result.problem)
+        self.assertNotIn(SECRET, result.problem)
+        self.assertNotIn(SECRET, "\n".join(caught.output))
 
 
 if __name__ == "__main__":
