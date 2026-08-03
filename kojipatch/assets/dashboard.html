@@ -386,7 +386,10 @@ var st = {
   tag: SNAPS.length ? SNAPS.length - 1 : 0,   /* по умолчанию — свежий тег */
   pair: PAIRS.length ? PAIRS.length - 1 : 0,  /* и самая широкая пара */
   q: '',
-  filters: { state: {}, diff: {} },
+  /* «Изменения» открываются на изменившихся компонентах: неизменившиеся
+     строки в этой таблице — шум, из-за которого не видно изменившихся.
+     Фильтр обычный, он виден чипом и снимается как любой другой. */
+  filters: { state: {}, diff: { 'changed': 1 } },
   sort: { state: { key: 'name', asc: true }, diff: { key: 'name', asc: true } }
 };
 /* Раскрытие строк: ключи вида "state:os-9.2:nginx", значения true/false.
@@ -480,7 +483,13 @@ function toggleFilter(key) {
   var set = activeFilters();
   if (key === 'all') { st.filters[st.tab] = {}; }
   else if (set[key]) { delete set[key]; }
-  else { set[key] = 1; }
+  else {
+    /* «версия та же» — не уточнение к «что-то изменилось», а другой срез
+       той же таблицы. Складывать их по И значит показать «версия не
+       менялась, но что-то другое поехало» — не то, что просит карточка. */
+    if (key === 'unchanged') delete set['changed'];
+    set[key] = 1;
+  }
   render();
 }
 
@@ -1131,8 +1140,11 @@ function writeHash() {
   var parts = ['tab=' + st.tab];
   if (SNAPS.length) parts.push('tag=' + encodeURIComponent(SNAPS[st.tag] ? SNAPS[st.tag].tag : ''));
   if (PAIRS.length) parts.push('pair=' + st.pair);
+  /* f= пишем всегда, в том числе пустой: у вкладки «Изменения» фильтр по
+     умолчанию непустой, и без явного «фильтров нет» ссылка на таблицу со
+     снятым фильтром при открытии снова показывала бы только изменившиеся. */
   var f = keys(activeFilters()).sort();
-  if (f.length) parts.push('f=' + encodeURIComponent(f.join(',')));
+  parts.push('f=' + encodeURIComponent(f.join(',')));
   if (st.q) parts.push('q=' + encodeURIComponent(st.q));
   var cfg = st.sort[st.tab];
   parts.push('sort=' + cfg.key + (cfg.asc ? '' : ':desc'));
