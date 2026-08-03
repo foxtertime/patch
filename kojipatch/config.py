@@ -6,10 +6,15 @@ from typing import Dict, List, Optional, Tuple
 
 import yaml
 
+from .classify import CVE_RE
+
 DEFAULT_PATCH_DIR = "PATCH"
 DEFAULT_TOKEN_ENV = "GITLAB_TOKEN"
 DEFAULT_PATCH_CLASSES = [
-    ("CVE", r"(?i)CVE-\d{4}-\d{4,}"),
+    # выражение для CVE в проекте одно — то, которым classify ищет
+    # идентификаторы в именах файлов; здесь оно только получает флаг
+    # регистронезависимости в виде, пригодном для строки правила
+    ("CVE", "(?i)" + CVE_RE.pattern),
     ("SAST", r"(?i)^sast[-_]"),
     ("DAST", r"(?i)^dast[-_]"),
 ]

@@ -86,6 +86,17 @@ class KojiClientTest(unittest.TestCase):
         self.assertEqual(set(details), {1, 2})
         self.assertFalse(any(call[0] == "multicall" for call in session.calls))
 
+    def test_batching_splits_the_ids(self):
+        # пять билдов при batch=2 — это три пакета, и ни один билд не теряется
+        builds = {bid: {"build_id": bid, "name": "p%d" % bid}
+                  for bid in range(1, 6)}
+        session = FakeKojiSession(tagged=TAGGED, builds=builds, rpms={})
+        client = KojiClient(session, batch=2)
+        details = client.build_details([1, 2, 3, 4, 5])
+        self.assertEqual(set(details), {1, 2, 3, 4, 5})
+        batches = [call[1] for call in session.calls if call[0] == "multicall"]
+        self.assertEqual(batches, [2, 2, 1])
+
     def test_hub_failure_is_wrapped_in_koji_error(self):
         session = _FailingSession(tagged=TAGGED, builds=BUILDS, rpms=RPMS)
         client = KojiClient(session, batch=10)

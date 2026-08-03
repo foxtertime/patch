@@ -3,6 +3,7 @@ import re
 import tempfile
 import unittest
 
+from kojipatch.classify import CVE_RE
 from kojipatch.config import Config, ConfigError, GitlabHost, load_config
 
 MINIMAL = """
@@ -109,6 +110,15 @@ class LoadConfigTest(unittest.TestCase):
         name, pattern = cfg.patch_classes[0]
         self.assertEqual(name, "CVE")
         self.assertTrue(re.compile(pattern).search("cve-2024-1234.patch"))
+
+    def test_default_cve_rule_comes_from_classify(self):
+        # выражение для CVE в проекте одно: правило по умолчанию — это
+        # ровно CVE_RE, иначе конфиг и классификатор разъехались бы
+        cfg = load_config(write(MINIMAL))
+        self.assertEqual(cfg.patch_classes[0][1], "(?i)" + CVE_RE.pattern)
+        self.assertEqual(
+            re.compile(cfg.patch_classes[0][1]).findall("CVE-2024-1234"),
+            CVE_RE.findall("CVE-2024-1234"))
 
 
 if __name__ == "__main__":

@@ -144,6 +144,18 @@ class RenderHtmlTest(unittest.TestCase):
         self.assertNotIn("</script><script>alert(1)", html)
         self.assertIn("<\\/script>", html)
 
+    def test_line_separators_are_escaped(self):
+        # U+2028/U+2029 внутри <script> — переводы строк для JS, а JSON их
+        # не экранирует: литерал развалился бы прямо по данным.
+        nasty = build("evil" + chr(0x2028) + "x" + chr(0x2029) + "y")
+        html = self.html([snap("t", [nasty])])
+        self.assertNotIn(chr(0x2028), html)
+        self.assertNotIn(chr(0x2029), html)
+        self.assertIn("\\u2028", html)
+        self.assertIn("\\u2029", html)
+        match = re.search(r"var DATA = (.*?);\n", html, re.S)
+        self.assertEqual(json.loads(match.group(1))["snapshots"][0]["tag"], "t")
+
     def test_html_has_both_tab_containers(self):
         html = self.html()
         self.assertIn('id="tab-state"', html)

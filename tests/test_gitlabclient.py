@@ -182,7 +182,54 @@ class PatchFilesTest(unittest.TestCase):
         self.assertIn("ref", result.problem)
 
 
+class RetrySleepTest(unittest.TestCase):
+    def sleeps_for(self, transport, **kwargs):
+        slept = []
+        cli = GitlabClient(HOSTS, token="t", transport=transport,
+                           sleeper=slept.append, **kwargs)
+        result = cli.patch_files("gitlab.example.com", "g/r", "br")
+        return result, slept
+
+    def test_no_backoff_after_the_last_failed_attempt(self):
+        # три попытки — две паузы: ждать после последней нечего, а с
+        # --jobs 8 против приболевшего GitLab это секунды на каждый билд
+        result, slept = self.sleeps_for(_BrokenTransport(), retries=3)
+        self.assertIsNone(result.present)
+        self.assertIn("connection reset", result.problem)
+        self.assertEqual(len(slept), 2)
+
+    def test_no_backoff_after_the_last_bad_status(self):
+        transport = FakeTransport({TREE_URL: Response(500, {}, {})})
+        _, slept = self.sleeps_for(transport, retries=3)
+        self.assertEqual(len(slept), 2)
+
+    def test_single_attempt_never_sleeps(self):
+        _, slept = self.sleeps_for(_BrokenTransport(), retries=1)
+        self.assertEqual(slept, [])
+
+
+class _BrokenTransport:
+    """Транспорт, у которого каждый запрос падает сетевой ошибкой."""
+
+    def __init__(self):
+        self.requests = []
+
+    def get(self, url, headers=None, params=None):
+        self.requests.append(url)
+        raise IOError("connection reset")
+
+
 class UrlTest(unittest.TestCase):
+    def test_urls_are_percent_encoded(self):
+        # пробел или «#» в имени ветки без кодирования ломают ссылку
+        cli, _ = client({})
+        self.assertEqual(cli.tree_url("gitlab.example.com", "g/r", "feat/a b#c"),
+                         "https://gitlab.example.com/g/r/-/tree/feat/a%20b%23c")
+        self.assertEqual(
+            cli.blob_url("gitlab.example.com", "g r/r", "b#1",
+                         "PATCH/a b.patch"),
+            "https://gitlab.example.com/g%20r/r/-/blob/b%231/PATCH/a%20b.patch")
+
     def test_tree_and_blob_urls(self):
         cli, _ = client({})
         self.assertEqual(cli.tree_url("gitlab.example.com", "g/r", "feat/x"),

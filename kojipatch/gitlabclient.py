@@ -87,13 +87,15 @@ class GitlabClient:
         cfg = self._host_config(host)
         if not cfg or not ref:
             return None
-        return "%s/%s/-/tree/%s" % (cfg.web.rstrip("/"), project, ref)
+        return "%s/%s/-/tree/%s" % (cfg.web.rstrip("/"), _path(project),
+                                    _path(ref))
 
     def blob_url(self, host, project, ref, path) -> Optional[str]:
         cfg = self._host_config(host)
         if not cfg or not ref:
             return None
-        return "%s/%s/-/blob/%s/%s" % (cfg.web.rstrip("/"), project, ref, path)
+        return "%s/%s/-/blob/%s/%s" % (cfg.web.rstrip("/"), _path(project),
+                                       _path(ref), _path(path))
 
     # -- дерево патчей ----------------------------------------------------
     def patch_files(self, host, project, ref) -> TreeResult:
@@ -177,7 +179,10 @@ class GitlabClient:
                                                params=params)
             except Exception as exc:  # сетевые ошибки транспорта
                 last = "gitlab: %s" % exc
-                self._backoff(attempt, None)
+                # после последней попытки ждать незачем: с --jobs 8 против
+                # приболевшего GitLab это секунды на каждый билд впустую
+                if attempt < self._retries - 1:
+                    self._backoff(attempt, None)
                 continue
             if response.status in _RETRY_STATUSES and attempt < self._retries - 1:
                 self._backoff(attempt, (response.headers or {}).get("Retry-After"))
@@ -194,6 +199,12 @@ class GitlabClient:
             except (TypeError, ValueError):
                 pass
         self._sleep(delay)
+
+
+def _path(value) -> str:
+    """Кусок пути веб-ссылки: слэши разделяют сегменты и остаются, а пробел
+    или «#» в имени ветки без кодирования ломают ссылку."""
+    return quote(str(value), safe="/")
 
 
 def _message(response) -> str:

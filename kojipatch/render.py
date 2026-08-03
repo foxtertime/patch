@@ -160,10 +160,14 @@ def build_page_data(snapshots, pairs, classifier) -> Dict[str, object]:
 
 def _encode(data: Dict[str, object]) -> str:
     text = json.dumps(data, ensure_ascii=False, sort_keys=True)
-    # безопасная вставка внутрь <script>
+    # Безопасная вставка внутрь <script>: U+2028/U+2029 для JS —
+    # разделители строк, внутри литерала их быть не должно. В самом
+    # исходнике пишем их escape-последовательностями: глазом такой
+    # символ не виден, а редактор, нормализующий переводы строк, его
+    # молча съест.
     return (text.replace("</", "<\\/")
-                .replace(" ", "\\u2028")
-                .replace(" ", "\\u2029"))
+                .replace("\u2028", "\\u2028")
+                .replace("\u2029", "\\u2029"))
 
 
 def render_html(snapshots, pairs, classifier,

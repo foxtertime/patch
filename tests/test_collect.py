@@ -5,6 +5,7 @@ from kojipatch.collect import collect_tag, problem_summary
 from kojipatch.config import Config, GitlabHost
 from kojipatch.gitlabclient import GitlabClient
 from kojipatch.kojiclient import KojiClient
+from kojipatch.model import Build, Snapshot
 from tests.fakes import FakeKojiSession, FakeTransport, Response
 
 HOST = "gitlab.example.com"
@@ -155,6 +156,22 @@ class CollectTagTest(unittest.TestCase):
         summary = problem_summary(snap)
         self.assertEqual(summary["no source url"], 1)
 
+    def test_problem_summary_groups_variable_messages_by_prefix(self):
+        # текст после двоеточия у этих проблем разный на каждом билде:
+        # без группировки сводка в stderr росла бы вместе с тегом
+        snap = Snapshot(tag="t", generated="n", koji_hub="h", koji_web=None,
+                        builds=[
+                            _build_with(["internal error: boom 1"]),
+                            _build_with(["internal error: boom 2"]),
+                            _build_with(["bad source url: нет схемы"]),
+                            _build_with(["bad source url: нет ветки"]),
+                            _build_with(["gitlab: 500 oops"]),
+                            _build_with(["no source url"]),
+                        ])
+        self.assertEqual(problem_summary(snap),
+                         {"internal error": 2, "bad source url": 2,
+                          "gitlab": 1, "no source url": 1})
+
     def test_unparseable_source_url_gets_a_problem(self):
         tagged = {"os-9.2": [{"build_id": 1, "name": "broken"}]}
         builds = {
@@ -256,6 +273,11 @@ class CollectTagTest(unittest.TestCase):
         collect_tag("os-9.2", config(), koji_client, gitlab, jobs=4, now="n",
                     progress=lambda done, total: seen.append((done, total)))
         self.assertEqual(seen[-1], (3, 3))
+
+
+def _build_with(problems):
+    return Build(nvr="p-1-1", name="p", version="1", release="1",
+                 problems=list(problems))
 
 
 class _ExplodingGitlab:

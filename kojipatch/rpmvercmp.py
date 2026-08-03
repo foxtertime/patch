@@ -53,9 +53,18 @@ def rpmvercmp(a: str, b: str) -> int:
         else:
             match_a, match_b, numeric = _ALPHA.match(a), _ALPHA.match(b), False
 
-        if match_b is None:
-            # цифры «весомее» букв
-            return 1 if numeric else -1
+        if match_a is None or match_b is None:
+            # str.isdigit() шире, чем \d: например у «²» isdigit() истинно, а
+            # \d его не берёт. Проверяем оба совпадения, иначе разбор падает
+            # с AttributeError и роняет весь дифф из-за одного странного
+            # символа в версии.
+            if match_a is None and match_b is None:
+                # разобрать нечем ни ту, ни другую сторону — выходим, чтобы
+                # не крутиться на месте вечно
+                break
+            # цифры «весомее» букв; сторона, которая не разобралась, легче
+            return (1 if numeric else -1) if match_b is None \
+                else (-1 if numeric else 1)
 
         seg_a, seg_b = match_a.group(1), match_b.group(1)
         a, b = a[len(seg_a):], b[len(seg_b):]

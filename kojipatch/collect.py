@@ -143,11 +143,17 @@ def _attach_patches(build: Build, info: dict, cfg, gitlab_client,
                                            parsed.ref, path)))
 
 
+# Проблемы, у которых после двоеточия стоит произвольный текст: в сводке их
+# группируем по префиксу, иначе одна строка stderr растёт до числа билдов.
+_GROUPED_PROBLEMS = ("gitlab:", "internal error:", "bad source url:")
+
+
 def problem_summary(snapshot: Snapshot) -> Dict[str, int]:
     """Сколько раз встретилась каждая проблема — для сводки в stderr."""
     counts = {}
     for build in snapshot.builds:
         for problem in build.problems:
-            key = problem.split(":")[0] if problem.startswith("gitlab:") else problem
+            key = (problem.split(":")[0]
+                   if problem.startswith(_GROUPED_PROBLEMS) else problem)
             counts[key] = counts.get(key, 0) + 1
     return counts

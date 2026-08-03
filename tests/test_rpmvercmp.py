@@ -44,6 +44,34 @@ class RpmVerCmpTest(unittest.TestCase):
         self.assertEqual(rpmvercmp("", "1"), -1)
 
 
+class OddCharactersTest(unittest.TestCase):
+    """str.isdigit() шире, чем \\d: «²» первому нравится, второму — нет.
+    Раньше на таком входе разбор падал с AttributeError и уносил весь дифф."""
+
+    SUP = "²"   # надстрочная двойка
+
+    def test_pseudo_digit_against_digit(self):
+        self.assertIsInstance(rpmvercmp("1." + self.SUP, "1.2"), int)
+        self.assertIsInstance(rpmvercmp("1.2", "1." + self.SUP), int)
+
+    def test_pseudo_digit_against_letters(self):
+        self.assertIsInstance(rpmvercmp(self.SUP, "a"), int)
+        self.assertIsInstance(rpmvercmp("a", self.SUP), int)
+
+    def test_two_pseudo_digits_do_not_hang(self):
+        self.assertIsInstance(rpmvercmp(self.SUP, "³"), int)
+        self.assertEqual(rpmvercmp(self.SUP, self.SUP), 0)
+
+    def test_comparison_is_antisymmetric(self):
+        self.assertEqual(rpmvercmp("1." + self.SUP, "1.2"),
+                         -rpmvercmp("1.2", "1." + self.SUP))
+
+    def test_evr_with_a_pseudo_digit_does_not_raise(self):
+        self.assertIsInstance(
+            compare_evr((None, "1." + self.SUP, "1.el9"),
+                        (None, "1.2", "1.el9")), int)
+
+
 class CompareEvrTest(unittest.TestCase):
     def test_release_breaks_the_tie(self):
         self.assertEqual(compare_evr((None, "1.0", "2.el9"),
