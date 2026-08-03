@@ -85,6 +85,14 @@ class LoadConfigTest(unittest.TestCase):
         with self.assertRaises(ConfigError):
             load_config("/nonexistent/kojipatch.yaml")
 
+    def test_koji_section_must_be_a_mapping(self):
+        with self.assertRaises(ConfigError):
+            load_config(write("koji: notadict\n"))
+
+    def test_gitlab_section_must_be_a_mapping(self):
+        with self.assertRaises(ConfigError):
+            load_config(write(MINIMAL + "gitlab: [1, 2]\n"))
+
     def test_no_file_requires_hub_override(self):
         cfg = load_config(None, {"koji_hub": "https://only/hub"})
         self.assertEqual(cfg.koji_hub, "https://only/hub")

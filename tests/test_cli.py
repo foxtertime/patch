@@ -1,5 +1,4 @@
 import io
-import json
 import os
 import tempfile
 import unittest
@@ -88,6 +87,18 @@ class CliRenderTest(unittest.TestCase):
             code = main(["--config", "/nonexistent.yaml", "collect",
                          "--tag", "t"])
         self.assertEqual(code, 2)
+
+    def test_malformed_config_section_is_fatal_without_traceback(self):
+        fd, path = tempfile.mkstemp(suffix=".yaml")
+        with os.fdopen(fd, "w") as handle:
+            handle.write("koji: notadict\n")
+        err = io.StringIO()
+        with redirect_stderr(err):
+            code = main(["--config", path, "collect", "--tag", "t"])
+        self.assertEqual(code, 2)
+        text = err.getvalue()
+        self.assertTrue(text.strip())
+        self.assertNotIn("Traceback", text)
 
     def test_help_lists_subcommands(self):
         out = io.StringIO()

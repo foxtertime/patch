@@ -80,6 +80,15 @@ def _patch_classes(raw) -> List[Tuple[str, str]]:
     return rules
 
 
+def _require_mapping(value, name: str) -> dict:
+    """Убеждается, что раздел конфига — отображение, а не строка/список."""
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise ConfigError("раздел %s должен быть отображением" % name)
+    return value
+
+
 def load_config(path: Optional[str],
                 overrides: Optional[Dict[str, str]] = None,
                 require_hub: bool = True) -> Config:
@@ -91,11 +100,12 @@ def load_config(path: Optional[str],
     data = _read_yaml(path) if path else {}
     overrides = {k: v for k, v in (overrides or {}).items() if v}
 
-    koji = data.get("koji") or {}
-    gitlab = data.get("gitlab") or {}
+    koji = _require_mapping(data.get("koji"), "koji")
+    gitlab = _require_mapping(data.get("gitlab"), "gitlab")
+    raw_hosts = _require_mapping(gitlab.get("hosts"), "gitlab.hosts")
     hosts = {}
-    for host, spec in (gitlab.get("hosts") or {}).items():
-        spec = spec or {}
+    for host, spec in raw_hosts.items():
+        spec = _require_mapping(spec, "gitlab.hosts.%s" % host)
         api = spec.get("api")
         if not api:
             raise ConfigError("у хоста %s не задан gitlab api" % host)

@@ -32,7 +32,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-problems", type=int, default=None,
                         help="вернуть код 1, если проблемных билдов больше")
     parser.add_argument("-v", "--verbose", action="store_true",
-                        help="печатать прогресс сбора")
+                        help="печатать прогресс сбора и трейсбек при фатальной ошибке")
 
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -106,6 +106,11 @@ def main(argv: Optional[List[str]] = None) -> int:
         cfg = _load_config(args)
     except ConfigError as exc:
         sys.stderr.write("ошибка конфига: %s\n" % exc)
+        return EXIT_FATAL
+    except Exception as exc:  # непредвиденная ошибка тоже не должна ронять CLI трейсбеком
+        if args.verbose:
+            traceback.print_exc()
+        sys.stderr.write("фатальная ошибка: %s\n" % exc)
         return EXIT_FATAL
 
     try:
