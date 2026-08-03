@@ -1,10 +1,15 @@
 """Подготовка данных страницы и подстановка их в HTML-шаблон."""
 import json
 import os
+import re
 from typing import Dict, List, Optional
 from urllib.parse import quote
 
 PLACEHOLDER = "/*__DATA__*/"
+# то же правило, что и slug() в дашборде: ключ фильтра из имени класса
+# патчей. Считать его по-разному на двух сторонах нельзя — карточка класса
+# вроде «C++» не нашла бы ни одной строки.
+_SLUG_RE = re.compile(r"[^a-z0-9]+")
 TEMPLATE_PATH = os.path.join(os.path.dirname(__file__), "assets",
                              "dashboard.html")
 
@@ -25,10 +30,15 @@ def _evr(build) -> str:
     return "%s%s-%s" % (prefix, build.version, build.release)
 
 
+def slug(name: str) -> str:
+    """Ключ фильтра из имени класса патчей — как slug() в дашборде."""
+    return _SLUG_RE.sub("-", str(name).lower())
+
+
 def _build_tags(build) -> List[str]:
     tags = []
     for patch in build.patches:
-        tag = patch.cls.lower()
+        tag = slug(patch.cls)
         if tag not in tags:
             tags.append(tag)
     if build.source is None:

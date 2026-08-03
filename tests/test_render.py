@@ -5,7 +5,8 @@ import unittest
 from kojipatch.classify import Classifier
 from kojipatch.diff import diff_chain
 from kojipatch.model import Build, Patch, Snapshot, Source
-from kojipatch.render import PLACEHOLDER, build_page_data, render_html
+from kojipatch.render import (PLACEHOLDER, build_page_data, render_html,
+                              slug)
 
 RULES = [("CVE", r"CVE-\d{4}-\d{4,}"), ("SAST", r"(?i)^sast[-_]"),
          ("DAST", r"(?i)^dast[-_]"), ("other", ".*")]
@@ -81,6 +82,21 @@ class PageDataTest(unittest.TestCase):
         self.assertEqual(sorted(rows["nginx"]["tags"]), ["cve", "sast"])
         self.assertIn("no-patch", rows["curl"]["tags"])
         self.assertIn("no-source", rows["vim"]["tags"])
+
+    def test_class_tag_uses_the_dashboard_slug_rule(self):
+        # ключ фильтра в карточке класса считает slug() из дашборда:
+        # /[^a-z0-9]+/g → '-'. Тег строки обязан считаться так же, иначе
+        # карточка класса «C++» не нашла бы ни одной строки.
+        classifier = Classifier([("C++", r"\.cpp$"), ("other", ".*")])
+        rows = build_page_data(
+            [snap("t", [build("x", patches=[patch("a.cpp", "C++")])])],
+            [], classifier)["snapshots"][0]["builds"]
+        self.assertIn("c-", rows[0]["tags"])
+
+    def test_slug_matches_the_javascript_rule(self):
+        for name, expected in (("CVE", "cve"), ("C++", "c-"),
+                               ("Fix_it now", "fix-it-now"), ("DAST", "dast")):
+            self.assertEqual(slug(name), expected, name)
 
     def test_gitlab_error_tag(self):
         broken = build("bad", problems=["gitlab: 403 Forbidden"], present=None)
@@ -192,6 +208,20 @@ class TemplateContractTest(unittest.TestCase):
 
     def test_supports_dark_theme(self):
         self.assertIn("prefers-color-scheme: dark", self.html)
+
+    def test_diff_tab_starts_filtered_to_changed_rows(self):
+        # обещание спеки и README: «Изменения» открываются на изменившихся
+        self.assertIn("diff: { 'changed': 1 }", self.html)
+
+    def test_search_is_debounced(self):
+        self.assertIn("SEARCH_DELAY", self.html)
+
+    def test_pair_lives_in_the_hash_by_tag_names(self):
+        self.assertIn("function pairKey(", self.html)
+        self.assertNotIn("'pair=' + st.pair", self.html)
+
+    def test_version_sort_is_documented_as_lexicographic(self):
+        self.assertIn("Сортировка лексикографическая", self.html)
 
     def test_tooltip_container_present(self):
         self.assertIn('id="tip"', self.html)

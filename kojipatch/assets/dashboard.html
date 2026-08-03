@@ -302,7 +302,7 @@ tr.detail-row > td { background: var(--card); padding: .85rem .7rem 1.1rem 2.2re
     <div class="tablewrap"><table id="state-table">
       <thead><tr>
         <th data-sort="name">компонент <span class="arrow">▲</span></th>
-        <th data-sort="evr">version-release <span class="arrow"></span></th>
+        <th data-sort="evr" data-tip="Сортировка лексикографическая: 1.10 встанет выше 1.9. Так и задумано — в соседних строках версии принадлежат разным компонентам, и сравнивать их по правилам rpm было бы не осмысленнее.">version-release <span class="arrow"></span></th>
         <th data-sort="branch" data-tip="Ветка GitLab, из которой собран билд. Если сборка шла с коммита, а не с ветки, рядом стоит тег from-commit.">ветка <span class="arrow"></span></th>
         <th data-sort="patches" data-tip="Сколько файлов лежит в каталоге PATCH ветки. Полоска показывает доли классов патчей в этой сборке.">патчи <span class="arrow"></span></th>
         <th data-sort="rpms">RPM <span class="arrow"></span></th>
@@ -319,9 +319,9 @@ tr.detail-row > td { background: var(--card); padding: .85rem .7rem 1.1rem 2.2re
     <div class="tablewrap"><table id="diff-table">
       <thead><tr>
         <th data-sort="name">компонент <span class="arrow">▲</span></th>
-        <th data-sort="old">было <span class="arrow"></span></th>
+        <th data-sort="old" data-tip="Сортировка лексикографическая: 1.10 встанет выше 1.9. Так и задумано — в соседних строках версии принадлежат разным компонентам.">было <span class="arrow"></span></th>
         <th></th>
-        <th data-sort="new">стало <span class="arrow"></span></th>
+        <th data-sort="new" data-tip="Сортировка лексикографическая: 1.10 встанет выше 1.9. Так и задумано — в соседних строках версии принадлежат разным компонентам.">стало <span class="arrow"></span></th>
         <th data-sort="dpatch" data-tip="Сколько файлов патчей пришло и ушло. Сортировка — по сумме пришедших и ушедших: сверху компоненты, у которых стек патчей менялся сильнее всего.">Δ патчей <span class="arrow"></span></th>
         <th data-sort="drpm" data-tip="Сколько бинарных пакетов появилось и исчезло. Сортировка — по сумме появившихся и исчезнувших.">Δ RPM <span class="arrow"></span></th>
         <th>теги</th>
@@ -353,9 +353,11 @@ var LABELS = {
   "patches-": "патчи ушли", "branch-changed": "сменил ветку",
   "changed": "что-то изменилось"
 };
-/* Классы патчей задаются конфигом, поэтому подписи для них берём из данных. */
+/* Классы патчей задаются конфигом, поэтому подписи для них берём из данных.
+   Ключ — тот же slug(), что стоит в теге строки и в карточке класса: имя
+   вроде «C++» иначе дало бы три разных ключа и карточку без строк. */
 for (var ci = 0; ci < CLASSES.length; ci++) {
-  LABELS[String(CLASSES[ci]).toLowerCase()] = "патчи " + CLASSES[ci];
+  LABELS[slug(CLASSES[ci])] = "патчи " + CLASSES[ci];
 }
 
 var ARROW = { added: "+", removed: "−", upgraded: "↑",
@@ -570,6 +572,9 @@ function scanDiff(row, q) {
 function curSnap() { return SNAPS[st.tag] || null; }
 function curPair() { return PAIRS[st.pair] || null; }
 
+/* Имя перехода для адресной строки: «старый..новый». */
+function pairKey(pair) { return pair ? pair.old + '..' + pair.new : ''; }
+
 function visibleRows() {
   var q = st.q, out = [], i, row, scan;
   if (st.tab === 'diff') {
@@ -619,6 +624,10 @@ function openOf(key, deep) {
 
 /* ---------- сортировка ---------- */
 
+/* Версии сравниваются как строки, а не по правилам rpm, и это осознанно:
+   в соседних строках стоят версии разных компонентов, так что «правильный»
+   порядок между ними всё равно ничего не значит. Про 1.10 выше 1.9
+   предупреждает подсказка на заголовке колонки. */
 function sortValue(row, key) {
   if (st.tab === 'diff') {
     if (key === 'old') return row.old_evr || '';
@@ -678,10 +687,12 @@ function tagsHtml(tags) {
 }
 
 /* Адреса приходят из koji и GitLab, то есть снаружи. В href пускаем только
-   http(s) и относительный путь: javascript: в ссылке нам ни к чему. */
+   http(s) и относительный путь: javascript: в ссылке нам ни к чему.
+   «//host/x» — не относительный путь, а ссылка на чужой хост по текущей
+   схеме, поэтому её тоже не пускаем. */
 function safeUrl(url) {
   if (!url) return null;
-  return /^(https?:\/\/|\/)/i.test(String(url)) ? String(url) : null;
+  return /^(https?:\/\/|\/(?!\/))/i.test(String(url)) ? String(url) : null;
 }
 
 function linkHtml(url, text) {
@@ -1078,6 +1089,9 @@ function allOpen(items) {
 }
 
 function render() {
+  /* Подсказка привязана к узлу, а таблица сейчас будет перерисована:
+     без этого она пережила бы свой якорь и висела бы над пустым местом. */
+  hideTip();
   var items = sortRows(visibleRows());
   var total = totalRows();
   var body = st.tab === 'diff' ? diffBody : stateBody;
@@ -1139,7 +1153,10 @@ function showTab(name) {
 function writeHash() {
   var parts = ['tab=' + st.tab];
   if (SNAPS.length) parts.push('tag=' + encodeURIComponent(SNAPS[st.tag] ? SNAPS[st.tag].tag : ''));
-  if (PAIRS.length) parts.push('pair=' + st.pair);
+  /* Пару храним именами тегов, а не номером: набор тегов от прогона к
+     прогону меняется, и присланная ссылка «pair=1» показала бы другой
+     переход, ничем не выдав подмены. */
+  if (PAIRS.length) parts.push('pair=' + encodeURIComponent(pairKey(curPair())));
   /* f= пишем всегда, в том числе пустой: у вкладки «Изменения» фильтр по
      умолчанию непустой, и без явного «фильтров нет» ссылка на таблицу со
      снятым фильтром при открытии снова показывала бы только изменившиеся. */
@@ -1191,7 +1208,7 @@ function readHash() {
   var raw = location.hash.replace(/^#/, '');
   if (!raw) return false;
   var parts = raw.split('&'), i, kvp, key, val;
-  var tab = null, filters = null, sort = null;
+  var tab = null, filters = null, sort = null, dropped = false;
   for (i = 0; i < parts.length; i++) {
     kvp = parts[i].split('=');
     key = kvp[0];
@@ -1200,18 +1217,25 @@ function readHash() {
     if (key === 'tab') {
       /* Пар нет — вкладки «Изменения» на странице тоже нет. */
       tab = (val === 'diff' && PAIRS.length) ? 'diff' : 'state';
+      if (val === 'diff' && !PAIRS.length) dropped = true;
     } else if (key === 'tag') {
       for (var j = 0; j < SNAPS.length; j++) {
         if (SNAPS[j].tag === val) st.tag = j;
       }
     } else if (key === 'pair') {
-      var n = parseInt(val, 10);
-      if (!isNaN(n) && n >= 0 && n < PAIRS.length) st.pair = n;
+      /* Не нашли перехода с такими тегами — остаёмся на паре по умолчанию. */
+      for (var p = 0; p < PAIRS.length; p++) {
+        if (pairKey(PAIRS[p]) === val) st.pair = p;
+      }
     } else if (key === 'f') filters = val ? val.split(',') : [];
     else if (key === 'q') st.q = val.trim().toLowerCase();
     else if (key === 'sort') sort = val.split(':');
   }
   if (tab) st.tab = tab;
+  /* Ссылка вела на «Изменения», но сравнивать в этом прогоне нечего. Фильтры
+     из неё — диффовые; на вкладке состояния они дали бы пустую таблицу без
+     единого намёка почему. */
+  if (dropped) filters = null;
   if (filters) {
     var live = [];
     for (i = 0; i < filters.length; i++) {
@@ -1236,10 +1260,18 @@ function nvrOf(row) {
   return evr ? row.name + '-' + String(evr).replace(/^[0-9]+:/, '') : row.name;
 }
 
+/* Подпись кнопки берём один раз при загрузке: если запомнить текущую, то
+   второй клик подряд запомнит «Скопировано» и вернёт кнопку к нему навсегда. */
+var COPY_LABEL = copyBtn.textContent;
+var flashTimer = null;
+
 function flash(text) {
-  var old = copyBtn.textContent;
   copyBtn.textContent = text;
-  setTimeout(function () { copyBtn.textContent = old; }, 1400);
+  if (flashTimer) clearTimeout(flashTimer);
+  flashTimer = setTimeout(function () {
+    flashTimer = null;
+    copyBtn.textContent = COPY_LABEL;
+  }, 1400);
 }
 
 function copyFallback(text) {
@@ -1359,9 +1391,18 @@ for (var hi = 0; hi < sortHeads.length; hi++) {
   }(sortHeads[hi]));
 }
 
+/* Каждое нажатие перестраивает весь tbody вместе с раскрытыми деталями, а
+   тег — это тысячи сборок. Ждём паузы в наборе. */
+var SEARCH_DELAY = 120;
+var searchTimer = null;
+
 search.addEventListener('input', function () {
-  st.q = search.value.trim().toLowerCase();
-  render();
+  if (searchTimer) clearTimeout(searchTimer);
+  searchTimer = setTimeout(function () {
+    searchTimer = null;
+    st.q = search.value.trim().toLowerCase();
+    render();
+  }, SEARCH_DELAY);
 });
 
 expandBtn.addEventListener('click', function () {
