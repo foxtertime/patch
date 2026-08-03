@@ -40,11 +40,28 @@ class KojiClient:
         results = {}
         for start in range(0, len(ids), self._batch):
             chunk = ids[start:start + self._batch]
-            try:
-                results.update(self._multicall_chunk(method, chunk, keyword))
-            except (AttributeError, NotImplementedError):
-                results.update(self._sequential_chunk(method, chunk, keyword))
+            results.update(self._call_chunk(method, chunk, keyword))
         return results
+
+    def _call_chunk(self, method: str, chunk: List[int],
+                    keyword: str) -> Dict[int, object]:
+        """Один пакет: сперва multicall, при его отсутствии — последовательные
+        вызовы; любая иная ошибка хаба оборачивается в KojiError с контекстом."""
+        try:
+            try:
+                return self._multicall_chunk(method, chunk, keyword)
+            except (AttributeError, NotImplementedError, TypeError):
+                # AttributeError/NotImplementedError — на хабе нет multicall
+                # (старый клиент) или он не вернул VirtualCall; TypeError —
+                # multicall на хабе до koji 1.18 был обычным булевым
+                # атрибутом, а не вызываемым методом. Во всех случаях —
+                # фолбэк на последовательные вызовы.
+                return self._sequential_chunk(method, chunk, keyword)
+        except KojiError:
+            raise
+        except Exception as exc:
+            raise KojiError("%s: ошибка хаба на %d билд(ах): %s" %
+                            (method, len(chunk), exc))
 
     def _invoke(self, target, method: str, build_id: int, keyword: str):
         call = getattr(target, method)
