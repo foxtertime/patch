@@ -1,0 +1,78 @@
+[
+ {
+  "builds": [
+   {
+    "build_id": 1,
+    "completed": "2026-05-14",
+    "epoch": null,
+    "name": "nginx",
+    "nvr": "nginx-1.25.0-1.el9",
+    "owner": "builder",
+    "patch_dir_present": true,
+    "patches": [
+     {
+      "class": "CVE",
+      "cves": [
+       "CVE-2024-7347"
+      ],
+      "name": "CVE-2024-7347.patch",
+      "path": "PATCH/CVE-2024-7347.patch",
+      "web_url": "https://gl/blob/CVE-2024-7347.patch"
+     },
+     {
+      "class": "SAST",
+      "cves": [],
+      "name": "sast-x.patch",
+      "path": "PATCH/sast-x.patch",
+      "web_url": "https://gl/blob/sast-x.patch"
+     }
+    ],
+    "problems": [],
+    "release": "1.el9",
+    "rpms": [
+     "a.x86_64"
+    ],
+    "source": {
+     "host": "h",
+     "project": "g/nginx",
+     "raw": "git+ssh://git@h/g/nginx?#origin/br-9.2",
+     "ref": "br-9.2",
+     "ref_kind": "branch",
+     "web_url": "https://gl/tree"
+    },
+    "task_id": 2,
+    "version": "1.25.0"
+   },
+   {
+    "build_id": 1,
+    "completed": "2026-05-14",
+    "epoch": null,
+    "name": "fresh",
+    "nvr": "fresh-2.0-1.el9",
+    "owner": "builder",
+    "patch_dir_present": true,
+    "patches": [],
+    "problems": [],
+    "release": "1.el9",
+    "rpms": [
+     "a.x86_64"
+    ],
+    "source": {
+     "host": "h",
+     "project": "g/fresh",
+     "raw": "git+ssh://git@h/g/fresh?#origin/main",
+     "ref": "main",
+     "ref_kind": "branch",
+     "web_url": "https://gl/tree"
+    },
+    "task_id": 2,
+    "version": "2.0"
+   }
+  ],
+  "generated": "2026-08-01T00:00:00+03:00",
+  "koji_hub": "https://hub/kojihub",
+  "koji_web": "https://hub/koji",
+  "schema": 1,
+  "tag": "os-9.2"
+ }
+]
