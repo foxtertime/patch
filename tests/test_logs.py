@@ -80,21 +80,17 @@ class ConfigureTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             logs.configure("verbose")
 
-    def test_propagate_flag_is_restored_after_teardown(self):
-        # configure() безусловно ставит propagate = False; tearDown должен
-        # восстановить исходное значение для изоляции тестов
+    def test_teardown_restores_the_propagate_flag(self):
+        # запускаем настоящий тест целиком, вместе с его setUp и tearDown,
+        # и смотрим на глобальное состояние после: если tearDown перестанет
+        # восстанавливать флаг, этот тест упадёт
         root = logging.getLogger("kojipatch")
-        original_propagate = root.propagate
-        logs.configure("info", stream=io.StringIO())
-        self.assertFalse(root.propagate)
-        # Имитируем tearDown
-        for handler in list(root.handlers):
-            if not isinstance(handler, logging.NullHandler):
-                root.removeHandler(handler)
-        root.setLevel(logging.NOTSET)
-        root.propagate = self._propagate
-        # Проверяем, что флаг восстановлен
-        self.assertEqual(root.propagate, original_propagate)
+        before = root.propagate
+        case = ConfigureTest("test_info_level_shows_info_and_hides_debug")
+        result = unittest.TestResult()
+        case.run(result)
+        self.assertEqual(result.errors + result.failures, [])
+        self.assertEqual(root.propagate, before)
 
     def test_levels_table_is_complete(self):
         self.assertEqual(sorted(logs.LEVELS),
