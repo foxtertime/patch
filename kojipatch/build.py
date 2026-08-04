@@ -11,7 +11,8 @@ ASSETS = os.path.join(os.path.dirname(__file__), "assets")
 TEMPLATE_PATH = os.path.join(ASSETS, "dashboard.html")
 # Порядок по зависимостям, а не по алфавиту: каждый следующий скрипт
 # рассчитывает, что предыдущие уже положили себя в KP.
-SCRIPTS = ("vercmp.js", "rpms.js", "diff.js", "viewmodel.js", "ui.js")
+SCRIPTS = ("vercmp.js", "rpms.js", "diff.js", "viewmodel.js", "store.js",
+           "ui.js")
 
 
 class BuildError(Exception):

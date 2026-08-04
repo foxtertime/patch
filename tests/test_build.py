@@ -129,6 +129,29 @@ class TemplateContractTest(unittest.TestCase):
         for name in sorted(wanted):
             self.assertIn('id="%s"' % name, self.html, name)
 
+    def test_has_a_drop_zone(self):
+        self.assertIn('id="drop"', self.html)
+        self.assertIn("Перетащите снапшоты сюда", self.html)
+
+    def test_has_a_file_picker(self):
+        self.assertIn('type="file"', self.html)
+
+    def test_has_a_sources_panel(self):
+        self.assertIn('id="sources"', self.html)
+        self.assertIn('id="sourcelist"', self.html)
+
+    def test_hidden_panels_really_hide(self):
+        # display: flex у .tabs и .sources сильнее hidden из стилей
+        # браузера: без своего правила спрятанная панель осталась бы видна.
+        self.assertIn(".tabs[hidden], .sources[hidden] { display: none; }",
+                      self.html)
+
+    def test_load_errors_live_outside_the_empty_screen(self):
+        # Экран загрузки прячется, как только появились данные. Список
+        # ошибок внутри него был бы невидим ровно тогда, когда нужен.
+        empty = self.html.index('<section id="tab-empty">')
+        self.assertLess(self.html.index('id="load-errors"'), empty)
+
     def test_reuses_ref_html_css_variables(self):
         for name in ("--bg", "--fg", "--muted", "--line", "--card",
                      "--accent", "--added", "--removed", "--hit"):

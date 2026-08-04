@@ -1,13 +1,15 @@
-/* Поведение страницы: разметка, фильтры, поиск, адресная строка.
-   Данные приходят готовыми из viewmodel.js — здесь их только рисуют. */
+/* Поведение страницы: загрузка снапшотов, разметка, фильтры, поиск,
+   адресная строка. Считает данные viewmodel.js, а что именно считать —
+   решает store.js; здесь это только рисуют и связывают с событиями. */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
-    module.exports = factory(require('./viewmodel.js'));
+    module.exports = factory(require('./viewmodel.js'), require('./store.js'));
   } else {
     root.KP = root.KP || {};
-    root.KP.ui = factory(root.KP.viewmodel);
+    root.KP.ui = factory(root.KP.viewmodel, root.KP.store);
   }
-}(typeof globalThis !== 'undefined' ? globalThis : this, function (viewmodel) {
+}(typeof globalThis !== 'undefined' ? globalThis : this,
+  function (viewmodel, store) {
   'use strict';
 
   /* Данные страницы считаются здесь же, из снапшотов: и запечённых
@@ -16,9 +18,15 @@
   var SNAPS = [], PAIRS = [], CLASSES = [];
 
   /* Единственная дверь для данных: сюда приходит то, что посчитал
-     viewmodel.js, отсюда перерисовывается страница. Перерисовка — не
-     полный сброс: LABELS подписи прежних классов не забывает. */
+     viewmodel.js, отсюда перерисовывается страница. Зовётся при каждом
+     изменении набора снапшотов, поэтому всё, что зависит от их состава,
+     здесь именно пересчитывается, а не дописывается. */
   function applyData(pageData) {
+    /* Держим выбор именами: после перестановки или удаления номер
+       показал бы другой тег, ничем не выдав подмены. */
+    var wantTag = SNAPS[st.tag] ? SNAPS[st.tag].tag : null;
+    var wantPair = PAIRS[st.pair] ? pairKey(PAIRS[st.pair]) : null;
+    var ci;
     DATA = pageData;
     SNAPS = pageData.snapshots || [];
     PAIRS = pageData.pairs || [];
@@ -26,12 +34,21 @@
     /* Классы патчей задаются конфигом, поэтому подписи для них берём из
        данных. Ключ — тот же slug(), что стоит в теге строки и в карточке
        класса: имя вроде «C++» иначе дало бы три разных ключа и карточку
-       без строк. */
-    for (var ci = 0; ci < CLASSES.length; ci++) {
-      LABELS[slug(CLASSES[ci])] = 'патчи ' + CLASSES[ci];
+       без строк. Карта заводится заново: подпись класса из выгруженного
+       снапшота пережила бы его и держала бы живым фильтр, которого на
+       странице больше нет ни на одной карточке. */
+    CLASS_LABELS = {};
+    for (ci = 0; ci < CLASSES.length; ci++) {
+      CLASS_LABELS[slug(CLASSES[ci])] = 'патчи ' + CLASSES[ci];
     }
     st.tag = SNAPS.length ? SNAPS.length - 1 : 0;
     st.pair = PAIRS.length ? PAIRS.length - 1 : 0;
+    for (ci = 0; wantTag !== null && ci < SNAPS.length; ci++) {
+      if (SNAPS[ci].tag === wantTag) st.tag = ci;
+    }
+    for (ci = 0; wantPair !== null && ci < PAIRS.length; ci++) {
+      if (pairKey(PAIRS[ci]) === wantPair) st.pair = ci;
+    }
     syncTabs();
     readHash();
     showTab(st.tab);
@@ -55,6 +72,9 @@
     "patches-": "патчи ушли", "branch-changed": "сменил ветку",
     "changed": "что-то изменилось"
   };
+  /* Подписи классов патчей живут отдельно от постоянных: классы приходят с
+     данными и уходят вместе с ними, а LABELS — словарь самой страницы. */
+  var CLASS_LABELS = {};
   var ARROW = { added: "+", removed: "−", upgraded: "↑",
                 downgraded: "↓", unchanged: "=" };
   var KNOWN_CLASS = { "autogen": 1, "cve": 1, "sast": 1, "dast": 1,
@@ -77,6 +97,18 @@
   var tabBtns = Array.prototype.slice.call(document.querySelectorAll('.tab'));
   var stateBody = document.getElementById('state-rows');
   var diffBody = document.getElementById('diff-rows');
+  var tabsNav = document.querySelector('.tabs');
+  var emptySection = document.getElementById('tab-empty');
+  var sourcesBox = document.getElementById('sources');
+  var chainBox = document.getElementById('chain');
+  var sourceList = document.getElementById('sourcelist');
+  var loadErrors = document.getElementById('load-errors');
+  var warningsBox = document.getElementById('warnings');
+  var fileInput = document.getElementById('file-input');
+  var dropZone = document.getElementById('drop');
+  var pickBtn = document.getElementById('pick');
+  var addMoreBtn = document.getElementById('add-more');
+  var editBtn = document.getElementById('edit-sources');
 
   /* Всё состояние страницы в одном месте: отсюда же оно уезжает в
      location.hash и оттуда же восстанавливается при перезагрузке. */
@@ -139,7 +171,7 @@
   }
 
   function label(key) {
-    return LABELS[key] || key;
+    return LABELS[key] || CLASS_LABELS[key] || key;
   }
 
   function plural(n, one, few, many) {
@@ -659,7 +691,10 @@
            + '<td class="src"><span class="chev" role="button" tabindex="0"'
            + ' aria-expanded="' + (open ? 'true' : 'false') + '">'
            + (open ? '▾' : '▸') + '</span> ' + hl(row.name, q) + '</td>'
-           + '<td class="ver">' + hl(row.evr, q) + '</td>'
+           /* Версии может не быть: снапшот приходит из файла, который выбрал
+              человек, и прочерк здесь честнее пустой ячейки. */
+           + '<td class="ver">' + (row.evr ? hl(row.evr, q)
+                : '<span class="none">—</span>') + '</td>'
            + '<td class="tagged">' + taggedCell(row, q) + '</td>'
            + '<td class="branch">' + (row.branch ? hl(row.branch, q)
                 : '<span class="none">—</span>') + '</td>'
@@ -1213,6 +1248,19 @@
         }
         var tab = node.getAttribute('data-tab');
         if (tab) { showTab(tab); render(); return; }
+        /* Список источников тоже перерисовывается целиком, поэтому его
+           кнопки живут здесь же, а не на своих обработчиках. */
+        var move = node.getAttribute('data-move');
+        if (move) {
+          var at = move.split(':');
+          store.move(parseInt(at[0], 10), parseInt(at[1], 10));
+          return;
+        }
+        var gone = node.getAttribute('data-drop-snap');
+        if (gone !== null && gone !== undefined) {
+          store.remove(parseInt(gone, 10));
+          return;
+        }
       }
       node = node.parentNode;
     }
@@ -1343,12 +1391,138 @@
     window.addEventListener('resize', syncStickyOffset);
   }
 
+  /* ---------- загрузка снапшотов ---------- */
+
+  /* Пустой дашборд показывает только зону загрузки: вкладки без данных
+     обещали бы содержимое, которого нет. */
+  function syncEmpty() {
+    var has = store.list().length > 0;
+    emptySection.hidden = has;
+    sourcesBox.hidden = !has;
+    tabsNav.hidden = !has;
+    if (!has) {
+      stateSection.hidden = true;
+      diffSection.hidden = true;
+    }
+  }
+
+  function renderSources() {
+    var items = store.list(), parts = [], i;
+    for (i = 0; i < items.length; i++) parts.push(esc(items[i].tag));
+    chainBox.innerHTML = parts.length
+      ? '<span class="l">снапшоты:</span> ' + parts.join(' <span class="arrow">→</span> ')
+      : '';
+    var out = '';
+    for (i = 0; i < items.length; i++) {
+      out += '<li><span class="mono">' + esc(items[i].tag) + '</span>'
+          + '<span class="sub">' + esc(items[i].generated) + ' · '
+          + items[i].builds + ' ' + plural(items[i].builds, 'сборка', 'сборки', 'сборок')
+          + ' · ' + esc(items[i].file) + '</span>'
+          + '<button type="button" class="mini" data-move="' + i + ':-1"'
+          + (i === 0 ? ' disabled' : '') + ' data-tip="Выше по цепочке">↑</button>'
+          + '<button type="button" class="mini" data-move="' + i + ':1"'
+          + (i === items.length - 1 ? ' disabled' : '') + ' data-tip="Ниже по цепочке">↓</button>'
+          + '<button type="button" class="mini" data-drop-snap="' + i + '"'
+          + ' data-tip="Убрать этот снапшот">✕</button></li>';
+    }
+    sourceList.innerHTML = out;
+    var warns = store.warnings(), wout = '';
+    for (i = 0; i < warns.length; i++) wout += '<div class="warn">' + esc(warns[i]) + '</div>';
+    warningsBox.innerHTML = wout;
+  }
+
+  store.onChange(function () {
+    applyData(viewmodel.buildPageData(store.snapshots()));
+    renderSources();
+    syncEmpty();
+  });
+
+  function showErrors(errors) {
+    var out = '', i;
+    for (i = 0; i < errors.length; i++) out += '<li>' + esc(errors[i]) + '</li>';
+    loadErrors.innerHTML = out;
+  }
+
+  function loadFiles(files) {
+    var errors = [], pending = files.length, i;
+    if (!pending) return;
+    function done() {
+      pending -= 1;
+      if (pending) return;
+      showErrors(errors);
+    }
+    for (i = 0; i < files.length; i++) {
+      (function (file) {
+        var reader = new FileReader();
+        reader.onload = function () {
+          var parsed = store.parseText(String(reader.result), file.name);
+          if (!parsed.ok) errors.push(parsed.error);
+          else {
+            var res = store.add(parsed.snapshots, file.name);
+            errors = errors.concat(res.rejected);
+          }
+          done();
+        };
+        /* Нечитаемый файл — не повод молчать: без этой ветки страница
+           просто ничего не сделала бы в ответ на выбор. */
+        reader.onerror = function () {
+          errors.push(file.name + ': файл не читается');
+          done();
+        };
+        reader.readAsText(file);
+      }(files[i]));
+    }
+  }
+
+  function openPicker() { fileInput.click(); }
+
+  pickBtn.addEventListener('click', openPicker);
+  addMoreBtn.addEventListener('click', openPicker);
+
+  fileInput.addEventListener('change', function () {
+    loadFiles(fileInput.files);
+    /* Тот же файл, выбранный второй раз, не даёт события, пока в поле
+       лежит его прежнее значение. */
+    fileInput.value = '';
+  });
+
+  editBtn.addEventListener('click', function () {
+    var open = sourceList.hidden;
+    sourceList.hidden = !open;
+    editBtn.setAttribute('aria-expanded', String(open));
+  });
+
+  function markOver(on) {
+    dropZone.className = on ? 'drop over' : 'drop';
+  }
+
+  /* Ронять файл можно на всю страницу, а не только на зону: браузер по
+     умолчанию открывает брошенный файл вместо страницы, и без
+     preventDefault на dragover дашборд просто заменился бы содержимым JSON. */
+  document.addEventListener('dragover', function (e) {
+    e.preventDefault();
+    markOver(true);
+  });
+  document.addEventListener('dragleave', function (e) {
+    /* Уход за пределы окна: внутри страницы dragleave приходит на каждой
+       границе, и снимать подсветку по ним значило бы мигать ею. */
+    if (!e.relatedTarget) markOver(false);
+  });
+  document.addEventListener('drop', function (e) {
+    e.preventDefault();
+    markOver(false);
+    loadFiles(e.dataTransfer ? e.dataTransfer.files : []);
+  });
+
   /* ---------- старт ---------- */
 
   /* Шапку рисует applyData, а не старт: набор снапшотов меняется на лету,
      и подпись обязана меняться вместе с ним. */
   function renderMeta() {
     var meta = document.getElementById('meta'), tags = [], i;
+    /* Ничего не загружено — шапке нечего сказать. Три прочерка над зоной
+       загрузки выглядели бы сломанной страницей, а не пустой. */
+    if (!SNAPS.length) { meta.innerHTML = ''; return; }
     for (i = 0; i < SNAPS.length; i++) tags.push(SNAPS[i].tag);
     meta.innerHTML =
         '<div><b>теги:</b> ' + (tags.length ? esc(tags.join(', ')) : '—') + '</div>'
@@ -1358,9 +1532,12 @@
 
   (function start() {
     /* Прелюдия страницы, если данные запёк сборщик; иначе дашборд пуст и
-       ждёт, пока снапшоты принесут ему снаружи. */
+       ждёт, пока снапшоты принесут ему снаружи. Путь один и тот же: и
+       запечённое, и подгруженное проходит через хранилище. */
     var raw = (typeof window !== 'undefined' && window.KP_SNAPSHOTS) || [];
-    applyData(viewmodel.buildPageData(raw));
+    if (raw.length) store.add(raw, 'встроено в файл');
+    syncEmpty();
+    renderSources();
     syncStickyOffset();
   }());
 

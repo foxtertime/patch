@@ -43,10 +43,48 @@ h1 { font-size: 1.5rem; margin: 0 0 .75rem; }
 .meta b { color: var(--fg); font-weight: 600; }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 
+/* Панель источников: что сейчас загружено и в каком порядке сравнивается.
+   Цепочка видна всегда, список с кнопками — по требованию: переставляют и
+   убирают снапшоты редко, а знать, что лежит на странице, нужно всегда. */
+.sources { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem;
+  margin-bottom: .8rem; }
+.chain { font-size: .875rem; margin-right: auto; overflow-wrap: anywhere; }
+.chain .l { color: var(--muted); font-size: .7rem; text-transform: uppercase;
+  letter-spacing: .03em; }
+.chain .arrow { color: var(--muted); }
+.sourcelist { list-style: none; margin: 0 0 1rem; padding: 0; }
+.sourcelist li { display: flex; flex-wrap: wrap; align-items: baseline;
+  gap: .1rem .5rem; padding: .35rem .6rem; margin-bottom: .3rem;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
+.sourcelist .sub { color: var(--muted); font-size: .78rem; margin-right: auto;
+  overflow-wrap: anywhere; }
+.mini { padding: .1rem .5rem; font-size: .8rem; line-height: 1.3; }
+.mini[disabled] { opacity: .4; cursor: default; }
+.warn { color: var(--major); font-size: .82rem; margin-bottom: .35rem;
+  padding-left: .55rem; border-left: 3px solid var(--major); }
+.loaderrors:not(:empty) { margin: 0 0 1rem; }
+
+/* Экран загрузки. Пунктирная рамка говорит «сюда можно ронять» без единого
+   слова инструкции; подсветка появляется, пока файл над страницей. */
+.drop { border: 2px dashed var(--line); border-radius: 10px;
+  padding: 3rem 1.5rem; text-align: center; }
+.drop.over { border-color: var(--accent); }
+.dropmain { font-size: 1.1rem; font-weight: 600; margin: 0 0 .4rem; }
+.dropsub { color: var(--muted); font-size: .875rem; margin: 0; }
+/* Кнопка внутри фразы: выглядит ссылкой, потому что стоит в тексте, но
+   остаётся кнопкой — она открывает диалог, а никуда не ведёт. */
+.linkish { display: inline; padding: 0; border: 0; border-radius: 0;
+  background: none; color: var(--accent); font: inherit;
+  text-decoration: underline; cursor: pointer; }
+.linkish:hover { border: 0; }
+
 /* Вкладки: не «кнопки приложения», а закладки документа — активная
    подчёркнута той же линией, что и шапка таблицы под ней. */
 .tabs { display: flex; gap: .25rem; border-bottom: 1px solid var(--line);
   margin-bottom: 1rem; }
+/* display у .tabs и .sources сильнее hidden из стилей браузера: без этих
+   двух строк спрятанные скриптом панели остались бы на экране. */
+.tabs[hidden], .sources[hidden] { display: none; }
 .tab { appearance: none; background: none; border: 0; border-radius: 0;
   padding: .5rem .9rem; margin-bottom: -1px; color: var(--muted);
   font: inherit; font-size: .95rem; font-weight: 600; cursor: pointer;
@@ -344,6 +382,25 @@ tr.detail-row > td { background: var(--card); padding: .85rem .7rem 1.1rem 2.2re
 <div class="wrap">
   <h1>Koji patch dashboard</h1>
   <div class="meta" id="meta"></div>
+  <div class="sources" id="sources" hidden>
+    <div class="chain" id="chain"></div>
+    <button type="button" class="toggle" id="add-more">добавить</button>
+    <button type="button" class="toggle" id="edit-sources" aria-expanded="false">изменить</button>
+  </div>
+  <ul class="sourcelist" id="sourcelist" hidden></ul>
+  <div class="warnings" id="warnings"></div>
+  <!-- Список ошибок загрузки стоит снаружи «пустого» экрана: как только
+       появились данные, экран прячется, и отказ файла внутри него никто
+       бы не увидел. -->
+  <ul class="problems loaderrors" id="load-errors"></ul>
+  <section id="tab-empty">
+    <div class="drop" id="drop">
+      <p class="dropmain">Перетащите снапшоты сюда</p>
+      <p class="dropsub">или <button type="button" class="linkish" id="pick">выберите файлы</button>.
+        Это JSON, который делает <span class="mono">kojipatch collect</span>.</p>
+    </div>
+  </section>
+  <input type="file" id="file-input" accept=".json,application/json" multiple hidden>
   <nav class="tabs">
     <button class="tab" data-tab="state" aria-selected="true">Состояние</button>
     <button class="tab" data-tab="diff" data-tip="Что изменилось между двумя тегами: компоненты, версии, патчи, состав RPM, ветки.">Изменения</button>

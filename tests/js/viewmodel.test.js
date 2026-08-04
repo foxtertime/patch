@@ -260,6 +260,41 @@ test('без адреса koji ссылки нет', function () {
   assert.strictEqual(page.snapshots[0].koji_web, null);
 });
 
+/* Снапшоты приходят из файла, который человек выбрал сам: питоновская
+   модель без version, release и nvr их не делает, а чужой или обрезанный
+   файл — запросто. Ниже — три места, где неизвестное могло бы уехать в
+   страницу под видом определённого значения. */
+
+test('билд без version — версии нет, а не «undefined-undefined»', function () {
+  var bare = build('nginx');
+  delete bare.version;
+  var row = data([snap('t', [bare])]).snapshots[0].builds[0];
+  assert.strictEqual(row.evr, null);
+});
+
+test('билд без release — версии нет', function () {
+  var bare = build('nginx');
+  bare.release = null;
+  var row = data([snap('t', [bare])]).snapshots[0].builds[0];
+  assert.strictEqual(row.evr, null);
+});
+
+test('билд без nvr — ссылки на koji нет, а не поиск по undefined', function () {
+  var bare = build('nginx');
+  delete bare.nvr;
+  var row = data([snap('t', [bare])]).snapshots[0].builds[0];
+  assert.strictEqual(row.koji_url, null);
+});
+
+test('в паре версии сторон тоже не выдумываются', function () {
+  var oldB = build('nginx'), newB = build('nginx', { version: '1.1' });
+  delete oldB.release;
+  var page = data([snap('t1', [oldB]), snap('t2', [newB])]);
+  var row = page.pairs[0].rows[0];
+  assert.strictEqual(row.old_evr, null);
+  assert.strictEqual(row.new_evr, '1.1-1.el9');
+});
+
 test('метки строки по классам патчей', function () {
   // tests/test_render.py: test_row_tags_for_patch_classes
   var rows = byName(data().snapshots[0].builds);

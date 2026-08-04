@@ -31,13 +31,24 @@
     });
   }
 
+  /* Снапшот приходит из файла, который выбрал человек, а не только из
+     питоновской модели: в нём может не быть ни nvr, ни version с release.
+     Неизвестное остаётся null и рисуется прочерком — ссылка на поиск по
+     «undefined» и версия «undefined-undefined» выдавали бы незнание за
+     данные. Проверка живёт здесь, а не в загрузчике: через viewmodel
+     проходят и подгруженные снапшоты, и запечённые сборщиком. */
   function kojiUrl(kojiWeb, nvr) {
-    if (!kojiWeb) return null;
+    if (!kojiWeb || nvr === null || nvr === undefined || nvr === '') {
+      return null;
+    }
     return String(kojiWeb).replace(/\/+$/, '')
       + '/search?match=exact&type=build&terms=' + quote(nvr);
   }
 
+  function missing(value) { return value === null || value === undefined; }
+
   function evrOf(build) {
+    if (missing(build.version) || missing(build.release)) return null;
     var prefix = build.epoch ? build.epoch + ':' : '';
     return prefix + build.version + '-' + build.release;
   }
