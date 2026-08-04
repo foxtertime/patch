@@ -158,10 +158,25 @@ h1 { font-size: 1.5rem; margin: 0 0 .75rem; }
 .controls { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center;
   position: sticky; top: 0; background: var(--bg); padding: .6rem 0; z-index: 20;
   border-bottom: 1px solid var(--line); }
+/* Поле поиска с крестиком внутри. Растягивается по строке фильтров
+   вместо самого поля — оно теперь внутри и занимает всю ширину. */
+.searchbox { position: relative; flex: 1 1 auto; min-width: 200px;
+  display: flex; }
 input[type=search] {
-  flex: 1 1 auto; min-width: 200px; padding: .5rem .75rem; border-radius: 6px;
+  width: 100%; padding: .5rem 2.1rem .5rem .75rem; border-radius: 6px;
   border: 1px solid var(--line); background: var(--card); color: var(--fg); font: inherit;
 }
+/* Свой крестик вместо нативного: тот есть только в WebKit, а в Firefox
+   его нет вовсе — два разных поведения хуже одного своего. Нативный
+   прячем, иначе в Chrome было бы два крестика подряд. */
+input[type=search]::-webkit-search-cancel-button { appearance: none;
+  -webkit-appearance: none; }
+#q-clear { position: absolute; right: .3rem; top: 50%;
+  transform: translateY(-50%); width: 1.6rem; height: 1.6rem; padding: 0;
+  border: 0; border-radius: 50%; background: none; color: var(--muted);
+  font-size: .8rem; line-height: 1; cursor: pointer; }
+#q-clear:hover { color: var(--fg); background: var(--line); }
+#q-clear[hidden] { display: none; }
 input[type=search]:focus { outline: 2px solid var(--accent); outline-offset: -1px;
   border-color: var(--accent); }
 button {
@@ -425,7 +440,11 @@ tr.detail-row > td { background: var(--card); padding: .85rem .7rem 1.1rem 2.2re
     <div class="cards global" id="state-cards"></div>
     <div class="cards diff" id="class-cards"></div>
     <div class="controls" id="controls">
-      <input type="search" id="q" placeholder="Компонент, тег, ветка, патч, CVE, RPM…" autocomplete="off">
+      <div class="searchbox">
+        <input type="search" id="q" placeholder="Компонент, тег, ветка, патч, CVE, RPM…" autocomplete="off">
+        <button type="button" id="q-clear" hidden aria-label="Очистить поиск"
+                data-tip="Очистить строку поиска">✕</button>
+      </div>
       <button id="expand" class="toggle" data-tip="Развернуть или свернуть все строки, которые сейчас видны. Фильтры и поиск учитываются.">Expand all</button>
       <button id="copy-nvr" class="toggle" data-tip="Скопировать NVR отфильтрованных строк">Copy NVR</button>
       <span class="count" id="count"></span>

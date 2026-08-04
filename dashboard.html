@@ -1,3 +1,1555 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Koji patch dashboard</title>
+<style>
+:root {
+  --bg: #ffffff; --fg: #1a1a1a; --muted: #6b7280; --line: #e5e7eb;
+  --card: #f9fafb; --accent: #2563eb; --up: #15803d; --down: #b91c1c;
+  --major: #b45309; --added: #15803d; --removed: #b91c1c; --repack: #7c3aed;
+  --hit: #fde68a; --hitfg: #1a1a1a;
+  /* Цвета классов патчей. Они же красят «полоску состава» в колонке
+     патчей, теги строк и полосы групп в развёрнутой строке: один и тот же
+     класс всюду одного цвета, иначе полоска ничего не сообщает. */
+  --autogen: #4338ca; --cve: #be123c; --sast: #6d28d9; --dast: #0e7490;
+  --coverage: #4d7c0f; --spec: #a16207; --changelog: #a21caf;
+  --files: #0f766e; --other: #6b7280;
+  /* высоту панели фильтров проставляет JS — от неё зависит смещение
+     «липкой» шапки таблицы. Значение здесь — запасное, до первого замера. */
+  --controls-h: 3.4rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1115; --fg: #e6e6e6; --muted: #9ca3af; --line: #262a33;
+    --card: #171a21; --accent: #60a5fa; --up: #4ade80; --down: #f87171;
+    --major: #fbbf24; --added: #4ade80; --removed: #f87171; --repack: #c4b5fd;
+    --hit: #78350f; --hitfg: #fef3c7;
+    --autogen: #818cf8; --cve: #fb7185; --sast: #a78bfa; --dast: #22d3ee;
+    --coverage: #a3e635; --spec: #fbbf24; --changelog: #e879f9;
+    --files: #5eead4; --other: #9ca3af;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; padding: 2rem 1.25rem 4rem; background: var(--bg); color: var(--fg);
+  font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+.wrap { max-width: 1400px; margin: 0 auto; }
+h1 { font-size: 1.5rem; margin: 0 0 .75rem; }
+.meta { color: var(--muted); font-size: .875rem; margin-bottom: 1.25rem; }
+.meta div { overflow-wrap: anywhere; }
+.meta b { color: var(--fg); font-weight: 600; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+/* Панель источников: что сейчас загружено и в каком порядке сравнивается.
+   Цепочка видна всегда, список с кнопками — по требованию: переставляют и
+   убирают снапшоты редко, а знать, что лежит на странице, нужно всегда. */
+.sources { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem;
+  margin-bottom: .8rem; }
+.chain { font-size: .875rem; margin-right: auto; overflow-wrap: anywhere; }
+.chain .l { color: var(--muted); font-size: .7rem; text-transform: uppercase;
+  letter-spacing: .03em; }
+.chain .arrow { color: var(--muted); }
+/* Дата стоит только у тегов-двойников и читается как уточнение к тегу, а не
+   как ещё одно звено цепочки или отдельная кнопка. */
+.chain .when, .pick .when { color: var(--muted); font-size: .8em; }
+.sourcelist { list-style: none; margin: 0 0 1rem; padding: 0; }
+.sourcelist li { display: flex; flex-wrap: wrap; align-items: baseline;
+  gap: .1rem .5rem; padding: .35rem .6rem; margin-bottom: .3rem;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
+.sourcelist .sub { color: var(--muted); font-size: .78rem; margin-right: auto;
+  overflow-wrap: anywhere; }
+.mini { padding: .1rem .5rem; font-size: .8rem; line-height: 1.3; }
+.mini[disabled] { opacity: .4; cursor: default; }
+.warn { color: var(--major); font-size: .82rem; margin-bottom: .35rem;
+  padding-left: .55rem; border-left: 3px solid var(--major); }
+.loaderrors:not(:empty) { margin: 0 0 1rem; }
+
+/* Экран загрузки. Пунктирная рамка говорит «сюда можно ронять» без единого
+   слова инструкции; подсветка появляется, пока файл над страницей. */
+.drop { border: 2px dashed var(--line); border-radius: 10px;
+  padding: 3rem 1.5rem; text-align: center; }
+.drop.over { border-color: var(--accent); }
+.dropmain { font-size: 1.1rem; font-weight: 600; margin: 0 0 .4rem; }
+.dropsub { color: var(--muted); font-size: .875rem; margin: 0; }
+/* Кнопка внутри фразы: выглядит ссылкой, потому что стоит в тексте, но
+   остаётся кнопкой — она открывает диалог, а никуда не ведёт. */
+.linkish { display: inline; padding: 0; border: 0; border-radius: 0;
+  background: none; color: var(--accent); font: inherit;
+  text-decoration: underline; cursor: pointer; }
+.linkish:hover { border: 0; }
+
+/* Вкладки: не «кнопки приложения», а закладки документа — активная
+   подчёркнута той же линией, что и шапка таблицы под ней. */
+.tabs { display: flex; gap: .25rem; border-bottom: 1px solid var(--line);
+  margin-bottom: 1rem; }
+/* display у .tabs и .sources сильнее hidden из стилей браузера: без этих
+   двух строк спрятанные скриптом панели остались бы на экране. */
+.tabs[hidden], .sources[hidden] { display: none; }
+.tab { appearance: none; background: none; border: 0; border-radius: 0;
+  padding: .5rem .9rem; margin-bottom: -1px; color: var(--muted);
+  font: inherit; font-size: .95rem; font-weight: 600; cursor: pointer;
+  border-bottom: 2px solid transparent; }
+.tab:hover { color: var(--fg); }
+.tab[aria-selected=true] { color: var(--fg); border-bottom-color: var(--accent); }
+.tab[hidden] { display: none; }
+
+/* Селектор тега или пары тегов. Всегда виден, даже когда выбор один:
+   он подписывает, на что именно смотрит страница. */
+.selector { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .9rem; }
+.pick { display: flex; align-items: baseline; gap: .45rem; padding: .35rem .75rem;
+  border-radius: 999px; border: 1px solid var(--line); background: var(--card);
+  color: var(--fg); font: inherit; font-size: .85rem; cursor: pointer; }
+.pick:hover { border-color: var(--accent); }
+.pick .sub { color: var(--muted); font-size: .75rem; }
+.pick[aria-pressed=true] { border-color: var(--accent); color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent); }
+.pick[aria-pressed=true] .sub,
+.pick[aria-pressed=true] .when { color: var(--accent); }
+.pick .sum { font-size: .68rem; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--major); }
+
+.cards { display: grid; gap: .6rem; }
+/* Итоги тега — крупно; разрезы по классам и статусам — плотной сеткой. */
+.cards.global { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  margin-bottom: .6rem; }
+.cards.diff { grid-template-columns: repeat(auto-fit, minmax(122px, 1fr));
+  margin-bottom: 1.5rem; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+  padding: .55rem .65rem; }
+.card .n { font-size: 1.2rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+.card .unit { font-size: .72rem; font-weight: 500; color: var(--muted);
+  letter-spacing: .02em; }
+.card .rpm { font-size: .74rem; font-weight: 500; color: var(--muted);
+  font-variant-numeric: tabular-nums; margin-bottom: .15rem; min-height: 1em; }
+.card .l { font-size: .7rem; color: var(--muted); text-transform: uppercase;
+  letter-spacing: .03em; }
+.card.big { padding: .85rem 1rem; }
+.card.big .l { font-size: .74rem; font-weight: 700; color: var(--fg);
+  margin-bottom: .35rem; }
+.card.big .n { font-size: 2rem; line-height: 1.1; }
+.card.big .rpm { margin: .3rem 0 0; }
+.card.clickable { cursor: pointer; text-align: left; font: inherit;
+  color: var(--fg); width: 100%; }
+.card.clickable:hover { border-color: var(--accent); }
+.card.clickable:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.card[aria-pressed=true] { border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent); }
+.card[aria-pressed=true] .n { color: var(--accent); }
+/* Класс патчей — цветной, поэтому карточка класса красит только подпись:
+   номер остаётся нейтральным и колонки чисел читаются как одна сетка. */
+.card .l.c-autogen, .tag.c-autogen, .pgroup.c-autogen,
+.meter i.c-autogen { color: var(--autogen); }
+.card .l.c-cve, .tag.c-cve, .pgroup.c-cve, .meter i.c-cve { color: var(--cve); }
+.card .l.c-sast, .tag.c-sast, .pgroup.c-sast, .meter i.c-sast { color: var(--sast); }
+.card .l.c-dast, .tag.c-dast, .pgroup.c-dast, .meter i.c-dast { color: var(--dast); }
+.card .l.c-coverage, .tag.c-coverage, .pgroup.c-coverage,
+.meter i.c-coverage { color: var(--coverage); }
+.card .l.c-spec, .tag.c-spec, .pgroup.c-spec, .meter i.c-spec { color: var(--spec); }
+.card .l.c-changelog, .tag.c-changelog, .pgroup.c-changelog,
+.meter i.c-changelog { color: var(--changelog); }
+.card .l.c-files, .tag.c-files, .pgroup.c-files,
+.meter i.c-files { color: var(--files); }
+.card .l.c-other, .tag.c-other, .pgroup.c-other, .meter i.c-other { color: var(--other); }
+.card .l.c-x, .tag.c-x, .pgroup.c-x, .meter i.c-x { color: var(--accent); }
+
+.controls { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center;
+  position: sticky; top: 0; background: var(--bg); padding: .6rem 0; z-index: 20;
+  border-bottom: 1px solid var(--line); }
+input[type=search] {
+  flex: 1 1 auto; min-width: 200px; padding: .5rem .75rem; border-radius: 6px;
+  border: 1px solid var(--line); background: var(--card); color: var(--fg); font: inherit;
+}
+input[type=search]:focus { outline: 2px solid var(--accent); outline-offset: -1px;
+  border-color: var(--accent); }
+button {
+  padding: .4rem .7rem; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--card); color: var(--fg); font: inherit; font-size: .85rem;
+  cursor: pointer;
+}
+button:hover { border-color: var(--accent); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.toggle { flex: 0 0 auto; white-space: nowrap; }
+.toggle[disabled] { opacity: .5; cursor: default; }
+.count { color: var(--muted); font-size: .85rem; margin-left: auto;
+  font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* Чипы активных фильтров: карточки уезжают при прокрутке, а фильтры
+   складываются по И — без этой строки непонятно, почему таблица пуста. */
+.chips { display: flex; flex-wrap: wrap; gap: .35rem; padding: .5rem 0 0; }
+.chips:empty { padding: 0; }
+.chip { display: inline-flex; align-items: center; gap: .35rem; padding: .18rem .5rem;
+  border-radius: 999px; border: 1px solid var(--accent); background: var(--card);
+  color: var(--accent); font-size: .78rem; cursor: pointer; }
+.chip:hover { background: var(--accent); color: #fff; }
+.chip.clear { border-color: var(--line); color: var(--muted); }
+.chip.clear:hover { background: var(--line); color: var(--fg); }
+
+/* Никакого overflow на обёртке: он сделал бы её скролл-контейнером,
+   и sticky-шапка стала бы отсчитываться от неё, а не от окна. */
+.tablewrap { border-top: 1px solid var(--line); }
+table { border-collapse: collapse; width: 100%; font-size: .9rem; }
+th, td { text-align: left; padding: .45rem .7rem; border-bottom: 1px solid var(--line);
+  vertical-align: top; }
+thead th {
+  position: sticky; top: var(--controls-h); background: var(--card); z-index: 10;
+  user-select: none; white-space: nowrap;
+  /* border-bottom у sticky-ячейки при border-collapse не рисуется */
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+thead th[data-sort] { cursor: pointer; }
+thead th[data-sort]:hover { color: var(--accent); }
+thead th .arrow { color: var(--muted); font-size: .75rem; }
+tr.main-row { cursor: pointer; }
+tr.main-row:hover > td { background: var(--card); }
+/* Проблемные сборки помечены полосой у левого края: это ответ на вопрос
+   «где смотреть» ещё до того, как строка развёрнута. */
+tr.main-row.bad > td:first-child { box-shadow: inset 3px 0 0 var(--removed); }
+/* break-word, а не anywhere: последний рвёт версию посередине, и 'el10'
+   превращается в 'el1 0'. */
+td.src { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 600;
+  overflow-wrap: break-word; }
+td.ver { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted);
+  overflow-wrap: break-word; }
+td.ver.new { color: var(--fg); }
+td.branch, td.tagged { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .85em; overflow-wrap: break-word; }
+/* Имя koji-тега не переносим: разорванное посередине, оно перестаёт быть
+   именем, а искать его глазами приходится в каждой унаследованной строке.
+   Колонка при auto-раскладке возьмёт ширину самого длинного тега — а он
+   стоит не в каждой строке, у затегованных прямо здесь прочерк. */
+td.tagged { white-space: nowrap; overflow-wrap: normal; }
+td.dir { text-align: center; font-weight: 700; white-space: nowrap; }
+tr.upgraded td.dir { color: var(--up); }
+tr.downgraded td.dir { color: var(--down); }
+tr.added td.dir { color: var(--added); }
+tr.removed td.dir { color: var(--removed); }
+td.num, td.built { text-align: right; font-variant-numeric: tabular-nums;
+  color: var(--muted); white-space: nowrap; }
+td.built { font-size: .82rem; }
+/* Время рядом с датой: та же строка, но бледнее, чтобы колонка читалась
+   по датам, а точное время не мешало их сравнивать. */
+td.built .tm { opacity: .65; }
+td.pat { white-space: nowrap; font-variant-numeric: tabular-nums; }
+td.pat .zero { color: var(--muted); }
+td.links { text-align: right; white-space: nowrap; }
+td.tags { white-space: nowrap; }
+.plus { color: var(--added); }
+.minus { color: var(--removed); }
+/* На узком экране девять колонок не помещаются. Пусть скроллится таблица,
+   а не вся страница вместе с панелью поиска; sticky-шапкой жертвуем. */
+@media (max-width: 900px) {
+  .tablewrap { overflow-x: auto; }
+  thead th { position: static; }
+  /* td.tagged здесь не трогаем: таблица уже скроллится, и целое имя тега
+     полезнее сэкономленных пикселей. */
+  td.src, td.ver, td.branch { overflow-wrap: anywhere; }
+  td.tags { white-space: normal; }
+}
+a.link { display: inline-block; padding: .12rem .5rem; border-radius: 999px;
+  border: 1px solid var(--line); color: var(--accent); text-decoration: none;
+  font-size: .72rem; font-weight: 500; margin-left: .2rem; }
+a.link:hover { border-color: var(--accent); background: var(--bg); }
+.chev { display: inline-block; width: 1em; color: var(--muted); font-size: .8em; }
+.tag { display: inline-block; font-size: .72rem; padding: .1rem .45rem; border-radius: 999px;
+  border: 1px solid currentColor; white-space: nowrap; margin-right: .2rem; }
+/* Теги в строках — те же фильтры, что и карточки: клик включает. */
+.tag[data-filter] { cursor: pointer; }
+.tag[data-filter]:hover { box-shadow: 0 0 0 1px currentColor; }
+.tag.added { color: var(--added); }
+.tag.removed { color: var(--removed); }
+.tag.upgraded { color: var(--up); }
+.tag.downgraded { color: var(--down); }
+.tag.unchanged { color: var(--muted); }
+.tag.repackaged { color: var(--repack); }
+.tag.bad { color: var(--removed); }
+.tag.warn { color: var(--major); }
+.tag.calm { color: var(--muted); }
+
+/* Полоска состава патчей: доли классов в одной сборке. В колонке из сотен
+   строк по ней видно, где стек патчей — это CVE, а где — «прочее».
+   Ширина одна для всех строк: доли сравнимы между сборками только тогда,
+   когда полоски одной длины. Радиус скругления небольшой — при пилюле
+   крайние сегменты срезались бы, и доля читалась бы меньше настоящей. */
+.meter { display: inline-flex; width: 120px; height: 10px; border-radius: 3px;
+  overflow: hidden; margin-left: .55rem; vertical-align: middle;
+  background: var(--line); }
+/* Класс, представленный одним патчем из сотни, даёт долю тоньше пикселя.
+   Пол в 2px оставляет его видимым: «класс есть, но его не видно» — худшая
+   из ошибок этой полоски, а точные числа всё равно в подсказке. */
+.meter i { display: block; height: 100%; background: currentColor;
+  min-width: 2px; }
+
+.hit { background: var(--hit); color: var(--hitfg); border-radius: 2px; }
+
+/* Развёрнутая строка. Один и тот же скелет для обеих вкладок:
+   подписанные блоки, внутри — пары «ключ — значение» и списки. */
+tr.detail-row > td { background: var(--card); padding: .85rem .7rem 1.1rem 2.2rem; }
+/* Ровно две колонки, как у «было/стало»: koji и gitlab, под ними патчи и
+   RPM, проблемы во всю ширину. Прежний auto-fit ужимал блоки тем сильнее,
+   чем шире экран — на широком все пять вставали в одну строку, и списку
+   пакетов доставалась колонка, в которую NVRA не влезает. */
+.detail { display: grid; gap: 1rem 1.6rem;
+  grid-template-columns: 1fr 1fr; align-items: start; }
+@media (max-width: 760px) { .detail { grid-template-columns: 1fr; } }
+.block { min-width: 0; }
+.block.wide { grid-column: 1 / -1; }
+.bl { font-size: .68rem; text-transform: uppercase; letter-spacing: .07em;
+  color: var(--muted); font-weight: 700; padding-bottom: .3rem; margin-bottom: .45rem;
+  border-bottom: 1px solid var(--line); }
+.kv { display: flex; gap: .5rem; font-size: .82rem; padding: .08rem 0; }
+.kv .k { color: var(--muted); flex: 0 0 6.2rem; }
+.kv .v { min-width: 0; overflow-wrap: anywhere; }
+.pgroup { margin-bottom: .5rem; }
+.pgroup .pclass { font-size: .7rem; font-weight: 700; letter-spacing: .05em;
+  text-transform: uppercase; }
+.pgroup .pclass .n { color: var(--muted); font-weight: 600; }
+/* Блок архитектуры набран так же, как блок класса патчей, но без цвета:
+   цвет в этом дашборде означает класс патча, и раскрасить им ещё и
+   архитектуры значило бы завести вторую, ложную легенду. */
+.pgroup.arch .pclass { color: var(--fg); }
+.plist { list-style: none; margin: .2rem 0 0; padding: .1rem 0 .1rem .6rem;
+  border-left: 2px solid currentColor; }
+.plist li { color: var(--fg); font-size: .82rem; padding: .1rem 0;
+  overflow-wrap: anywhere; }
+.plist li.is-added { color: var(--added); }
+.plist li.is-removed { color: var(--removed); }
+.plist a { color: var(--accent); text-decoration: none;
+  border-bottom: 1px solid transparent; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.plist a:hover { border-bottom-color: var(--accent); }
+/* Пришедший и ушедший патч должны читаться и по ссылке тоже: иначе синий
+   цвет ссылки съедает единственный сигнал «что изменилось». */
+.plist li.is-added a { color: var(--added); }
+.plist li.is-removed a { color: var(--removed); text-decoration: line-through; }
+.plist .ppath { color: var(--muted); font-size: .74rem; }
+/* Знак дублирует цвет — на случай, если цвет не различим. */
+.sign { font-weight: 700; margin-right: .15rem; }
+/* Пакеты — такой же список, как патчи, по одному в строке. */
+.rlist { list-style: none; margin: .2rem 0 0; padding: .1rem 0 .1rem .6rem;
+  border-left: 2px solid var(--line); }
+/* Висячий отступ: перенесённый хвост NVRA сдвинут вправо и не читается как
+   ещё один пакет. Первая строка при этом стоит там же, где стояла. */
+.rlist li { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .78rem; padding: .1rem 0 .1rem .9rem; text-indent: -.9rem;
+  overflow-wrap: anywhere; }
+/* Только во вкладке «изменения»: там левая и правая колонки выравниваются
+   по номеру строки, и перенос длинного NVRA сдвинул бы всё, что ниже.
+   Поэтому строка ровно одна, а списку даётся горизонтальная прокрутка —
+   полоса появляется под всеми строками и высоту строк не трогает. */
+.rlist.fixed { overflow-x: auto; }
+.rlist.fixed li { white-space: nowrap; overflow-wrap: normal;
+  padding-left: 0; text-indent: 0; }
+.rlist li.is-added { color: var(--added); }
+.rlist li.is-removed { color: var(--removed); text-decoration: line-through; }
+/* Пустая ячейка напротив пришедшего или ушедшего пакета: строка обязана
+   занять место, иначе соседняя колонка уедет вверх. */
+.rlist li.rgap { color: var(--muted); opacity: .45; }
+/* Ветка, сменившаяся между тегами, красится тем же цветом, что и уехавший
+   или приехавший патч: «эта сторона потеряла» / «эта сторона получила». */
+.is-added { color: var(--added); }
+.is-removed { color: var(--removed); }
+.problems { list-style: none; margin: 0; padding: 0; }
+.problems li { color: var(--removed); font-size: .82rem; padding: .1rem 0;
+  overflow-wrap: anywhere; }
+.none { color: var(--muted); font-size: .82rem; }
+/* Приписка к значению: «прямой», «унаследован». */
+.note { color: var(--muted); font-size: .74rem; margin-left: .4rem; }
+/* Список koji-тегов билда. Основной набран цветом текста и жирным, прочие
+   приглушены: глаз должен находить «где билд сейчас» без чтения списка. */
+.ktags { display: flex; flex-wrap: wrap; gap: .05rem .55rem;
+  align-items: baseline; }
+.ktag { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .8rem; color: var(--muted); overflow-wrap: anywhere; }
+.ktag.main { color: var(--fg); font-weight: 700; }
+/* «Было / стало» — две колонки одинаковой ширины, чтобы взгляд сравнивал
+   строки по горизонтали, а не искал соответствие. */
+.sides { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem 1.6rem; }
+@media (max-width: 760px) { .sides { grid-template-columns: 1fr; } }
+.side { min-width: 0; }
+.side .bl b { color: var(--fg); }
+
+.empty { padding: 2rem; text-align: center; color: var(--muted); }
+/* Подсказка живёт одна на всю страницу и позиционируется скриптом,
+   иначе у крайних карточек она вылезала бы за край окна. */
+/* Кнопка «наверх». Тег в тысячу сборок — это метры прокрутки, а фильтры и
+   вкладки остались вверху. Появляется ниже первого экрана: на нетронутой
+   странице она была бы пятном поверх таблицы и ничего не решала. Ниже
+   подсказки по z-index — та всплывает поверх всего. */
+#totop { position: fixed; right: 1.25rem; bottom: 1.25rem; z-index: 90;
+  width: 2.6rem; height: 2.6rem; border-radius: 50%; cursor: pointer;
+  border: 1px solid var(--line); background: var(--card); color: var(--fg);
+  font: inherit; font-size: 1.1rem; line-height: 1;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .18); }
+#totop:hover { border-color: var(--accent); color: var(--accent); }
+#totop[hidden] { display: none; }
+#tip { position: fixed; display: none; z-index: 100; max-width: 320px;
+  background: var(--fg); color: var(--bg); font-size: .78rem; line-height: 1.45;
+  padding: .5rem .65rem; border-radius: 6px; pointer-events: none;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .28); }
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Koji patch dashboard</h1>
+  <div class="meta" id="meta"></div>
+  <div class="sources" id="sources" hidden>
+    <div class="chain" id="chain"></div>
+    <button type="button" class="toggle" id="add-more">добавить</button>
+    <button type="button" class="toggle" id="edit-sources" aria-expanded="false">изменить</button>
+  </div>
+  <ul class="sourcelist" id="sourcelist" hidden></ul>
+  <div class="warnings" id="warnings"></div>
+  <!-- Список ошибок загрузки стоит снаружи «пустого» экрана: как только
+       появились данные, экран прячется, и отказ файла внутри него никто
+       бы не увидел. -->
+  <ul class="problems loaderrors" id="load-errors"></ul>
+  <section id="tab-empty">
+    <div class="drop" id="drop">
+      <p class="dropmain">Перетащите снапшоты сюда</p>
+      <p class="dropsub">или <button type="button" class="linkish" id="pick">выберите файлы</button>.
+        Это JSON, который делает <span class="mono">kojipatch collect</span>.</p>
+    </div>
+  </section>
+  <input type="file" id="file-input" accept=".json,application/json" multiple hidden>
+  <nav class="tabs">
+    <button class="tab" data-tab="state" aria-selected="true">Состояние</button>
+    <button class="tab" data-tab="diff" data-tip="Что изменилось между двумя тегами: компоненты, версии, патчи, состав RPM, ветки.">Изменения</button>
+  </nav>
+  <section id="tab-state">
+    <div class="selector" id="tag-select"></div>
+    <div class="cards global" id="state-cards"></div>
+    <div class="cards diff" id="class-cards"></div>
+    <div class="controls" id="controls">
+      <input type="search" id="q" placeholder="Компонент, тег, ветка, патч, CVE, RPM…" autocomplete="off">
+      <button id="expand" class="toggle" data-tip="Развернуть или свернуть все строки, которые сейчас видны. Фильтры и поиск учитываются.">Expand all</button>
+      <button id="copy-nvr" class="toggle" data-tip="Скопировать NVR отфильтрованных строк">Copy NVR</button>
+      <span class="count" id="count"></span>
+    </div>
+    <div class="chips" id="chips"></div>
+    <div class="tablewrap"><table id="state-table">
+      <thead><tr>
+        <th data-sort="name">компонент <span class="arrow">▲</span></th>
+        <th data-sort="evr" data-tip="Сортировка лексикографическая: 1.10 встанет выше 1.9. Так и задумано — в соседних строках версии принадлежат разным компонентам, и сравнивать их по правилам rpm было бы не осмысленнее.">version-release <span class="arrow"></span></th>
+        <th data-sort="tagged_in" data-tip="Koji-тег, в котором билд действительно затегован. Прочерк — билд затегован прямо в выбранный тег; имя — билд унаследован из этого тега. Вопросительный знак — снапшот собран версией, которая тег ещё не записывала.">тег <span class="arrow"></span></th>
+        <th data-sort="branch" data-tip="Ветка GitLab, из которой собран билд. Если сборка шла с коммита, а не с ветки, рядом стоит тег from-commit.">ветка <span class="arrow"></span></th>
+        <th data-sort="patches" data-tip="Сколько файлов лежит в каталоге PATCH ветки. Полоска показывает, из каких классов они состоят: цвет занимает долю, равную доле класса. Длина полоски одна у всех строк — сколько патчей, говорит число слева. Наведите на полоску, чтобы увидеть точные числа.">патчи <span class="arrow"></span></th>
+        <th data-sort="rpms">RPM <span class="arrow"></span></th>
+        <th data-sort="completed" data-tip="Когда koji завершил сборку, в московском времени. Хаб отдаёт UTC, в снапшоте хранится он же — перевод делается при построении дашборда. Сортировка показывает самые залежавшиеся.">собран <span class="arrow"></span></th>
+        <th>теги</th>
+        <th>ссылки</th>
+      </tr></thead>
+      <tbody id="state-rows"></tbody>
+    </table></div>
+  </section>
+  <section id="tab-diff" hidden>
+    <div class="selector" id="pair-select"></div>
+    <div class="cards diff" id="diff-cards"></div>
+    <div class="tablewrap"><table id="diff-table">
+      <thead><tr>
+        <th data-sort="name">компонент <span class="arrow">▲</span></th>
+        <th data-sort="old" data-tip="Сортировка лексикографическая: 1.10 встанет выше 1.9. Так и задумано — в соседних строках версии принадлежат разным компонентам.">было <span class="arrow"></span></th>
+        <th></th>
+        <th data-sort="new" data-tip="Сортировка лексикографическая: 1.10 встанет выше 1.9. Так и задумано — в соседних строках версии принадлежат разным компонентам.">стало <span class="arrow"></span></th>
+        <th data-sort="dpatch" data-tip="Сколько файлов патчей пришло и ушло. Сортировка — по сумме пришедших и ушедших: сверху компоненты, у которых стек патчей менялся сильнее всего.">Δ патчей <span class="arrow"></span></th>
+        <th data-sort="drpm" data-tip="Сколько бинарных пакетов появилось и исчезло. Сортировка — по сумме появившихся и исчезнувших.">Δ RPM <span class="arrow"></span></th>
+        <th>теги</th>
+        <th>ссылки</th>
+      </tr></thead>
+      <tbody id="diff-rows"></tbody>
+    </table></div>
+  </section>
+</div>
+<button type="button" id="totop" hidden aria-label="Наверх"
+        data-tip="Вернуться к началу страницы">↑</button>
+<div id="tip" role="tooltip"></div>
+<script>
+/* vercmp.js */
+/* Сравнение версий по алгоритму RPM, без внешних зависимостей. */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else { root.KP = root.KP || {}; root.KP.vercmp = factory(); }
+}(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+  'use strict';
+
+  var DIGITS = /^(\d+)/;
+  var ALPHA = /^([A-Za-z]+)/;
+
+  /* Python-версия опирается на str.isalnum(), который шире \w и включает,
+     например, надстрочные цифры «²»/«³» (U+00B2/U+00B3). Этот диапазон
+     ýже: À-￿ начинается с U+00C0 и не захватывает U+0080–U+00BF, так что
+     «²»/«³» сюда не попадают и stripSeparators съедает их как разделители,
+     а не как альфанумерики. Это осознанно не расширяли: на входах с такими
+     символами у самого Python нет осмысленного/стабильного ответа (см.
+     тест на rpmvercmp('²','³') в tests/js/vercmp.test.js и разбор в
+     task-3-report.md) — воспроизводить его квирки бит в бит незачем, важно
+     лишь не падать и не зацикливаться, а это обеспечено независимо от
+     точных границ диапазона. */
+  var ALNUM = /[0-9A-Za-zÀ-￿]/;
+
+  function stripSeparators(text) {
+    var index = 0;
+    while (index < text.length
+           && !(ALNUM.test(text.charAt(index))
+                || text.charAt(index) === '~' || text.charAt(index) === '^')) {
+      index += 1;
+    }
+    return text.slice(index);
+  }
+
+  function rpmvercmp(a, b) {
+    a = a || '';
+    b = b || '';
+    if (a === b) return 0;
+
+    while (a || b) {
+      a = stripSeparators(a);
+      b = stripSeparators(b);
+
+      if (a.charAt(0) === '~' || b.charAt(0) === '~') {
+        if (a.charAt(0) !== '~') return 1;
+        if (b.charAt(0) !== '~') return -1;
+        a = a.slice(1); b = b.slice(1);
+        continue;
+      }
+
+      if (a.charAt(0) === '^' || b.charAt(0) === '^') {
+        if (!a) return -1;
+        if (!b) return 1;
+        if (a.charAt(0) !== '^') return 1;
+        if (b.charAt(0) !== '^') return -1;
+        a = a.slice(1); b = b.slice(1);
+        continue;
+      }
+
+      if (!a || !b) break;
+
+      var numeric = /[0-9]/.test(a.charAt(0));
+      var re = numeric ? DIGITS : ALPHA;
+      var matchA = re.exec(a), matchB = re.exec(b);
+
+      if (matchA === null || matchB === null) {
+        /* Разобрать нечем ни ту, ни другую сторону — выходим, чтобы не
+           крутиться на месте вечно. */
+        if (matchA === null && matchB === null) break;
+        /* Цифры весомее букв; сторона, которая не разобралась, легче. */
+        if (matchB === null) return numeric ? 1 : -1;
+        return numeric ? -1 : 1;
+      }
+
+      var segA = matchA[1], segB = matchB[1];
+      a = a.slice(segA.length);
+      b = b.slice(segB.length);
+
+      if (numeric) {
+        segA = segA.replace(/^0+/, '') || '0';
+        segB = segB.replace(/^0+/, '') || '0';
+        if (segA.length !== segB.length) return segA.length > segB.length ? 1 : -1;
+      }
+
+      if (segA !== segB) return segA > segB ? 1 : -1;
+    }
+
+    if (!a && !b) return 0;
+    return a ? 1 : -1;
+  }
+
+  function compareEvr(a, b) {
+    var epochA = Number(a[0] || 0), epochB = Number(b[0] || 0);
+    if (epochA !== epochB) return epochA > epochB ? 1 : -1;
+    var result = rpmvercmp(a[1], b[1]);
+    if (result) return result;
+    return rpmvercmp(a[2], b[2]);
+  }
+
+  return { rpmvercmp: rpmvercmp, compareEvr: compareEvr };
+}));
+
+</script>
+<script>
+/* rpms.js */
+/* Архитектура RPM и порядок пакетов в списках. Порядок нужен и в строках
+   таблицы, и в выравнивании «было/стало», поэтому он один на всех. */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else { root.KP = root.KP || {}; root.KP.rpms = factory(); }
+}(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+  'use strict';
+
+  /* src и noarch — не «ещё одна архитектура», а исходник и пакет, которому
+     архитектура не нужна. Остальные идут по алфавиту. */
+  var LEADING = ['src', 'noarch'];
+
+  function archOf(nvra) {
+    var index = String(nvra).lastIndexOf('.');
+    return index === -1 ? '?' : String(nvra).slice(index + 1);
+  }
+
+  function archRank(arch) {
+    var index = LEADING.indexOf(arch);
+    return index === -1 ? LEADING.length : index;
+  }
+
+  function compareArch(a, b) {
+    var ra = archRank(a), rb = archRank(b);
+    if (ra !== rb) return ra < rb ? -1 : 1;
+    /* Внутри ведущей группы имя уже определено рангом; сравнивать нечего. */
+    if (ra < LEADING.length) return 0;
+    return a < b ? -1 : a > b ? 1 : 0;
+  }
+
+  function compareNvra(a, b) {
+    var byArch = compareArch(archOf(a), archOf(b));
+    if (byArch) return byArch;
+    return a < b ? -1 : a > b ? 1 : 0;
+  }
+
+  function sortRpms(items) {
+    return (items || []).slice().sort(compareNvra);
+  }
+
+  return { archOf: archOf, compareArch: compareArch,
+           compareNvra: compareNvra, sortRpms: sortRpms };
+}));
+
+</script>
+<script>
+/* diff.js */
+/* Сравнение снапшотов тегов. Порт kojipatch/diff.py. */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) {
+    module.exports = factory(require('./vercmp.js'), require('./rpms.js'));
+  } else {
+    root.KP = root.KP || {};
+    root.KP.diff = factory(root.KP.vercmp, root.KP.rpms);
+  }
+}(typeof globalThis !== 'undefined' ? globalThis : this,
+  function (vercmp, rpmsmod) {
+  'use strict';
+
+  var STATUSES = ['added', 'removed', 'unchanged', 'upgraded', 'downgraded'];
+
+  function evr(build) { return [build.epoch, build.version, build.release]; }
+
+  function status(oldB, newB) {
+    var result = vercmp.compareEvr(evr(oldB), evr(newB));
+    if (result === 0) return 'unchanged';
+    return result < 0 ? 'upgraded' : 'downgraded';
+  }
+
+  function refOf(build) {
+    return (build && build.source) ? build.source.ref : null;
+  }
+
+  /* Один и тот же билд переехал между тегами.
+   *
+   * Три оговорки, каждая — против ложной пометки.
+   *
+   * Сравниваем сам tag_name, а не «прямой/унаследованный»: второе зависит от
+   * того, какой тег мы сейчас смотрим. Когда os-9.2 наследует os-9.1,
+   * нетронутый билд в старом снапшоте прямой, а в новом унаследованный — и
+   * такое сравнение пометило бы переездом полтега.
+   *
+   * Сравниваем только при совпадающем NVR. Обновлённый компонент — это
+   * другой билд, и лежать в другом теге для него нормально; про него всё уже
+   * сказано меткой upgraded. Переезд интересен ровно тогда, когда сам билд
+   * остался прежним: значит, его вытащили из родительского тега и затеговали
+   * напрямую (или наоборот).
+   *
+   * Неизвестный тег (снапшот прежней версии) сравнивать не с чем: молчим.
+   */
+  function tagChanged(oldB, newB) {
+    if (oldB.tag_name === null || oldB.tag_name === undefined
+        || newB.tag_name === null || newB.tag_name === undefined) {
+      return false;
+    }
+    if (oldB.nvr !== newB.nvr) return false;
+    return oldB.tag_name !== newB.tag_name;
+  }
+
+  /* Ключ подпакета для сравнения: name.arch, без version-release.
+   *
+   * Сравнивать надо состав подпакетов, а не версии: иначе любое обновление
+   * компонента выглядит как «состав RPM изменился». Все подпакеты одного
+   * билда несут его же version-release, поэтому вырезать их из NVRA
+   * надёжно.
+   */
+  function rpmKey(build, nvra) {
+    /* String(), а не сам nvra: снапшот приходит из файла, который выбрал
+       человек, и store.js проверяет его неглубоко — в rpms может лежать
+       что угодно. Падение здесь случалось бы внутри store.add, а его
+       откат отверг бы файл, принесённый вторым, тогда как виноват был бы
+       первый, уже стоящий в цепочке. Ключ и так строка по смыслу. */
+    var name = String(nvra);
+    var tail = '-' + build.version + '-' + build.release + '.';
+    var index = name.lastIndexOf(tail);
+    if (index === -1) return name;
+    return name.slice(0, index) + '.' + name.slice(index + tail.length);
+  }
+
+  /* Ключ подпакета → NVRA, под которыми он встретился в снапшоте.
+   *
+   * В снапшоте остаётся полный NVRA (так требует модель), поэтому наружу
+   * отдаём именно его: строки в rpms_added/rpms_removed должны совпадать со
+   * строками в old_rpms/new_rpms, по которым дашборд красит «было/стало».
+   *
+   * Map, а не объект: в alignRpms перебор идёт в порядке вставки, и
+   * целочисленные ключи объекта его бы нарушили.
+   */
+  function rpmKeys(build) {
+    var keys = new Map();
+    var rpms = build.rpms || [];
+    for (var i = 0; i < rpms.length; i += 1) {
+      var nvra = rpms[i];
+      var key = rpmKey(build, nvra);
+      if (!keys.has(key)) keys.set(key, []);
+      keys.get(key).push(nvra);
+    }
+    return keys;
+  }
+
+  function rpmDelta(source, other) {
+    var out = [];
+    source.forEach(function (nvras, key) {
+      if (!other.has(key)) out = out.concat(nvras);
+    });
+    return out.sort();
+  }
+
+  function rpmRowPairs(left, right) {
+    left = left.slice().sort();
+    right = right.slice().sort();
+    var rows = [];
+    var max = Math.max(left.length, right.length);
+    for (var i = 0; i < max; i += 1) {
+      rows.push([i < left.length ? left[i] : null,
+                 i < right.length ? right[i] : null]);
+    }
+    return rows;
+  }
+
+  /* Строки «было/стало» по подпакетам: одна строка — один подпакет.
+   *
+   * Один и тот же подпакет должен стоять слева и справа на одной высоте,
+   * иначе версии не сравнить глазами. Строки собираются по ключу
+   * (name.arch), а не по NVRA: NVRA несёт версию билда и с обновлением
+   * меняется целиком. Пропавший подпакет остаётся на своём месте с пустой
+   * правой ячейкой; пришедший уходит вниз своей группы, чтобы не сдвигать
+   * всё, что стоит выше.
+   *
+   * Строки идут группами по архитектуре, в порядке compareArch. Дашборд
+   * рисует блоки, просто разрезая список по смене архитектуры, — поэтому
+   * порядок задаётся здесь, один раз и сразу для обеих колонок.
+   */
+  function alignRpms(oldB, newB) {
+    var oldKeys = oldB ? rpmKeys(oldB) : new Map();
+    var newKeys = newB ? rpmKeys(newB) : new Map();
+
+    var archSet = new Set();
+    oldKeys.forEach(function (_v, key) { archSet.add(rpmsmod.archOf(key)); });
+    newKeys.forEach(function (_v, key) { archSet.add(rpmsmod.archOf(key)); });
+    var arches = Array.from(archSet).sort(rpmsmod.compareArch);
+
+    var rows = [];
+    arches.forEach(function (arch) {
+      var kept = [];
+      oldKeys.forEach(function (_v, key) {
+        if (rpmsmod.archOf(key) === arch) kept.push(key);
+      });
+      kept.sort(function (a, b) {
+        var minA = oldKeys.get(a).slice().sort()[0];
+        var minB = oldKeys.get(b).slice().sort()[0];
+        return minA < minB ? -1 : minA > minB ? 1 : 0;
+      });
+      kept.forEach(function (key) {
+        rows = rows.concat(rpmRowPairs(oldKeys.get(key),
+                                        newKeys.has(key) ? newKeys.get(key) : []));
+      });
+
+      var fresh = [];
+      newKeys.forEach(function (_v, key) {
+        if (!oldKeys.has(key) && rpmsmod.archOf(key) === arch) fresh.push(key);
+      });
+      fresh.sort(function (a, b) {
+        var minA = newKeys.get(a).slice().sort()[0];
+        var minB = newKeys.get(b).slice().sort()[0];
+        return minA < minB ? -1 : minA > minB ? 1 : 0;
+      });
+      fresh.forEach(function (key) {
+        rows = rows.concat(rpmRowPairs([], newKeys.get(key)));
+      });
+    });
+    return rows;
+  }
+
+  function isChanged(component) {
+    return Boolean(component.status !== 'unchanged'
+                   || component.patches_added.length
+                   || component.patches_removed.length
+                   || component.repackaged
+                   || component.branch_changed
+                   || component.tag_changed);
+  }
+
+  function counts(components) {
+    var result = {};
+    STATUSES.forEach(function (s) { result[s] = 0; });
+    result.patches_added = 0;
+    result.patches_removed = 0;
+    result.repackaged = 0;
+    result.branch_changed = 0;
+    result.tag_changed = 0;
+    result.changed = 0;
+    components.forEach(function (component) {
+      result[component.status] += 1;
+      if (component.patches_added.length) result.patches_added += 1;
+      if (component.patches_removed.length) result.patches_removed += 1;
+      if (component.repackaged) result.repackaged += 1;
+      if (component.branch_changed) result.branch_changed += 1;
+      if (component.tag_changed) result.tag_changed += 1;
+      if (component.changed) result.changed += 1;
+    });
+    return result;
+  }
+
+  function byName(snapshot) {
+    var map = {};
+    (snapshot.builds || []).forEach(function (b) { map[b.name] = b; });
+    return map;
+  }
+
+  function setMinus(a, b) {
+    var out = [];
+    a.forEach(function (item) { if (!b.has(item)) out.push(item); });
+    return out.sort();
+  }
+
+  /* Сравнивает два снапшота по именам компонентов. */
+  function diffSnapshots(oldSnap, newSnap, isSummary) {
+    isSummary = Boolean(isSummary);
+    var oldMap = byName(oldSnap);
+    var newMap = byName(newSnap);
+    var names = new Set(Object.keys(oldMap).concat(Object.keys(newMap)));
+    var sortedNames = Array.from(names).sort();
+
+    var components = [];
+    sortedNames.forEach(function (name) {
+      var oldBuild = Object.prototype.hasOwnProperty.call(oldMap, name)
+        ? oldMap[name] : null;
+      var newBuild = Object.prototype.hasOwnProperty.call(newMap, name)
+        ? newMap[name] : null;
+
+      var component;
+      if (oldBuild === null) {
+        component = { name: name, status: 'added', old: null, new: newBuild,
+                       patches_added: [], patches_removed: [],
+                       rpms_added: [], rpms_removed: [],
+                       branch_changed: false, repackaged: false,
+                       tag_changed: false };
+      } else if (newBuild === null) {
+        component = { name: name, status: 'removed', old: oldBuild, new: null,
+                       patches_added: [], patches_removed: [],
+                       rpms_added: [], rpms_removed: [],
+                       branch_changed: false, repackaged: false,
+                       tag_changed: false };
+      } else {
+        var oldPatches = new Set((oldBuild.patches || []).map(function (p) { return p.path; }));
+        var newPatches = new Set((newBuild.patches || []).map(function (p) { return p.path; }));
+        var oldRpms = rpmKeys(oldBuild);
+        var newRpms = rpmKeys(newBuild);
+        var repackaged = oldRpms.size !== newRpms.size
+          || Array.from(oldRpms.keys()).some(function (key) { return !newRpms.has(key); });
+
+        component = {
+          name: name, status: status(oldBuild, newBuild),
+          old: oldBuild, new: newBuild,
+          patches_added: setMinus(newPatches, oldPatches),
+          patches_removed: setMinus(oldPatches, newPatches),
+          rpms_added: rpmDelta(newRpms, oldRpms),
+          rpms_removed: rpmDelta(oldRpms, newRpms),
+          branch_changed: refOf(oldBuild) !== refOf(newBuild),
+          repackaged: repackaged,
+          tag_changed: tagChanged(oldBuild, newBuild)
+        };
+      }
+      component.changed = isChanged(component);
+      components.push(component);
+    });
+
+    return { old_tag: oldSnap.tag, new_tag: newSnap.tag,
+             is_summary: isSummary, components: components,
+             counts: counts(components) };
+  }
+
+  /* Пары подряд идущих снапшотов плюс сводная пара первый→последний. */
+  function diffChain(snapshots) {
+    if (snapshots.length < 2) return [];
+    var pairs = [];
+    for (var i = 0; i < snapshots.length - 1; i += 1) {
+      pairs.push(diffSnapshots(snapshots[i], snapshots[i + 1], false));
+    }
+    if (snapshots.length > 2) {
+      pairs.push(diffSnapshots(snapshots[0], snapshots[snapshots.length - 1], true));
+    }
+    return pairs;
+  }
+
+  return { diffSnapshots: diffSnapshots, diffChain: diffChain,
+           alignRpms: alignRpms };
+}));
+
+</script>
+<script>
+/* viewmodel.js */
+/* Данные страницы: снапшоты и пары, готовые к отрисовке.
+   Порт kojipatch/render.py (всё, кроме сборки самого HTML). */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) {
+    module.exports = factory(require('./diff.js'), require('./rpms.js'));
+  } else {
+    root.KP = root.KP || {};
+    root.KP.viewmodel = factory(root.KP.diff, root.KP.rpms);
+  }
+}(typeof globalThis !== 'undefined' ? globalThis : this,
+  function (diff, rpmsmod) {
+  'use strict';
+
+  /* Снапшот приходит из файла, который выбрал человек, а store.js
+     проверяет его только неглубоко — полей билда внутри может не быть
+     вовсе. ui.js на «неизвестно» местами сравнивает строго (=== null,
+     например у build_id и task_id): undefined мимо такой проверки
+     проходит молча и печатается пустой строкой вместо прочерка.
+     orNull держит этот договор — неизвестное всегда null, никогда
+     undefined. Заодно тем же спасается сверка с JSON-эталоном в
+     тестах: undefined пропадает из объекта при сериализации, а null
+     остаётся. */
+  function orNull(value) { return value === undefined ? null : value; }
+
+  /* Ключи здешних словарей — имена классов патчей, а их задаёт конфиг. У
+     голого объекта есть свойства Object.prototype, и на ключ «constructor»
+     он отвечает функцией, а не «ничего нет»: счётчик тогда становится
+     строкой «function Object() { [native code] }1», а класс, выведенный из
+     патчей, молча пропадает из списка. Та же охрана уже стоит в
+     snapshotCounts — здесь она доведена до остальных мест. */
+  function own(map, key) {
+    return Object.prototype.hasOwnProperty.call(map, key) ? map[key] : undefined;
+  }
+
+  function bump(counts, key) {
+    counts[key] = (own(counts, key) || 0) + 1;
+  }
+
+  /* Повторяет urllib.parse.quote с safe='/': всё, кроме букв, цифр и
+     _.-~/ , уходит в проценты. Своя функция, а не encodeURIComponent:
+     тот экранирует «/» и не трогает «!*'()», и ссылки разъехались бы. */
+  function quote(text) {
+    return String(text).replace(/[^A-Za-z0-9_.\-~/]/g, function (ch) {
+      var code = ch.charCodeAt(0), out = '', bytes, i;
+      if (code < 128) return '%' + ('0' + code.toString(16).toUpperCase()).slice(-2);
+      bytes = unescape(encodeURIComponent(ch));
+      for (i = 0; i < bytes.length; i++) {
+        out += '%' + ('0' + bytes.charCodeAt(i).toString(16).toUpperCase()).slice(-2);
+      }
+      return out;
+    });
+  }
+
+  /* Снапшот приходит из файла, который выбрал человек, а не только из
+     питоновской модели: в нём может не быть ни nvr, ни version с release.
+     Неизвестное остаётся null и рисуется прочерком — ссылка на поиск по
+     «undefined» и версия «undefined-undefined» выдавали бы незнание за
+     данные. Проверка живёт здесь, а не в загрузчике: через viewmodel
+     проходит любой снапшот, какой бы файл человек ни подгрузил. */
+  function kojiUrl(kojiWeb, nvr) {
+    if (!kojiWeb || nvr === null || nvr === undefined || nvr === '') {
+      return null;
+    }
+    return String(kojiWeb).replace(/\/+$/, '')
+      + '/search?match=exact&type=build&terms=' + quote(nvr);
+  }
+
+  function missing(value) { return value === null || value === undefined; }
+
+  function evrOf(build) {
+    if (missing(build.version) || missing(build.release)) return null;
+    var prefix = build.epoch ? build.epoch + ':' : '';
+    return prefix + build.version + '-' + build.release;
+  }
+
+  /* То же правило, что и slug() в дашборде: ключ фильтра из имени класса
+     патчей. Считать его по-разному на двух сторонах нельзя — карточка
+     класса вроде «C++» не нашла бы ни одной строки. */
+  function slug(name) {
+    return String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-');
+  }
+
+  /* Москва — UTC+3 круглый год: перехода на летнее время в России нет с
+     2014, поэтому смещение задано числом, а не через часовые пояса.
+     Дата без часа не переводится: прибавив три часа к неизвестному
+     времени, мы бы утверждали то, чего не знаем. */
+  var MSK_SHIFT_MS = 3 * 60 * 60 * 1000;
+  var STAMP = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/;
+
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+
+  /* Через Date.UTC, а не через локальный конструктор Date: иначе к
+     смещению примешался бы пояс машины, на которой открыт дашборд. */
+  function toMsk(value) {
+    if (!value || String(value).length <= 10) return value === undefined ? null : value;
+    var m = STAMP.exec(String(value));
+    if (!m) return value;
+    var ms = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]) + MSK_SHIFT_MS;
+    var d = new Date(ms);
+    return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-'
+      + pad(d.getUTCDate()) + ' ' + pad(d.getUTCHours()) + ':'
+      + pad(d.getUTCMinutes()) + ':' + pad(d.getUTCSeconds());
+  }
+
+  /* Унаследован ли билд в этот тег. null — тег билда неизвестен.
+     Неизвестность отдельным значением, а не false: снапшот прежней версии
+     не знает про tag_name, и объявить такие билды прямыми значило бы
+     показать в дашборде утверждение, которого никто не проверял. */
+  function inheritedIn(build, tag) {
+    if (build.tag_name === null || build.tag_name === undefined || !tag) {
+      return null;
+    }
+    return build.tag_name !== tag;
+  }
+
+  /* Порядок меток состояния после классов патчей. Он же порядок в колонке
+     «теги»: сперва откуда билд, потом что не так с патчами, потом ошибки. */
+  var STATE_TAG_ORDER = ['inherited', 'no-source', 'from-commit', 'no-patch',
+                         'gitlab-error', 'internal-error'];
+
+  /* Позиция метки в строке. Классы патчей идут первыми, в порядке списка
+     классов — том же, в каком стоят карточки классов. */
+  function tagSortKey(tag, classOrder) {
+    if (classOrder.indexOf(tag) !== -1) return [0, classOrder.indexOf(tag), ''];
+    if (STATE_TAG_ORDER.indexOf(tag) !== -1) {
+      return [1, STATE_TAG_ORDER.indexOf(tag), ''];
+    }
+    return [2, 0, tag];
+  }
+
+  function compareKeys(a, b) {
+    var i;
+    for (i = 0; i < a.length; i++) {
+      if (a[i] < b[i]) return -1;
+      if (a[i] > b[i]) return 1;
+    }
+    return 0;
+  }
+
+  /* Метки строки, всегда в одном и том же порядке.
+
+     Порядок здесь позиционный: колонку «теги» читают по месту, а порядок
+     файлов в каталоге PATCH задаёт GitLab и он разный от репозитория к
+     репозиторию. Без сортировки у одной строки первым стоял бы cve, у
+     соседней sast, и колонка перестала бы читаться. */
+  function buildTags(build, tag, classOrder) {
+    classOrder = classOrder || [];
+    var tags = [], patches = build.patches || [], problems = build.problems || [];
+    var i, key, gitlabError = false, internalError = false;
+    for (i = 0; i < patches.length; i++) {
+      key = slug(patches[i]['class']);
+      if (tags.indexOf(key) === -1) tags.push(key);
+    }
+    if (inheritedIn(build, tag)) tags.push('inherited');
+    if (!build.source) tags.push('no-source');
+    else if (build.source.ref_kind === 'commit') tags.push('from-commit');
+    if (build.patch_dir_present === false) tags.push('no-patch');
+    for (i = 0; i < problems.length; i++) {
+      if (problems[i].indexOf('gitlab:') === 0
+          || problems[i].indexOf('bad source') === 0) gitlabError = true;
+      if (problems[i].indexOf('internal error') === 0) internalError = true;
+    }
+    if (gitlabError) tags.push('gitlab-error');
+    if (internalError) tags.push('internal-error');
+    return tags.sort(function (a, b) {
+      return compareKeys(tagSortKey(a, classOrder), tagSortKey(b, classOrder));
+    });
+  }
+
+  function patchDict(patch) {
+    return { path: orNull(patch.path), name: orNull(patch.name),
+             'class': orNull(patch['class']), cves: (patch.cves || []).slice(),
+             url: orNull(patch.web_url) };
+  }
+
+  function patchDicts(patches) {
+    var out = [], i;
+    for (i = 0; i < patches.length; i++) out.push(patchDict(patches[i]));
+    return out;
+  }
+
+  function buildRow(build, kojiWeb, tag, classOrder) {
+    var counts = {}, patches = build.patches || [], i;
+    for (i = 0; i < patches.length; i++) bump(counts, patches[i]['class']);
+    var source = build.source || null;
+    return {
+      name: orNull(build.name), nvr: orNull(build.nvr),
+      version: orNull(build.version), release: orNull(build.release),
+      evr: evrOf(build),
+      branch: source ? orNull(source.ref) : null,
+      ref_kind: source ? orNull(source.ref_kind) : 'none',
+      project: source ? orNull(source.project) : null,
+      source_url: source ? orNull(source.web_url) : null,
+      koji_url: kojiUrl(kojiWeb, build.nvr),
+      completed: toMsk(build.completed), owner: orNull(build.owner),
+      build_id: orNull(build.build_id), task_id: orNull(build.task_id),
+      // koji_tags, а не tags: ключ tags в строке занят вычисляемыми
+      // метками дашборда, и путать их нельзя
+      tagged_in: orNull(build.tag_name), inherited: inheritedIn(build, tag),
+      koji_tags: (build.tags || []).slice(),
+      patches: patchDicts(patches),
+      // порядок задаём здесь: дашборд режет список на блоки по смене
+      // архитектуры и сам ничего не пересортировывает
+      patch_counts: counts, rpms: rpmsmod.sortRpms(build.rpms || []),
+      patch_dir_present: orNull(build.patch_dir_present),
+      problems: (build.problems || []).slice(),
+      tags: buildTags(build, tag, classOrder)
+    };
+  }
+
+  function snapshotCounts(rows, classNames) {
+    var byClass = {}, i, name, row, counts, bucket;
+    for (i = 0; i < classNames.length; i++) {
+      byClass[classNames[i]] = { builds: 0, files: 0 };
+    }
+    var withPatches = 0, withoutPatches = 0, problems = 0, files = 0;
+    var inherited = 0, direct = 0;
+    for (i = 0; i < rows.length; i++) {
+      row = rows[i];
+      if (row.inherited === true) inherited += 1;
+      else if (row.inherited === false) direct += 1;
+      if (row.patches.length) withPatches += 1;
+      if (row.patch_dir_present === false) withoutPatches += 1;
+      if (row.problems.length) problems += 1;
+      files += row.patches.length;
+      counts = row.patch_counts;
+      for (name in counts) {
+        if (!Object.prototype.hasOwnProperty.call(counts, name)) continue;
+        if (!Object.prototype.hasOwnProperty.call(byClass, name)) {
+          byClass[name] = { builds: 0, files: 0 };
+        }
+        bucket = byClass[name];
+        bucket.builds += 1;
+        bucket.files += counts[name];
+      }
+    }
+    return { builds: rows.length, with_patches: withPatches,
+             inherited: inherited, direct: direct,
+             without_patches: withoutPatches, problems: problems,
+             patch_files: files, by_class: byClass };
+  }
+
+  function diffTags(component) {
+    var tags = [component.status];
+    if (component.repackaged) tags.push('repackaged');
+    if (component.patches_added.length) tags.push('patches+');
+    if (component.patches_removed.length) tags.push('patches-');
+    if (component.branch_changed) tags.push('branch-changed');
+    if (component.tag_changed) tags.push('tag-changed');
+    return tags;
+  }
+
+  function diffRow(component, kojiWeb, oldTag, newTag) {
+    var old = component.old || null, fresh = component['new'] || null;
+    var shown = fresh || old;
+    return {
+      old_tagged_in: old ? orNull(old.tag_name) : null,
+      new_tagged_in: fresh ? orNull(fresh.tag_name) : null,
+      old_inherited: old ? inheritedIn(old, oldTag) : null,
+      new_inherited: fresh ? inheritedIn(fresh, newTag) : null,
+      name: component.name, status: component.status,
+      changed: Boolean(component.changed),
+      old_evr: old ? evrOf(old) : null,
+      new_evr: fresh ? evrOf(fresh) : null,
+      old_branch: (old && old.source) ? orNull(old.source.ref) : null,
+      new_branch: (fresh && fresh.source) ? orNull(fresh.source.ref) : null,
+      patches_added: component.patches_added.slice(),
+      patches_removed: component.patches_removed.slice(),
+      rpms_added: component.rpms_added.slice(),
+      rpms_removed: component.rpms_removed.slice(),
+      old_patches: patchDicts(old ? (old.patches || []) : []),
+      new_patches: patchDicts(fresh ? (fresh.patches || []) : []),
+      // выровненные строки «было/стало» вместо двух отдельных списков:
+      // так один и тот же подпакет стоит в обеих колонках на одной высоте,
+      // и NVRA не дублируются в данных страницы
+      rpm_rows: diff.alignRpms(old, fresh),
+      koji_url: shown ? kojiUrl(kojiWeb, shown.nvr) : null,
+      source_url: (shown && shown.source) ? orNull(shown.source.web_url) : null,
+      tags: diffTags(component)
+    };
+  }
+
+  /* Порядок классов задаёт и карточки, и метки в строке. Берём его из
+     снапшота: конфига у дашборда нет. Первый снапшот задаёт порядок,
+     остальные могут только дописать в конец то, чего в нём не было.
+     Снапшот прежней версии списка не несёт — тогда выводим классы из
+     самих патчей по алфавиту: выдумывать порядок конфига нельзя. */
+  function patchClassesOf(snapshots) {
+    var out = [], i, j, list;
+    for (i = 0; i < snapshots.length; i++) {
+      list = snapshots[i].patch_classes || [];
+      for (j = 0; j < list.length; j++) {
+        if (out.indexOf(list[j]) === -1) out.push(list[j]);
+      }
+    }
+    if (out.length) return out;
+    var seen = {}, derived = [], builds, patches, k;
+    for (i = 0; i < snapshots.length; i++) {
+      builds = snapshots[i].builds || [];
+      for (j = 0; j < builds.length; j++) {
+        patches = builds[j].patches || [];
+        for (k = 0; k < patches.length; k++) {
+          if (!own(seen, patches[k]['class'])) {
+            seen[patches[k]['class']] = 1;
+            derived.push(patches[k]['class']);
+          }
+        }
+      }
+    }
+    return derived.sort(function (a, b) { return a < b ? -1 : a > b ? 1 : 0; });
+  }
+
+  /* Снапшот по имени тега. Тег не уникален: два прогона одного тега —
+     штатный случай (дашборд для того и открывает несколько файлов), и тогда
+     сюда попадает первый совпавший, а не тот, который сравнивает пара. */
+  function snapshotByTag(snapshots, tag) {
+    var i;
+    for (i = 0; i < snapshots.length; i++) {
+      if (snapshots[i].tag === tag) return snapshots[i];
+    }
+    return null;
+  }
+
+  function pairBlock(pair, snapshots) {
+    var oldSnap = snapshotByTag(snapshots, pair.old_tag);
+    var newSnap = snapshotByTag(snapshots, pair.new_tag);
+    var rows = [], i, component, source;
+    for (i = 0; i < pair.components.length; i++) {
+      component = pair.components[i];
+      /* Расхождение с render.py, где хаб брался у первого снапшота: адрес
+         koji берём у той стороны пары, из которой пришёл показанный билд.
+         За один прогон это одно и то же, но дашборд умеет открыть файлы
+         разных прогонов, и тогда общий адрес вёл бы на чужой хаб.
+
+         Сторону ищем по имени тега, а два прогона одного тега — законный
+         случай, и адрес тогда берётся у первого прогона с таким тегом,
+         то есть может оказаться чужим. Заметно это только когда у прогонов
+         разный koji_web; предупреждения на это нет — хранилище сравнивает
+         koji_hub, а не koji_web. Чинить это здесь нечем: пара приходит
+         названной тегами, и починка меняет данные страницы, а с ними и
+         питоновский эталон. */
+      source = component['new'] ? newSnap : oldSnap;
+      rows.push(diffRow(component, source ? source.koji_web : null,
+                        pair.old_tag, pair.new_tag));
+    }
+    /* Счётчики копируем: в данных страницы не должно остаться ссылки на
+       внутренний объект пары — правка одного молча меняла бы другое. */
+    var counts = {}, key;
+    for (key in pair.counts) {
+      if (Object.prototype.hasOwnProperty.call(pair.counts, key)) {
+        counts[key] = pair.counts[key];
+      }
+    }
+    return { old: pair.old_tag, 'new': pair.new_tag,
+             summary: Boolean(pair.is_summary),
+             counts: counts, rows: rows };
+  }
+
+  /* Собирает всё, что нужно странице, в один сериализуемый объект.
+     Пары считаются здесь же, а не приходят снаружи, как в render.py: у
+     дашборда на входе только сами снапшоты. */
+  function buildPageData(snapshots) {
+    snapshots = snapshots || [];
+    var classNames = patchClassesOf(snapshots);
+    // метки классов в строке — те же slug'и, что и ключи карточек классов
+    var classOrder = [], i;
+    for (i = 0; i < classNames.length; i++) classOrder.push(slug(classNames[i]));
+
+    var blocks = [];
+    for (i = 0; i < snapshots.length; i++) {
+      var snap = snapshots[i];
+      // порядок билдов в снапшоте не гарантирован — сортируем здесь
+      var rows = (snap.builds || []).map(function (b) {
+        return buildRow(b, snap.koji_web, snap.tag, classOrder);
+      }).sort(function (a, b) {
+        return a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
+      });
+      blocks.push({ tag: orNull(snap.tag), generated: orNull(snap.generated),
+                    koji_web: snap.koji_web || null,
+                    counts: snapshotCounts(rows, classNames), builds: rows });
+    }
+
+    var pairs = [];
+    var chain = diff.diffChain(snapshots);
+    for (i = 0; i < chain.length; i++) {
+      pairs.push(pairBlock(chain[i], snapshots));
+    }
+
+    return { generated: snapshots.length ? orNull(snapshots[0].generated) : '',
+             patch_classes: classNames, snapshots: blocks, pairs: pairs };
+  }
+
+  return { buildPageData: buildPageData, slug: slug, toMsk: toMsk,
+           patchClassesOf: patchClassesOf };
+}));
+
+</script>
+<script>
+/* store.js */
+/* Загруженные снапшоты: разбор, порядок, дубликаты, предупреждения.
+   Хранилище ничего не рисует и не знает про DOM — ровно поэтому его
+   поведение проверяется в node, а не глазами в браузере. */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else { root.KP = root.KP || {}; root.KP.store = factory(); }
+}(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+  'use strict';
+
+  var items = [];        /* {snapshot, file} в порядке цепочки */
+  var warns = [];
+  var manual = false;    /* человек переставил руками — не пересортировывать */
+  var listeners = [];
+
+  function isArray(value) {
+    return Object.prototype.toString.call(value) === '[object Array]';
+  }
+
+  /* Минимум, при котором снапшот вообще можно показать. Глубже не лезем:
+     модель почти все поля билда объявляет необязательными, и отказ от
+     целого файла из-за одной сборки потерял бы все остальные. */
+  function isSnapshot(value) {
+    return Boolean(value) && typeof value === 'object' && !isArray(value)
+        && value.schema === 1 && typeof value.tag === 'string'
+        && typeof value.generated === 'string' && isArray(value.builds);
+  }
+
+  /* Время сбора для сортировки. Нечитаемая дата остаётся строкой: выдать её
+     за ноль эпохи значило бы поставить такой снапшот первым в цепочке. */
+  function stamp(value) {
+    var ms = Date.parse(value);
+    return isNaN(ms) ? String(value) : ms;
+  }
+
+  function compareItems(a, b) {
+    var x = stamp(a.snapshot.generated), y = stamp(b.snapshot.generated);
+    /* Читаемое время и нечитаемая строка несравнимы. Ставим непонятное в
+       конец, а не туда, куда его случайно уронит сравнение разных типов. */
+    if (typeof x !== typeof y) return typeof x === 'number' ? -1 : 1;
+    if (x < y) return -1;
+    if (x > y) return 1;
+    return a.snapshot.tag < b.snapshot.tag
+      ? -1 : (a.snapshot.tag > b.snapshot.tag ? 1 : 0);
+  }
+
+  function fire() { for (var i = 0; i < listeners.length; i++) listeners[i](); }
+
+  /* Любое изменение состава — целиком или никак.
+
+     Проверка снапшота при загрузке нарочно неглубокая (иначе одна кривая
+     сборка отменяла бы файл на восемьсот годных), поэтому негодное внутри
+     доезжает до отрисовки и роняет её: builds: [null] — это массив, значит
+     «снапшот». Если такой снапшот останется в хранилище, страница застынет
+     недорисованной, а каждое следующее действие будет падать на нём же —
+     убрать его будет нечем. Поэтому подписчиков зовём под try: упали —
+     возвращаем прежний состав и зовём ещё раз, уже на нём.
+
+     Причину возвращаем строкой, а не бросаем дальше: она нужна человеку на
+     экране, а не в консоли, которую он не открывал. У add для неё есть свой
+     ответ, у remove и move ответа нет — им передают note, и причина уезжает
+     в предупреждения, которые страница показывает всегда. Живёт она до
+     следующей попытки что-либо изменить: предупреждения каждый раз
+     считаются заново от текущего состава, поэтому строка про откат не
+     переживёт ни удачную перестановку (иначе она врала бы про новый,
+     правильный порядок), ни второй такой же отказ.
+
+     change() возвращает, изменилось ли что-нибудь: на пустом изменении
+     подписчиков звать незачем, а перерисовка тега — это тысячи строк. */
+  function commit(change, note) {
+    var prevItems = items.slice(), prevManual = manual, message;
+    if (!change()) return null;
+    try {
+      fire();
+    } catch (e) {
+      items = prevItems;
+      manual = prevManual;
+      /* Предупреждения — от восстановленного состава, а не те, что были до
+         попытки: старая строка про откат относилась бы к порядку, которого
+         на странице нет. */
+      checkHubs();
+      message = e && e.message ? String(e.message) : String(e);
+      if (note) warns.push(note + ' ' + message);
+      /* Прежний состав уже был отрисован — на нём подписчик не падал.
+         Если и он теперь падает, страница сломана не этим изменением, и
+         скрыть это хранилище не может: исключение уходит наружу. */
+      fire();
+      return message;
+    }
+    return null;
+  }
+
+  /* Хаб у снапшотов разный — сравнивать их обычно бессмысленно, но бывает
+     и наоборот (переезд хаба, зеркало), поэтому это предупреждение, а не
+     отказ. Считаем заново от текущего состава: после удаления снапшота
+     старое предупреждение могло стать неправдой. */
+  function checkHubs() {
+    var base = null, i, hub;
+    warns = [];
+    for (i = 0; i < items.length; i++) {
+      hub = items[i].snapshot.koji_hub;
+      if (!hub) continue;
+      if (base === null) { base = hub; continue; }
+      if (hub !== base) {
+        warns.push(items[i].file + ': снапшот ' + items[i].snapshot.tag
+                 + ' собран с другого хаба (' + hub + '), сравнение с '
+                 + base + ' может ничего не значить');
+      }
+    }
+  }
+
+  function isDuplicate(snapshot) {
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].snapshot.tag === snapshot.tag
+          && items[i].snapshot.generated === snapshot.generated) return true;
+    }
+    return false;
+  }
+
+  /* Разбор одного файла. Ничего не бросает: одна опечатка в имени тега не
+     должна отменять загрузку остальных четырёх файлов. */
+  function parseText(text, fileName) {
+    var data, list, i, snapshot;
+    try {
+      data = JSON.parse(text);
+    } catch (e) {
+      return { ok: false,
+               error: fileName + ': не разбирается как JSON — ' + e.message };
+    }
+    list = isArray(data) ? data : [data];
+    if (!list.length) {
+      return { ok: false, error: fileName + ': пустой список снапшотов' };
+    }
+    for (i = 0; i < list.length; i++) {
+      snapshot = list[i];
+      /* Чужую версию схемы называем прямо: «это не снапшот» сбило бы с
+         толку человека, у которого файл сделан другой версией kojipatch. */
+      if (snapshot && typeof snapshot === 'object' && !isArray(snapshot)
+          && snapshot.schema !== undefined && snapshot.schema !== 1) {
+        return { ok: false,
+                 error: fileName + ': версия схемы ' + snapshot.schema
+                      + ', а дашборд понимает только 1' };
+      }
+      if (!isSnapshot(snapshot)) {
+        return { ok: false,
+                 error: fileName + ': это не снапшот kojipatch — нужны tag, '
+                      + 'generated и builds' };
+      }
+    }
+    return { ok: true, snapshots: list };
+  }
+
+  function add(snapshots, fileName) {
+    var added = 0, rejected = [], failure;
+    snapshots = snapshots || [];
+    failure = commit(function () {
+      var i, snapshot;
+      for (i = 0; i < snapshots.length; i++) {
+        snapshot = snapshots[i];
+        /* add() — публичная точка входа хранилища, а не только пара к
+           parseText: полагаться на то, что снапшот уже проверен снаружи,
+           значило бы держать вход в хранилище открытым для чужого кода. */
+        if (!isSnapshot(snapshot)) {
+          rejected.push(fileName + ': это не снапшот kojipatch — нужны tag, '
+                      + 'generated и builds');
+          continue;
+        }
+        if (isDuplicate(snapshot)) {
+          rejected.push(fileName + ': снапшот ' + snapshot.tag + ' от '
+                      + snapshot.generated + ' уже загружен');
+          continue;
+        }
+        items.push({ snapshot: snapshot, file: fileName });
+        added += 1;
+      }
+      if (added && !manual) items.sort(compareItems);
+      checkHubs();
+      return added > 0;
+    });
+    if (failure) {
+      /* Откат уже случился: в хранилище прежний состав, и отказ надо назвать
+         так же, как любой другой отказ файлу — строкой рядом с его именем. */
+      rejected.push(fileName + ': дашборд не смог показать эти данные — '
+                  + failure + '; файл не загружен');
+      added = 0;
+    }
+    return { added: added, rejected: rejected };
+  }
+
+  function remove(index) {
+    commit(function () {
+      if (index < 0 || index >= items.length) return false;
+      items.splice(index, 1);
+      checkHubs();
+      return true;
+    }, 'снапшот остался на месте: без него страница не рисуется —');
+  }
+
+  /* Ручной порядок включается только состоявшейся перестановкой: клик по
+     крайней стрелке ничего не двигает и отменять автосортировку не должен. */
+  function move(index, delta) {
+    commit(function () {
+      var to = index + delta, item;
+      if (index < 0 || index >= items.length || to < 0 || to >= items.length) {
+        return false;
+      }
+      manual = true;
+      item = items[index];
+      items.splice(index, 1);
+      items.splice(to, 0, item);
+      /* Предупреждения считает каждый путь, меняющий состав: порядок задаёт
+         и то, чей хаб считается основным, и живёт ли здесь ещё строка про
+         откат прошлой перестановки. */
+      checkHubs();
+      return true;
+    }, 'порядок не изменён: в этом порядке страница не рисуется —');
+  }
+
+  function list() {
+    var out = [], i;
+    for (i = 0; i < items.length; i++) {
+      out.push({ tag: items[i].snapshot.tag,
+                 generated: items[i].snapshot.generated,
+                 builds: (items[i].snapshot.builds || []).length,
+                 file: items[i].file });
+    }
+    return out;
+  }
+
+  function snapshots() {
+    var out = [], i;
+    for (i = 0; i < items.length; i++) out.push(items[i].snapshot);
+    return out;
+  }
+
+  function warnings() { return warns.slice(); }
+  function onChange(fn) { listeners.push(fn); }
+  function reset() { items = []; warns = []; manual = false; listeners = []; }
+
+  return { parseText: parseText, add: add, remove: remove, move: move,
+           list: list, snapshots: snapshots, warnings: warnings,
+           onChange: onChange, reset: reset };
+}));
+
+</script>
+<script>
+/* ui.js */
 /* Поведение страницы: загрузка снапшотов, разметка, фильтры, поиск,
    адресная строка. Считает данные viewmodel.js, а что именно считать —
    решает store.js; здесь это только рисуют и связывают с событиями. */
@@ -119,7 +1671,6 @@
   var controls = document.getElementById('controls');
   var chipsBox = document.getElementById('chips');
   var search = document.getElementById('q');
-  var clearBtn = document.getElementById('q-clear');
   var counter = document.getElementById('count');
   var expandBtn = document.getElementById('expand');
   var copyBtn = document.getElementById('copy-nvr');
@@ -1302,9 +2853,6 @@
       st.sort[st.tab] = { key: sort[0], asc: sort[1] !== 'desc' };
     }
     search.value = st.q;
-    /* Запрос мог приехать из ссылки — крестик обязан появиться вместе
-       с ним, а не ждать первого касания клавиатуры. */
-    clearBtn.hidden = !search.value;
     return true;
   }
 
@@ -1469,36 +3017,13 @@
   var SEARCH_DELAY = 120;
   var searchTimer = null;
 
-  /* Крестик следует за полем без задержки: перерисовку таблицы откладывают
-     ради тысяч строк, а показать крестик ничего не стоит, и запаздывать
-     ему не за чем. */
-  function syncClear() {
-    clearBtn.hidden = !search.value;
-  }
-
   search.addEventListener('input', function () {
-    syncClear();
     if (searchTimer) clearTimeout(searchTimer);
     searchTimer = setTimeout(function () {
       searchTimer = null;
       st.q = search.value.trim().toLowerCase();
       render();
     }, SEARCH_DELAY);
-  });
-
-  clearBtn.addEventListener('click', function () {
-    /* Отложенный поиск отменяем не ради правильности — сработав, он
-       прочитал бы уже пустое поле и ничего не испортил, — а ради работы:
-       это лишняя перерисовка всей таблицы через 120 мс после той, что мы
-       делаем прямо сейчас. На теге в тысячу сборок она заметна. */
-    if (searchTimer) { clearTimeout(searchTimer); searchTimer = null; }
-    search.value = '';
-    st.q = '';
-    syncClear();
-    /* Курсор обратно в поле: крестиком чаще всего чистят, чтобы набрать
-       другое, а не чтобы уйти со страницы. */
-    search.focus();
-    render();
   });
 
   expandBtn.addEventListener('click', function () {
@@ -1777,3 +3302,7 @@
 
   return { applyData: applyData };
 }));
+
+</script>
+</body>
+</html>

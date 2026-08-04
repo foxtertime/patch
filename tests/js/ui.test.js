@@ -810,3 +810,57 @@ test('щелчок по кнопке «наверх» поднимает стр�
   dom.fire(dom.id('totop'), 'click', {});
   assert.strictEqual(dom.window.pageYOffset, 0);
 });
+
+/* Крестик в поле поиска. Нативный рисует только WebKit, в Firefox его нет
+   вовсе — поэтому свой, одинаковый везде. */
+function wait(ms) {
+  return new Promise(function (done) { setTimeout(done, ms); });
+}
+
+test('крестик поиска прячется, когда поле пустое', function () {
+  var dom = load();
+  assert.strictEqual(dom.id('q-clear').hidden, true);
+});
+
+test('крестик появляется сразу при вводе, не дожидаясь перерисовки',
+  function () {
+    var dom = load();
+    var field = dom.id('q');
+    field.value = 'nginx';
+    dom.fire(field, 'input', {});
+    assert.strictEqual(dom.id('q-clear').hidden, false);
+  });
+
+test('щелчок по крестику очищает поле и снимает запрос', async function () {
+  var dom = load();
+  store.add([snap('os-9.2', '2026-08-01T00:00:00+03:00')], 'a.json');
+  var field = dom.id('q');
+  field.value = 'такого-компонента-нет';
+  dom.fire(field, 'input', {});
+  await wait(200);                       /* поиск отложен на 120 мс */
+  assert.match(dom.location.hash, /q=/, 'запрос должен доехать до адреса');
+  assert.match(dom.id('state-rows').innerHTML, /class="empty"/);
+
+  dom.fire(dom.id('q-clear'), 'click', {});
+  assert.strictEqual(field.value, '');
+  assert.strictEqual(dom.id('q-clear').hidden, true);
+  assert.doesNotMatch(dom.location.hash, /q=/, 'запрос обязан уйти из адреса');
+  assert.doesNotMatch(dom.id('state-rows').innerHTML, /class="empty"/);
+  assert.strictEqual(dom.focused(), field, 'курсор обязан вернуться в поле');
+});
+
+/* Между вводом и поиском 120 мс. Щелчок по крестику попадает в этот
+   промежуток чаще, чем кажется: набрал, увидел, что не то, сразу стёр. */
+test('крестик, нажатый до срабатывания поиска, не даёт запросу вернуться',
+  async function () {
+    var dom = load();
+    store.add([snap('os-9.2', '2026-08-01T00:00:00+03:00')], 'a.json');
+    var field = dom.id('q');
+    field.value = 'такого-компонента-нет';
+    dom.fire(field, 'input', {});          /* поиск ещё не сработал */
+    dom.fire(dom.id('q-clear'), 'click', {});
+    await wait(200);                       /* переживаем отложенный вызов */
+    assert.strictEqual(field.value, '');
+    assert.doesNotMatch(dom.location.hash, /q=/);
+    assert.doesNotMatch(dom.id('state-rows').innerHTML, /class="empty"/);
+  });

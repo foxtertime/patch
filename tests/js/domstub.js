@@ -31,6 +31,8 @@ function Node(tag, attrs) {
   this.handlers = {};
 }
 
+var focused = null;
+
 Node.prototype.getAttribute = function (name) {
   if (name === 'class') return this.className || null;
   return Object.prototype.hasOwnProperty.call(this.attrs, name)
@@ -79,6 +81,10 @@ Node.prototype.addEventListener = function (type, fn) {
 };
 
 Node.prototype.click = function () { dispatch(this, 'click', {}); };
+/* Фокус заглушка не изображает — только запоминает, кому его отдали:
+   скрипту важно, что вызов не падает, а тесту — что курсор вернули
+   в поле, а не бросили на кнопке. */
+Node.prototype.focus = function () { focused = this; };
 
 /* Селекторы разбираем ровно те, что нужны ui.js: тег, классы и наличие
    атрибута, без комбинаторов. Больше в скрипте не встречается, а полный
@@ -294,6 +300,7 @@ function install(options) {
       return node;
     },
     fire: function (node, type, extra) { return dispatch(node, type, extra); },
+    focused: function () { return focused; },
     fireWindow: function (type) {
       var list = window.handlers[type] || [], j;
       for (j = 0; j < list.length; j++) list[j]({ type: type });
