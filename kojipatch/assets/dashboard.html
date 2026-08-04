@@ -760,36 +760,41 @@ function builtHtml(value, q) {
        + (time ? ' <span class="tm">' + hl(time, q) + '</span>' : '');
 }
 
-/* Все koji-теги билда. Основной — тот, через который билд попал в этот
-   снапшот, — выделен цветом и насыщенностью: остальные только сообщают,
-   где билд висит ещё, и соперничать за внимание с ним не должны.
-   Если listTags ничего не дал (старый снапшот), показываем то, что знаем
-   из listTagged, — но не выдаём это за полный список. */
-function kojiTagsHtml(row, q) {
-  var list = (row.koji_tags || []).slice(), main = row.tagged_in;
-  if (main && list.indexOf(main) === -1) list.unshift(main);
-  if (!list.length) return '<span class="none">неизвестно</span>';
+function inheritedNote(inherited) {
+  if (inherited === null) return '';
+  return '<span class="note">(' + (inherited ? 'унаследован' : 'прямой')
+       + ')</span>';
+}
+
+/* Тег, через который билд попал в этот снапшот. */
+function mainTagHtml(row, q) {
+  if (!row.tagged_in) return '<span class="none">неизвестно</span>';
+  return '<span class="ktag main">' + hl(row.tagged_in, q) + '</span>'
+       + inheritedNote(row.inherited);
+}
+
+/* Остальные теги, в которых висит тот же билд. Строка остаётся на месте и
+   когда их нет: блоки соседних раскрытых строк не должны разъезжаться. */
+function otherTagsHtml(row, q) {
+  var all = row.koji_tags || [], list = [], i;
+  for (i = 0; i < all.length; i++) {
+    if (all[i] !== row.tagged_in) list.push(all[i]);
+  }
+  if (!list.length) return '<span class="none">—</span>';
   var out = '<div class="ktags">';
-  for (var i = 0; i < list.length; i++) {
-    var isMain = Boolean(main) && list[i] === main;
-    out += '<span class="ktag' + (isMain ? ' main' : '') + '">'
-        + hl(list[i], q) + '</span>';
-    if (isMain && row.inherited !== null) {
-      out += '<span class="note">'
-          + (row.inherited ? 'унаследован' : 'прямой') + '</span>';
-    }
+  for (i = 0; i < list.length; i++) {
+    out += '<span class="ktag">' + hl(list[i], q) + '</span>';
   }
   return out + '</div>';
 }
 
-/* Развёрнутый вид того же: здесь есть место сказать словами. */
+/* То же для сторон «было/стало»: там места на две строки нет. */
 function taggedText(taggedIn, inherited, q) {
   if (inherited === null || !taggedIn) {
     return '<span class="none">неизвестно</span>';
   }
   return '<span class="mono">' + hl(taggedIn, q) + '</span>'
-       + '<span class="note">' + (inherited ? 'унаследован' : 'прямой')
-       + '</span>';
+       + inheritedNote(inherited);
 }
 
 function tagsHtml(tags) {
@@ -952,7 +957,8 @@ function stateDetail(row, q) {
 
   out += '<div class="block"><div class="bl">koji</div>'
       + kv('NVR', '<span class="mono">' + hl(row.nvr, q) + '</span>')
-      + kv('теги', kojiTagsHtml(row, q))
+      + kv('основной тег', mainTagHtml(row, q))
+      + kv('другие теги', otherTagsHtml(row, q))
       + kv('собран', row.completed
             ? hl(row.completed, q) + (row.completed.length > 10
                 ? '<span class="note">МСК</span>' : '')
