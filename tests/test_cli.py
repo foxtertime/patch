@@ -1,6 +1,8 @@
 import io
+import json
 import logging
 import os
+import re
 import shutil
 import tempfile
 import unittest
@@ -100,13 +102,30 @@ class CliRenderTest(TempDirTest):
         self.assertIn("os-9.2", html)
         self.assertNotIn("/*__DATA__*/", html)
 
-    def test_render_single_snapshot_has_no_pairs(self):
+    def test_render_single_snapshot_has_nothing_to_compare(self):
+        # пары считает сама страница, и данные ей отдаются снапшотами:
+        # из одного снапшота вкладке «Изменения» браться неоткуда
         out = self.out_path()
         code, _ = self.run_cli(["render", SNAP_91, "-o", out])
         self.assertEqual(code, 0)
         with open(out, encoding="utf-8") as handle:
-            self.assertIn('"pairs": []', handle.read().replace("\n", " ")
-                          .replace('"pairs":[]', '"pairs": []'))
+            html = handle.read()
+        raw = re.search(r"window\.KP_SNAPSHOTS = (\[.*?\]);</script>",
+                        html, re.S)
+        self.assertIsNotNone(raw)
+        self.assertEqual(len(json.loads(raw.group(1))), 1)
+
+    def test_dashboard_writes_a_page_without_data(self):
+        # дашборд без снапшотов: страница, которой данные принесут потом.
+        # Ни конфига, ни хаба ей не нужно
+        out = self.out_path("dashboard.html")
+        code, err = self.run_cli(["dashboard", "-o", out])
+        self.assertEqual(code, 0)
+        with open(out, encoding="utf-8") as handle:
+            html = handle.read()
+        self.assertIn("<!doctype html>", html)
+        self.assertNotIn("window.KP_SNAPSHOTS =", html)
+        self.assertIn(out, err)
 
     def test_render_of_missing_file_is_fatal(self):
         code, err = self.run_cli(["render", "/nonexistent.json",
@@ -134,7 +153,7 @@ class CliRenderTest(TempDirTest):
             with self.assertRaises(SystemExit):
                 main(["--help"])
         text = out.getvalue()
-        for word in ("collect", "render", "run"):
+        for word in ("collect", "render", "dashboard", "run"):
             self.assertIn(word, text)
 
 

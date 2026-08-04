@@ -1,4 +1,4 @@
-"""Точка входа: collect, render, run."""
+"""Точка входа: collect, render, dashboard, run."""
 import argparse
 import logging
 import os
@@ -6,13 +6,11 @@ import time
 from typing import List, Optional
 
 from . import logs
-from .classify import Classifier
+from .build import BuildError, build_html
 from .collect import collect_tag
 from .config import ConfigError, load_config
-from .diff import diff_chain
 from .gitlabclient import GitlabClient
 from .model import SnapshotError, dump_snapshots, load_snapshots
-from .render import RenderError, render_html
 
 EXIT_OK = 0
 EXIT_PROBLEMS = 1
@@ -51,6 +49,11 @@ def _parser() -> argparse.ArgumentParser:
     render.add_argument("snapshots", nargs="+")
     render.add_argument("-o", "--output", default="dashboard.html")
 
+    dashboard = subparsers.add_parser(
+        "dashboard",
+        help="положить дашборд на диск (данные подгружаются в нём)")
+    dashboard.add_argument("-o", "--output", default="dashboard.html")
+
     run = subparsers.add_parser("run", help="собрать и сразу построить HTML")
     run.add_argument("--tag", action="append", required=True, dest="tags")
     run.add_argument("-o", "--output", default="dashboard.html")
@@ -61,9 +64,9 @@ def _parser() -> argparse.ArgumentParser:
 def _load_config(args):
     overrides = {"koji_hub": args.koji_hub, "gitlab_api": args.gitlab_api,
                  "patch_dir": args.patch_dir}
-    # render работает из снапшотов, koji.hub ему не нужен
+    # эти двое работают из снапшотов, koji.hub им не нужен
     return load_config(args.config, overrides,
-                       require_hub=args.command != "render")
+                       require_hub=args.command not in ("render", "dashboard"))
 
 
 def _collect(args, cfg):
@@ -80,8 +83,7 @@ def _collect(args, cfg):
 
 
 def _render(snapshots, cfg, output) -> None:
-    pairs = diff_chain(snapshots)
-    html = render_html(snapshots, pairs, Classifier.from_config(cfg))
+    html = build_html(snapshots)
     with open(output, "w", encoding="utf-8") as handle:
         handle.write(html)
     logger.info("написан %s", output)
@@ -107,6 +109,12 @@ def main(argv: Optional[List[str]] = None) -> int:
         return _fatal("фатальная ошибка", exc)
 
     try:
+        if args.command == "dashboard":
+            with open(args.output, "w", encoding="utf-8") as handle:
+                handle.write(build_html())
+            logger.info("написан %s", args.output)
+            return EXIT_OK
+
         if args.command == "render":
             snapshots = []
             for path in args.snapshots:
@@ -134,8 +142,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         return EXIT_OK
     except SnapshotError as exc:
         return _fatal("ошибка снапшота", exc)
-    except RenderError as exc:
-        return _fatal("ошибка отрисовки", exc)
+    except BuildError as exc:
+        return _fatal("ошибка сборки страницы", exc)
     except OSError as exc:
         return _fatal("ошибка ввода-вывода", exc)
     except Exception as exc:  # koji недоступен и прочие фатальные случаи

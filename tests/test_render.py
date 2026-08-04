@@ -1,12 +1,9 @@
-import json
-import re
 import unittest
 
 from kojipatch.classify import Classifier
 from kojipatch.diff import diff_chain
 from kojipatch.model import Build, Patch, Snapshot, Source
-from kojipatch.render import (PLACEHOLDER, build_page_data, render_html,
-                              slug, to_msk)
+from kojipatch.render import build_page_data, slug, to_msk
 
 RULES = [("CVE", r"CVE-\d{4}-\d{4,}"), ("SAST", r"(?i)^sast[-_]"),
          ("DAST", r"(?i)^dast[-_]"), ("other", ".*")]
@@ -297,114 +294,6 @@ class MoscowTimeTest(unittest.TestCase):
         rows = build_page_data([snap("t", [one])], [], Classifier(RULES)
                                )["snapshots"][0]["builds"]
         self.assertEqual(rows[0]["completed"], "2026-05-15 01:30:00")
-
-
-class RenderHtmlTest(unittest.TestCase):
-    def setUp(self):
-        self.classifier = Classifier(RULES)
-        self.snapshots = [snap("os-9.2", [build("nginx")])]
-
-    def html(self, snapshots=None):
-        return render_html(snapshots or self.snapshots, [], self.classifier)
-
-    def test_no_placeholder_remains(self):
-        self.assertNotIn(PLACEHOLDER, self.html())
-
-    def test_embedded_json_parses(self):
-        match = re.search(r"var DATA = (.*?);\n", self.html(), re.S)
-        self.assertIsNotNone(match)
-        data = json.loads(match.group(1))
-        self.assertEqual(data["snapshots"][0]["tag"], "os-9.2")
-
-    def test_script_close_tag_is_escaped(self):
-        nasty = build("evil</script><script>alert(1)</script>")
-        html = self.html([snap("t", [nasty])])
-        self.assertNotIn("</script><script>alert(1)", html)
-        self.assertIn("<\\/script>", html)
-
-    def test_line_separators_are_escaped(self):
-        # U+2028/U+2029 внутри <script> — переводы строк для JS, а JSON их
-        # не экранирует: литерал развалился бы прямо по данным.
-        nasty = build("evil" + chr(0x2028) + "x" + chr(0x2029) + "y")
-        html = self.html([snap("t", [nasty])])
-        self.assertNotIn(chr(0x2028), html)
-        self.assertNotIn(chr(0x2029), html)
-        self.assertIn("\\u2028", html)
-        self.assertIn("\\u2029", html)
-        match = re.search(r"var DATA = (.*?);\n", html, re.S)
-        self.assertEqual(json.loads(match.group(1))["snapshots"][0]["tag"], "t")
-
-    def test_html_has_both_tab_containers(self):
-        html = self.html()
-        self.assertIn('id="tab-state"', html)
-        self.assertIn('id="tab-diff"', html)
-
-
-class TemplateContractTest(unittest.TestCase):
-    def setUp(self):
-        self.classifier = Classifier(RULES)
-        old = snap("os-9.1", [build("nginx", "1.0")])
-        new = snap("os-9.2", [build("nginx", "1.1",
-                                    patches=[patch("CVE-2024-7347.patch", "CVE")])])
-        from kojipatch.diff import diff_chain as chain
-        self.html = render_html([old, new], chain([old, new]), self.classifier)
-
-    def test_has_tab_navigation(self):
-        self.assertIn('data-tab="state"', self.html)
-        self.assertIn('data-tab="diff"', self.html)
-
-    def test_has_search_and_expand_controls(self):
-        self.assertIn('id="q"', self.html)
-        self.assertIn('id="expand"', self.html)
-
-    def test_has_active_filter_chip_bar(self):
-        self.assertIn('id="chips"', self.html)
-
-    def test_has_copy_nvr_button(self):
-        self.assertIn('id="copy-nvr"', self.html)
-
-    def test_reuses_ref_html_css_variables(self):
-        for name in ("--bg", "--fg", "--muted", "--line", "--card",
-                     "--accent", "--added", "--removed", "--hit"):
-            self.assertIn(name, self.html, name)
-
-    def test_supports_dark_theme(self):
-        self.assertIn("prefers-color-scheme: dark", self.html)
-
-    def test_diff_tab_starts_filtered_to_changed_rows(self):
-        # обещание спеки и README: «Изменения» открываются на изменившихся
-        self.assertIn("diff: { 'changed': 1 }", self.html)
-
-    def test_search_is_debounced(self):
-        self.assertIn("SEARCH_DELAY", self.html)
-
-    def test_pair_lives_in_the_hash_by_tag_names(self):
-        self.assertIn("function pairKey(", self.html)
-        self.assertNotIn("'pair=' + st.pair", self.html)
-
-    def test_version_sort_is_documented_as_lexicographic(self):
-        self.assertIn("Сортировка лексикографическая", self.html)
-
-    def test_tooltip_container_present(self):
-        self.assertIn('id="tip"', self.html)
-
-    def test_no_external_resources(self):
-        for marker in ("<script src=", "<link rel=\"stylesheet\"", "https://cdn",
-                       "@import"):
-            self.assertNotIn(marker, self.html, marker)
-
-
-class LoggingTest(unittest.TestCase):
-    def test_page_size_is_logged_at_debug(self):
-        classifier = Classifier(RULES)
-        old = snap("os-9.1", [build("nginx", "1.0")])
-        new = snap("os-9.2", [build("nginx", "1.1")])
-        from kojipatch.diff import diff_chain as chain
-        with self.assertLogs("kojipatch", level="DEBUG") as caught:
-            render_html([old, new], chain([old, new]), classifier)
-        line = "\n".join(caught.output)
-        self.assertIn("kojipatch.render", line)
-        self.assertIn("kojipatch.diff", line)
 
 
 if __name__ == "__main__":
