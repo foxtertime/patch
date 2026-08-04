@@ -1532,8 +1532,8 @@ def _encode(data) -> str:
     """
     text = json.dumps(data, ensure_ascii=False, sort_keys=True)
     return (text.replace("</", "<\\/")
-                .replace(" ", "\\u2028")
-                .replace(" ", "\\u2029"))
+                .replace("\u2028", "\\u2028")
+                .replace("\u2029", "\\u2029"))
 
 
 def build_html(snapshots: Optional[List] = None,
