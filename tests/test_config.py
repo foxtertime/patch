@@ -162,6 +162,27 @@ class DefaultRulesOnRealNamesTest(unittest.TestCase):
             self.classifier.classify("sast-cve-2024-42516-fix.patch.new"),
             "CVE")
 
+    def test_spec_patch(self):
+        self.assertEqual(self.classifier.classify("nginx.spec.patch"), "SPEC")
+
+    def test_spec_marker_in_the_middle_of_a_longer_name(self):
+        self.assertEqual(
+            self.classifier.classify("httpd-2.4.62.spec.patch.new"), "SPEC")
+
+    def test_spec_needs_the_dots(self):
+        # «spec» внутри слова — не спек-патч: иначе туда уехали бы
+        # specfile-*, respec-* и прочие имена с этими буквами
+        self.assertEqual(self.classifier.classify("nginx-respec-fix.patch"),
+                         "other")
+        self.assertEqual(self.classifier.classify("specialcase.patch"),
+                         "other")
+
+    def test_cve_wins_over_spec(self):
+        # спек-патч, закрывающий CVE, — прежде всего CVE: класс отвечает на
+        # вопрос «зачем патч», а не «какой файл он правит»
+        self.assertEqual(
+            self.classifier.classify("httpd-cve-2024-42516.spec.patch"), "CVE")
+
     def test_plain_patch_is_other(self):
         self.assertEqual(
             self.classifier.classify("httpd-2.4.62-fix-build.patch.new"),
