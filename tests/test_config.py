@@ -100,7 +100,7 @@ class LoadConfigTest(unittest.TestCase):
         self.assertIsInstance(cfg, Config)
 
     def test_hub_is_optional_when_not_required(self):
-        # подкоманда render читает готовые снапшоты и до koji не ходит
+        # подкоманда dashboard пуста при старте и до koji не ходит
         cfg = load_config(None, None, require_hub=False)
         self.assertEqual(cfg.koji_hub, "")
         self.assertEqual(cfg.patch_classes[-1], ("other", ".*"))

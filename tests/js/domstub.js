@@ -262,8 +262,7 @@ function install(options) {
     handlers: {},
     innerWidth: 1200,
     innerHeight: 800,
-    addEventListener: Node.prototype.addEventListener,
-    KP_SNAPSHOTS: options.snapshots || undefined
+    addEventListener: Node.prototype.addEventListener
   };
   var location = { hash: options.hash || '' };
   var history = { replaceState: function (state, title, url) {

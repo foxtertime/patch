@@ -1,10 +1,8 @@
-"""Сборка страницы: шаблон, скрипты и прелюдия с данными."""
-import json
+"""Сборка страницы: шаблон и скрипты в одном файле."""
 import re
 import unittest
 
 from kojipatch.build import SCRIPTS, BuildError, build_html
-from kojipatch.model import load_snapshots
 
 RICH = "tests/fixtures/rich-old.json"
 
@@ -35,22 +33,9 @@ class BuildHtml(unittest.TestCase):
             self.assertNotIn(marker, html, marker)
 
     def test_empty_dashboard_carries_no_data(self):
-        # само имя KP_SNAPSHOTS в странице есть всегда: его читает ui.js.
-        # Пустой дашборд не несёт присваивания — данных в нём нет.
-        self.assertNotIn("window.KP_SNAPSHOTS =", build_html())
-
-    def test_snapshots_are_embedded_as_a_prelude(self):
-        snapshots = load_snapshots(RICH)
-        html = build_html(snapshots)
-        raw = re.search(r"window\.KP_SNAPSHOTS = (\[.*?\]);", html, re.S)
-        self.assertIsNotNone(raw)
-        self.assertEqual(json.loads(raw.group(1))[0]["tag"], "os-9.1")
-
-    def test_script_close_tag_is_escaped(self):
-        """«</script>» внутри строки данных закрыл бы блок и снёс страницу."""
-        snapshots = load_snapshots(RICH)
-        snapshots[0].builds[0].problems = ["</script><b>oops"]
-        self.assertNotIn("</script><b>", build_html(snapshots))
+        # данные страницы больше не запекает питон: их подгружают в
+        # браузере, и имени KP_SNAPSHOTS в собранном файле нет вовсе.
+        self.assertNotIn("KP_SNAPSHOTS", build_html())
 
     def test_missing_template_is_reported(self):
         with self.assertRaises(BuildError):
@@ -59,33 +44,6 @@ class BuildHtml(unittest.TestCase):
     def test_template_without_placeholder_is_reported(self):
         with self.assertRaises(BuildError):
             build_html(template_path=RICH)
-
-
-class PreludeTest(unittest.TestCase):
-    """Прелюдия — единственный способ отдать данные собранной странице."""
-
-    def prelude(self, html):
-        raw = re.search(r"window\.KP_SNAPSHOTS = (\[.*?\]);</script>",
-                        html, re.S)
-        self.assertIsNotNone(raw, "прелюдии в странице нет")
-        return json.loads(raw.group(1))
-
-    def test_embedded_json_parses(self):
-        data = self.prelude(build_html(load_snapshots(RICH)))
-        self.assertEqual(data[0]["tag"], "os-9.1")
-
-    def test_line_separators_are_escaped(self):
-        # U+2028/U+2029 внутри <script> — переводы строк для JS, а JSON их
-        # не экранирует: литерал развалился бы прямо по данным.
-        snapshots = load_snapshots(RICH)
-        snapshots[0].builds[0].problems = ["evil" + chr(0x2028) + "x"
-                                           + chr(0x2029) + "y"]
-        html = build_html(snapshots)
-        self.assertNotIn(chr(0x2028), html)
-        self.assertNotIn(chr(0x2029), html)
-        self.assertIn("\\u2028", html)
-        self.assertIn("\\u2029", html)
-        self.assertEqual(self.prelude(html)[0]["tag"], "os-9.1")
 
 
 class TemplateContractTest(unittest.TestCase):

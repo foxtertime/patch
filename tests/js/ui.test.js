@@ -80,15 +80,6 @@ test('каждый запрос скрипта находит свой узел'
   assert.ok(dom.id('tab-diff').querySelector('.tablewrap'));
 });
 
-test('снапшот из прелюдии сразу оказывается в хранилище', function () {
-  var dom = load({ snapshots: [snap('os-9.1', '2026-07-01T00:00:00+03:00')] });
-  assert.strictEqual(store.list().length, 1);
-  assert.strictEqual(dom.id('tab-empty').hidden, true);
-  assert.strictEqual(dom.document.querySelector('.tabs').hidden, false);
-  assert.ok(dom.id('state-rows').innerHTML.indexOf('nginx') !== -1,
-            dom.id('state-rows').innerHTML);
-});
-
 test('один снапшот — сравнивать нечего', function () {
   var dom = load();
   store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
@@ -408,19 +399,6 @@ test('негодный снапшот не вешает страницу', async
   assert.strictEqual(store.list().length, 1);
   assert.strictEqual(dom.id('tab-empty').hidden, true);
   assert.ok(dom.id('state-rows').innerHTML.indexOf('nginx') !== -1);
-});
-
-test('негодная прелюдия объясняется, а не пропадает молча', function () {
-  /* Снапшот, запечённый сборщиком, проходит тот же путь через хранилище и
-     так же может не отрисоваться. Пустая страница без единого слова о том,
-     почему она пуста, — не ответ. */
-  var dom = load({ snapshots: [{ schema: 1, tag: 't',
-                                 generated: '2026-08-01T00:00:00+03:00',
-                                 builds: [null] }] });
-  assert.strictEqual(store.list().length, 0);
-  assert.strictEqual(dom.id('tab-empty').hidden, false);
-  assert.ok(dom.id('load-errors').innerHTML.indexOf('встроено в файл') !== -1,
-            dom.id('load-errors').innerHTML);
 });
 
 test('негодный снапшот не уносит соседей по загрузке', async function () {

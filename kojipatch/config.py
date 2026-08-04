@@ -136,8 +136,8 @@ def load_config(path: Optional[str],
                 require_hub: bool = True) -> Config:
     """Читает YAML-конфиг и накладывает поверх непустые overrides.
 
-    require_hub=False нужен подкоманде render: она работает из готовых
-    снапшотов и до koji вообще не ходит.
+    require_hub=False нужен подкоманде dashboard: она кладёт на диск
+    пустую страницу и до koji вообще не ходит.
     """
     data = _read_yaml(path) if path else {}
     overrides = {k: v for k, v in (overrides or {}).items() if v}

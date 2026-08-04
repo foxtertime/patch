@@ -1,8 +1,6 @@
 import io
-import json
 import logging
 import os
-import re
 import shutil
 import tempfile
 import unittest
@@ -91,29 +89,25 @@ class TempDirTest(LoggerStateMixin, unittest.TestCase):
         return code, err.getvalue()
 
 
-class CliRenderTest(TempDirTest):
-    def test_render_two_snapshots(self):
-        out = self.out_path()
-        code, _ = self.run_cli(["render", SNAP_91, SNAP_92, "-o", out])
-        self.assertEqual(code, 0)
-        with open(out, encoding="utf-8") as handle:
-            html = handle.read()
-        self.assertIn("os-9.1", html)
-        self.assertIn("os-9.2", html)
-        self.assertNotIn("/*__DATA__*/", html)
+class CliTest(TempDirTest):
+    def test_render_command_is_gone(self):
+        """Дашборд больше не печёт данные внутрь себя: снапшоты в него
+        подгружают. Молчаливо принять старую команду значило бы написать
+        файл, в котором ничего нет."""
+        with self.assertRaises(SystemExit):
+            main(["render", "snapshot.json"])
 
-    def test_render_single_snapshot_has_nothing_to_compare(self):
-        # пары считает сама страница, и данные ей отдаются снапшотами:
-        # из одного снапшота вкладке «Изменения» браться неоткуда
-        out = self.out_path()
-        code, _ = self.run_cli(["render", SNAP_91, "-o", out])
-        self.assertEqual(code, 0)
-        with open(out, encoding="utf-8") as handle:
-            html = handle.read()
-        raw = re.search(r"window\.KP_SNAPSHOTS = (\[.*?\]);</script>",
-                        html, re.S)
-        self.assertIsNotNone(raw)
-        self.assertEqual(len(json.loads(raw.group(1))), 1)
+    def test_run_command_is_gone(self):
+        # run был эквивалентом collect + render за один вызов; без render
+        # ему нечего делать со снапшотами дальше сбора
+        with self.assertRaises(SystemExit):
+            main(["run", "--tag", "t"])
+
+    def test_dashboard_command_writes_the_page(self):
+        path = os.path.join(self.tmp, "dash.html")
+        self.assertEqual(main(["dashboard", "-o", path]), 0)
+        with open(path, encoding="utf-8") as handle:
+            self.assertIn("Перетащите снапшоты сюда", handle.read())
 
     def test_dashboard_writes_a_page_without_data(self):
         # дашборд без снапшотов: страница, которой данные принесут потом.
@@ -124,14 +118,8 @@ class CliRenderTest(TempDirTest):
         with open(out, encoding="utf-8") as handle:
             html = handle.read()
         self.assertIn("<!doctype html>", html)
-        self.assertNotIn("window.KP_SNAPSHOTS =", html)
+        self.assertNotIn("KP_SNAPSHOTS", html)
         self.assertIn(out, err)
-
-    def test_render_of_missing_file_is_fatal(self):
-        code, err = self.run_cli(["render", "/nonexistent.json",
-                                  "-o", self.out_path()])
-        self.assertEqual(code, 2)
-        self.assertIn("снапшот", err)
 
     def test_bad_config_is_fatal(self):
         code, _ = self.run_cli(["--config", "/nonexistent.yaml", "collect",
@@ -153,7 +141,7 @@ class CliRenderTest(TempDirTest):
             with self.assertRaises(SystemExit):
                 main(["--help"])
         text = out.getvalue()
-        for word in ("collect", "render", "dashboard", "run"):
+        for word in ("collect", "dashboard"):
             self.assertIn(word, text)
 
 
@@ -163,22 +151,22 @@ class LogLevelTest(LoggerStateMixin, unittest.TestCase):
         os.close(fd)
         return path
 
-    def snapshots(self):
-        return [os.path.join(FIXTURES, "snapshot-os-9.1.json"),
-                os.path.join(FIXTURES, "snapshot-os-9.2.json")]
-
     def test_written_file_is_logged_at_info(self):
         out = self.out_path()
         with self.assertLogs("kojipatch.cli", level="INFO") as caught:
-            code = main(["render"] + self.snapshots() + ["-o", out])
+            code = main(["dashboard", "-o", out])
         self.assertEqual(code, 0)
         self.assertIn(out, "\n".join(caught.output))
 
     def test_fatal_error_is_logged_at_error(self):
+        # ошибка ввода-вывода при записи страницы — «каталог» вместо
+        # «файл» — отличается от ошибки конфига и тоже фатальна
+        directory = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, directory, True)
         with self.assertLogs("kojipatch.cli", level="ERROR") as caught:
-            code = main(["render", "/nonexistent.json", "-o", self.out_path()])
+            code = main(["dashboard", "-o", directory])
         self.assertEqual(code, 2)
-        self.assertIn("снапшот", "\n".join(caught.output).lower())
+        self.assertIn("ошибка ввода-вывода", "\n".join(caught.output))
 
     def test_error_carries_a_traceback_record_at_debug(self):
         # пользователю — одна строка, разработчику — трейсбек, но только
@@ -196,25 +184,18 @@ class LogLevelTest(LoggerStateMixin, unittest.TestCase):
         for record in caught.records:
             self.assertIsNone(record.exc_info)
 
-    def test_snapshot_error_is_named_in_the_error_line(self):
-        # «cli: ошибка: ...» не говорит ничего, в отличие от соседних
-        # «ошибка конфига» и «ошибка ввода-вывода»
-        with self.assertLogs("kojipatch.cli", level="ERROR") as caught:
-            main(["render", "/nonexistent.json", "-o", self.out_path()])
-        self.assertIn("ошибка снапшота", "\n".join(caught.output))
-
     def test_unknown_level_is_rejected_by_argparse(self):
         err = io.StringIO()
         with redirect_stderr(err):
             with self.assertRaises(SystemExit):
-                main(["--log-level", "loud", "render", "x.json"])
+                main(["--log-level", "loud", "dashboard"])
         self.assertIn("--log-level", err.getvalue())
 
     def test_verbose_flag_is_gone(self):
         err = io.StringIO()
         with redirect_stderr(err):
             with self.assertRaises(SystemExit):
-                main(["-v", "render", "x.json"])
+                main(["-v", "dashboard"])
         self.assertIn("unrecognized", err.getvalue())
 
     def test_help_mentions_log_level(self):
@@ -226,7 +207,7 @@ class LogLevelTest(LoggerStateMixin, unittest.TestCase):
 
 
 class SnapshotFixtureTest(unittest.TestCase):
-    """Фикстуры читаются как есть — ими же кормится демонстрационный рендер."""
+    """Фикстуры читаются как есть: контракт формата снапшота на входе."""
 
     def snapshot(self, path):
         snaps = load_snapshots(path)
@@ -275,7 +256,7 @@ class SnapshotRoundTripTest(TempDirTest):
                          [b.to_dict() for b in snapshot.builds])
 
 
-# ---- сквозные прогоны collect/run против фейков koji и GitLab ----
+# ---- сквозные прогоны collect против фейков koji и GitLab ----
 
 HUB = "https://hub/kojihub"
 GITLAB_API = "https://gitlab.example.com/api/v4"
@@ -304,7 +285,7 @@ ROUTES = {TREE % "g%2Fnginx": Response(200, [
      "path": "PATCH/CVE-2024-7347.patch"}], {})}
 
 
-class RunCommandTest(TempDirTest):
+class CollectCommandTest(TempDirTest):
     """kojiclient.connect и GitlabClient подменяются присваиванием в модуль:
     внешней библиотеки моков в проекте нет, а сети в тестах быть не должно."""
 
@@ -335,41 +316,13 @@ class RunCommandTest(TempDirTest):
         return ["--koji-hub", HUB, "--gitlab-api", GITLAB_API,
                 "--jobs", "1"] + list(rest)
 
-    def test_run_writes_html_and_returns_zero(self):
-        out = self.out_path()
-        code, err = self.run_cli(self.argv("run", "--tag", "os-9.2", "-o", out))
+    def test_collect_writes_a_loadable_snapshot(self):
+        path = os.path.join(self.tmp, "collected.json")
+        code, err = self.run_cli(self.argv("collect", "--tag", "os-9.2",
+                                           "-o", path))
         self.assertEqual(code, 0)
-        with open(out, encoding="utf-8") as handle:
-            html = handle.read()
-        self.assertIn("os-9.2", html)
-        self.assertIn("nginx-1.25.0-1.el9", html)
-        self.assertIn("CVE-2024-7347.patch", html)
-        self.assertNotIn("/*__DATA__*/", html)
-        self.assertIn("os-9.2", err)
+        self.assertIn(path, err)
         self.assertIn("2 билдов, 1 проблемных", err)
-
-    def test_run_returns_one_when_problems_exceed_the_limit(self):
-        code, err = self.run_cli(self.argv("run", "--tag", "os-9.2",
-                                           "-o", self.out_path()))
-        self.assertEqual(code, 0)
-        code, err = self.run_cli(
-            ["--max-problems", "0"] + self.argv("run", "--tag", "os-9.2",
-                                                "-o", self.out_path()))
-        self.assertEqual(code, 1)
-        self.assertIn("проблемных билдов 1 > 0", err)
-
-    def test_problem_limit_is_not_exceeded_when_equal(self):
-        code, _ = self.run_cli(
-            ["--max-problems", "1"] + self.argv("run", "--tag", "os-9.2",
-                                                "-o", self.out_path()))
-        self.assertEqual(code, 0)
-
-    def test_run_saves_a_loadable_snapshot(self):
-        path = os.path.join(self.tmp, "snap.json")
-        code, _ = self.run_cli(self.argv("run", "--tag", "os-9.2",
-                                         "-o", self.out_path(),
-                                         "--save-snapshots", path))
-        self.assertEqual(code, 0)
         snaps = load_snapshots(path)
         self.assertEqual(snaps[0].tag, "os-9.2")
         nginx = snaps[0].by_name()["nginx"]
@@ -378,17 +331,25 @@ class RunCommandTest(TempDirTest):
                          ["CVE-2024-7347.patch"])
         self.assertEqual(snaps[0].by_name()["curl"].problems, ["no source url"])
 
-    def test_collect_writes_a_snapshot_without_html(self):
-        path = os.path.join(self.tmp, "collected.json")
+    def test_collect_returns_one_when_problems_exceed_the_limit(self):
         code, err = self.run_cli(self.argv("collect", "--tag", "os-9.2",
-                                           "-o", path))
+                                           "-o", self.out_path("a.json")))
         self.assertEqual(code, 0)
-        self.assertEqual(load_snapshots(path)[0].tag, "os-9.2")
-        self.assertIn(path, err)
+        code, err = self.run_cli(
+            ["--max-problems", "0"] + self.argv("collect", "--tag", "os-9.2",
+                                                "-o", self.out_path("b.json")))
+        self.assertEqual(code, 1)
+        self.assertIn("проблемных билдов 1 > 0", err)
+
+    def test_problem_limit_is_not_exceeded_when_equal(self):
+        code, _ = self.run_cli(
+            ["--max-problems", "1"] + self.argv("collect", "--tag", "os-9.2",
+                                                "-o", self.out_path("a.json")))
+        self.assertEqual(code, 0)
 
     def test_unknown_tag_is_fatal(self):
-        code, err = self.run_cli(self.argv("run", "--tag", "нет-такого",
-                                           "-o", self.out_path()))
+        code, err = self.run_cli(self.argv("collect", "--tag", "нет-такого",
+                                           "-o", self.out_path("a.json")))
         self.assertEqual(code, 2)
         self.assertIn("нет-такого", err)
 
@@ -400,7 +361,7 @@ class LoggerIsolationTest(unittest.TestCase):
         # пропадёт, этот тест упадёт
         logger = logging.getLogger("kojipatch")
         before = (list(logger.handlers), logger.level, logger.propagate)
-        case = CliRenderTest("test_render_two_snapshots")
+        case = CliTest("test_dashboard_command_writes_the_page")
         result = unittest.TestResult()
         case.run(result)
         self.assertEqual(result.errors + result.failures, [])

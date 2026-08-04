@@ -156,8 +156,9 @@
       var i, snapshot;
       for (i = 0; i < snapshots.length; i++) {
         snapshot = snapshots[i];
-        /* add() зовут и мимо parseText — с прелюдией, запечённой сборщиком.
-           Проверяем ещё раз здесь, чтобы негодное не попало в хранилище. */
+        /* add() — публичная точка входа хранилища, а не только пара к
+           parseText: полагаться на то, что снапшот уже проверен снаружи,
+           значило бы держать вход в хранилище открытым для чужого кода. */
         if (!isSnapshot(snapshot)) {
           rejected.push(fileName + ': это не снапшот kojipatch — нужны tag, '
                       + 'generated и builds');

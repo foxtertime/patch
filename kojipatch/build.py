@@ -1,8 +1,7 @@
 """Сборка дашборда: шаблон плюс скрипты в один самодостаточный файл."""
-import json
 import logging
 import os
-from typing import List, Optional
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -27,23 +26,8 @@ def _read(path: str) -> str:
         raise BuildError("не прочитать %s: %s" % (path, exc))
 
 
-def _encode(data) -> str:
-    """JSON, безопасный внутри <script>.
-
-    U+2028 и U+2029 для JS — разделители строк, внутри литерала их быть не
-    должно. В самом исходнике они записаны escape-последовательностями:
-    глазом такой символ не виден, а редактор, нормализующий переводы строк,
-    его молча съест.
-    """
-    text = json.dumps(data, ensure_ascii=False, sort_keys=True)
-    return (text.replace("</", "<\\/")
-                .replace("\u2028", "\\u2028")
-                .replace("\u2029", "\\u2029"))
-
-
-def build_html(snapshots: Optional[List] = None,
-               template_path: Optional[str] = None) -> str:
-    """Собранная страница. snapshots=None — пустой дашборд."""
+def build_html(template_path: Optional[str] = None) -> str:
+    """Собранная страница: данные в неё подгружают уже в браузере."""
     path = template_path or TEMPLATE_PATH
     template = _read(path)
     if PLACEHOLDER not in template:
@@ -51,11 +35,6 @@ def build_html(snapshots: Optional[List] = None,
                          % (path, PLACEHOLDER))
 
     blocks = []
-    if snapshots:
-        from .model import snapshot_to_dict
-        payload = [snapshot_to_dict(s) for s in snapshots]
-        blocks.append("<script>window.KP_SNAPSHOTS = %s;</script>"
-                      % _encode(payload))
     for name in SCRIPTS:
         source = _read(os.path.join(ASSETS, "js", name))
         blocks.append("<script>\n/* %s */\n%s\n</script>" % (name, source))
