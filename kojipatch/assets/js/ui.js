@@ -777,11 +777,15 @@
               ? linkHtml(row.source_url, 'gitlab') : '<span class="none">—</span>')
         + '</div>';
 
-    out += '<div class="block"><div class="bl">патчи · ' + row.patches.length
-        + '</div>' + patchesHtml(row.patches, q, null, '') + '</div>';
-
+    /* Порядок блоков — не косметика: сетка в два столбца ставит их под
+       предыдущей парой, и каждый оказывается под своим источником. RPM
+       приезжают из koji, патчи лежат в GitLab, поэтому RPM идут первыми
+       и встают под koji, а патчи — под gitlab. */
     out += '<div class="block"><div class="bl">RPM · ' + row.rpms.length
         + '</div>' + rpmsHtml(row.rpms, q) + '</div>';
+
+    out += '<div class="block"><div class="bl">патчи · ' + row.patches.length
+        + '</div>' + patchesHtml(row.patches, q, null, '') + '</div>';
 
     if (row.problems.length) {
       out += '<div class="block wide"><div class="bl">проблемы</div>'

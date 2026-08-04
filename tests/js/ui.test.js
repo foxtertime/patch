@@ -767,3 +767,19 @@ test('версии нет — в таблице прочерк, а не пуст
   var html = dom.id('state-rows').innerHTML;
   assert.ok(/<td class="ver">\s*<span class="none">—<\/span>/.test(html), html);
 });
+
+/* Порядок блоков в раскрытой строке несёт смысл: сетка в два столбца
+   ставит их парами, и каждый оказывается под своим источником — RPM под
+   koji, откуда они приезжают, патчи под gitlab, где они лежат. Без теста
+   это держалось бы только на порядке двух строк в шаблоне. */
+test('в раскрытой строке RPM стоят под koji, а патчи под gitlab', function () {
+  var dom = load();
+  store.add([snap('os-9.2', '2026-08-01T00:00:00+03:00')], 'a.json');
+  dom.fire(dom.id('expand'), 'click', {});
+  var blocks = [];
+  dom.id('state-rows').innerHTML.replace(
+    /<div class="bl">([^<·]*)/g,
+    function (_, title) { blocks.push(title.trim()); return ''; });
+  assert.deepStrictEqual(blocks.slice(0, 4),
+                         ['koji', 'gitlab', 'RPM', 'патчи']);
+});
