@@ -90,6 +90,12 @@ class CollectTagTest(unittest.TestCase):
         self.assertEqual(snap.koji_hub, "https://hub/kojihub")
         self.assertEqual(snap.koji_web, "https://hub/koji")
 
+    def test_snapshot_records_the_patch_classes(self):
+        snap, _ = self.collect()
+        self.assertEqual(snap.patch_classes,
+                         Classifier.from_config(config()).class_names())
+        self.assertIn("other", snap.patch_classes)
+
     def test_builds_are_sorted_by_name(self):
         snap, _ = self.collect()
         self.assertEqual([b.name for b in snap.builds], ["curl", "nginx", "vim"])

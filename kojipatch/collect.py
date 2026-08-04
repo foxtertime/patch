@@ -130,6 +130,7 @@ def collect_tag(tag: str, cfg, koji_client, gitlab_client, jobs: int = 8,
 
     snapshot = Snapshot(tag=tag, generated=now or _now_iso(),
                         koji_hub=cfg.koji_hub, koji_web=cfg.koji_web,
+                        patch_classes=classifier.class_names(),
                         builds=builds)
     _log_summary(snapshot, time.monotonic() - started)
     return snapshot

@@ -118,6 +118,11 @@ class Snapshot:
     generated: str
     koji_hub: str
     koji_web: Optional[str] = None
+    # Имена классов патчей в порядке классификатора. Пустой список означает
+    # «не записано» — так читаются снапшоты, собранные до появления поля.
+    # Дашборду этот порядок нужен для карточек классов и меток строк, а
+    # взять его больше неоткуда: конфига у него нет.
+    patch_classes: List[str] = field(default_factory=list)
     builds: List[Build] = field(default_factory=list)
 
     def by_name(self) -> Dict[str, Build]:
@@ -128,6 +133,7 @@ def snapshot_to_dict(snapshot: Snapshot) -> Dict[str, Any]:
     return {"schema": SCHEMA, "tag": snapshot.tag,
             "generated": snapshot.generated, "koji_hub": snapshot.koji_hub,
             "koji_web": snapshot.koji_web,
+            "patch_classes": list(snapshot.patch_classes),
             "builds": [b.to_dict() for b in snapshot.builds]}
 
 
@@ -142,6 +148,7 @@ def snapshot_from_dict(data: Dict[str, Any]) -> Snapshot:
         return Snapshot(tag=data["tag"], generated=data["generated"],
                         koji_hub=data["koji_hub"],
                         koji_web=data.get("koji_web"),
+                        patch_classes=list(data.get("patch_classes") or []),
                         builds=[Build.from_dict(b)
                                 for b in data.get("builds") or []])
     except KeyError as exc:
