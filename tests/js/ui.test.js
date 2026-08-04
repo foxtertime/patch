@@ -507,6 +507,57 @@ test('фильтр по классу не переживает смену сос
             + dom.id('state-rows').innerHTML);
 });
 
+/* Вкладки скрипт переключает делегированием, как карточки: кнопки в шаблоне
+   есть, но обработчик один на документ. */
+function pressTab(dom, name) {
+  var nodes = dom.document.querySelectorAll('.tab'), i;
+  for (i = 0; i < nodes.length; i++) {
+    if (nodes[i].getAttribute('data-tab') === name) {
+      dom.fire(nodes[i], 'click', {});
+      return;
+    }
+  }
+  throw new Error('в шаблоне нет вкладки ' + name);
+}
+
+/* Фильтры у вкладок свои, и мёртвым фильтр остаётся молча: пока человек на
+   «Изменениях», отсев по одной текущей вкладке ничего не делает с
+   «Состоянием», а один клик по вкладке возвращает и пустую таблицу, и
+   «sast · sast» в чипе. */
+test('мёртвый фильтр отсеивается и на той вкладке, где человека сейчас нет',
+     async function () {
+  var dom = load();
+  function sast(tag, gen) {
+    return snap(tag, gen, { classes: ['SAST'],
+      builds: [build('nginx', { patches: [patch('s.patch', 'SAST')] })] });
+  }
+  function cve(tag, gen) {
+    return snap(tag, gen, { classes: ['CVE'],
+      builds: [build('nginx', { patches: [patch('c.patch', 'CVE')] })] });
+  }
+  store.add([sast('os-9.1', JUL), sast('os-9.2', AUG)], 'a.json');
+  await dom.tick();
+  pressCard(dom, 'tab-state', 'sast');      /* фильтр поставлен на «Состоянии» */
+  pressTab(dom, 'diff');                    /* и человек ушёл на «Изменения» */
+  assert.strictEqual(dom.id('tab-diff').hidden, false);
+  /* Пара на странице есть всё время, поэтому вкладка «Изменения» никуда не
+     девается и остаётся текущей: снапшоты с SAST сперва заменяются, а
+     потом уходят. */
+  store.add([cve('os-9.3', SEP), cve('os-9.4', '2026-10-01T00:00:00+03:00')],
+            'b.json');
+  store.remove(0);
+  store.remove(0);
+  await dom.tick();
+  assert.strictEqual(dom.id('tab-diff').hidden, false,
+                     'человек уехал с «Изменений», сценарий проверяет не то');
+  pressTab(dom, 'state');
+  assert.strictEqual(dom.id('chips').innerHTML, '',
+                     'на невидимой вкладке фильтр пережил свой снапшот');
+  assert.ok(dom.id('state-rows').innerHTML.indexOf('nginx') !== -1,
+            'таблица пуста под фильтр, которого нет ни на одной карточке: '
+            + dom.id('state-rows').innerHTML);
+});
+
 /* Файлы роняют на страницу по одному, и каждый — отдельный store.add, то
    есть отдельный applyData. Обещание README «открывается на последнем
    снапшоте цепочки и на самом широком переходе» обязано выполняться и

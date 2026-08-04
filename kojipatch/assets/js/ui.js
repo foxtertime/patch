@@ -1208,16 +1208,17 @@
      снапшот. Свой мы узнаём по подписи, по классу патчей или по тегу живой
      строки; чужой молча выбрасываем, чтобы страница не показывала пустую
      таблицу под фильтр, которого не поставить и не снять — его нет ни на
-     одной карточке. */
-  function knownFilter(key) {
+     одной карточке. Вкладка приходит доводом, а не берётся из st: судить
+     приходится и о той, на которой человека сейчас нет. */
+  function knownFilter(key, tab) {
     var i;
     if (!key || key === 'all') return false;
     if (LABELS.hasOwnProperty(key)) return true;
     for (i = 0; i < CLASSES.length; i++) {
       if (slug(CLASSES[i]) === key) return true;
     }
-    var host = st.tab === 'diff' ? curPair() : curSnap();
-    var rows = host ? (st.tab === 'diff' ? host.rows : host.builds) : [];
+    var host = tab === 'diff' ? curPair() : curSnap();
+    var rows = host ? (tab === 'diff' ? host.rows : host.builds) : [];
     for (i = 0; i < rows.length; i++) {
       if (rows[i].tags.indexOf(key) !== -1) return true;
     }
@@ -1226,20 +1227,20 @@
 
   /* Единственное место, где обещание knownFilter выполняется: и для фильтров
      из хеша, и для тех, что человек поставил кликом, а данные под ними
-     сменились. Обе вкладки сразу — фильтры у них свои, а knownFilter судит
-     по данным текущей, поэтому на время отсева текущей побывает каждая. */
+     сменились. Обе вкладки сразу: наборы фильтров у них свои, и мёртвый
+     фильтр на невидимой сейчас вкладке встретил бы человека той же пустой
+     таблицей через один клик по ней. */
   function dropDeadFilters() {
-    var was = st.tab, tabs = ['state', 'diff'], t, i, from, live;
+    var tabs = ['state', 'diff'], t, i, tab, from, live;
     for (t = 0; t < tabs.length; t++) {
-      st.tab = tabs[t];
-      from = keys(activeFilters());
+      tab = tabs[t];
+      from = keys(st.filters[tab]);
       live = [];
       for (i = 0; i < from.length; i++) {
-        if (knownFilter(from[i])) live.push(from[i]);
+        if (knownFilter(from[i], tab)) live.push(from[i]);
       }
-      st.filters[st.tab] = setFrom(live);
+      st.filters[tab] = setFrom(live);
     }
-    st.tab = was;
   }
 
   function readHash() {
