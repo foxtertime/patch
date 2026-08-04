@@ -360,7 +360,7 @@ tr.detail-row > td { background: var(--card); padding: .85rem .7rem 1.1rem 2.2re
         <th data-sort="branch" data-tip="Ветка GitLab, из которой собран билд. Если сборка шла с коммита, а не с ветки, рядом стоит тег from-commit.">ветка <span class="arrow"></span></th>
         <th data-sort="patches" data-tip="Сколько файлов лежит в каталоге PATCH ветки. Полоска показывает доли классов патчей в этой сборке.">патчи <span class="arrow"></span></th>
         <th data-sort="rpms">RPM <span class="arrow"></span></th>
-        <th data-sort="completed" data-tip="Когда koji завершил сборку, в UTC — как отдаёт хаб. В местное время не переводится: снапшотом делятся, и он должен читаться у всех одинаково. Сортировка показывает самые залежавшиеся.">собран <span class="arrow"></span></th>
+        <th data-sort="completed" data-tip="Когда koji завершил сборку, в московском времени. Хаб отдаёт UTC, в снапшоте хранится он же — перевод делается при построении дашборда. Сортировка показывает самые залежавшиеся.">собран <span class="arrow"></span></th>
         <th>теги</th>
         <th>ссылки</th>
       </tr></thead>
@@ -955,7 +955,7 @@ function stateDetail(row, q) {
       + kv('теги', kojiTagsHtml(row, q))
       + kv('собран', row.completed
             ? hl(row.completed, q) + (row.completed.length > 10
-                ? '<span class="note">UTC</span>' : '')
+                ? '<span class="note">МСК</span>' : '')
             : '<span class="none">—</span>')
       + kv('владелец', hl(row.owner || '—', q))
       + kv('build id', esc(row.build_id === null ? '—' : row.build_id))

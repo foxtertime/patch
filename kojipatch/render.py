@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import re
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from urllib.parse import quote
 
@@ -39,6 +40,29 @@ def _evr(build) -> str:
 def slug(name: str) -> str:
     """Ключ фильтра из имени класса патчей — как slug() в дашборде."""
     return _SLUG_RE.sub("-", str(name).lower())
+
+
+# Москва — UTC+3 круглый год: перехода на летнее время в России нет с 2014,
+# поэтому смещение задано числом, а не через tzdata. Понадобится другая
+# зона — меняется эта одна константа.
+MSK_SHIFT = timedelta(hours=3)
+
+
+def to_msk(value: Optional[str]) -> Optional[str]:
+    """Время сборки из снапшота (UTC) в московском времени.
+
+    Перевод делается здесь, а не при сборе: в снапшоте время остаётся тем,
+    что отдал хаб, и файл читается однозначно независимо от того, кто и где
+    его открыл. Дата без часа не переводится — прибавив три часа к
+    неизвестному времени, мы бы утверждали то, чего не знаем.
+    """
+    if not value or len(value) <= 10:
+        return value
+    try:
+        stamp = datetime.strptime(value[:19], "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return value
+    return (stamp + MSK_SHIFT).strftime("%Y-%m-%d %H:%M:%S")
 
 
 def _inherited(build, tag: Optional[str]) -> Optional[bool]:
@@ -117,7 +141,7 @@ def _build_row(build, koji_web, tag: Optional[str] = None,
         "project": source.project if source else None,
         "source_url": source.web_url if source else None,
         "koji_url": _koji_url(koji_web, build.nvr),
-        "completed": build.completed, "owner": build.owner,
+        "completed": to_msk(build.completed), "owner": build.owner,
         "build_id": build.build_id, "task_id": build.task_id,
         # koji_tags, а не tags: ключ tags в строке занят вычисляемыми
         # метками дашборда, и путать их нельзя

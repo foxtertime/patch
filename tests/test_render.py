@@ -6,7 +6,7 @@ from kojipatch.classify import Classifier
 from kojipatch.diff import diff_chain
 from kojipatch.model import Build, Patch, Snapshot, Source
 from kojipatch.render import (PLACEHOLDER, build_page_data, render_html,
-                              slug)
+                              slug, to_msk)
 
 RULES = [("CVE", r"CVE-\d{4}-\d{4,}"), ("SAST", r"(?i)^sast[-_]"),
          ("DAST", r"(?i)^dast[-_]"), ("other", ".*")]
@@ -257,6 +257,46 @@ class PageDataTest(unittest.TestCase):
         snaps = [snap("a", []), snap("b", []), snap("c", [])]
         data = self.data(snaps, diff_chain(snaps))
         self.assertTrue(data["pairs"][-1]["summary"])
+
+
+class MoscowTimeTest(unittest.TestCase):
+    """UTC из снапшота показывается в московском времени."""
+
+    def test_utc_becomes_msk(self):
+        self.assertEqual(to_msk("2026-05-14 10:11:12"), "2026-05-14 13:11:12")
+
+    def test_conversion_crosses_midnight(self):
+        # ровно за этим и нужен перевод даты, а не одного часа
+        self.assertEqual(to_msk("2026-05-14 22:30:00"), "2026-05-15 01:30:00")
+
+    def test_conversion_crosses_a_month(self):
+        self.assertEqual(to_msk("2026-05-31 23:00:00"), "2026-06-01 02:00:00")
+
+    def test_date_without_time_is_left_alone(self):
+        # снапшот прежней версии: часа нет, и придумывать его нельзя —
+        # прибавив три часа к полуночи, мы бы утверждали то, чего не знаем
+        self.assertEqual(to_msk("2026-05-14"), "2026-05-14")
+
+    def test_unparsable_value_survives_as_is(self):
+        self.assertEqual(to_msk("когда-то давно"), "когда-то давно")
+
+    def test_empty_values(self):
+        self.assertIsNone(to_msk(None))
+        self.assertEqual(to_msk(""), "")
+
+    def test_build_row_carries_moscow_time(self):
+        rows = build_page_data(
+            [snap("t", [build("nginx")])], [], Classifier(RULES)
+        )["snapshots"][0]["builds"]
+        # фикстура собрана в 2026-05-14 без времени — остаётся как есть
+        self.assertEqual(rows[0]["completed"], "2026-05-14")
+
+    def test_build_row_shifts_a_full_timestamp(self):
+        one = build("nginx")
+        one.completed = "2026-05-14 22:30:00"
+        rows = build_page_data([snap("t", [one])], [], Classifier(RULES)
+                               )["snapshots"][0]["builds"]
+        self.assertEqual(rows[0]["completed"], "2026-05-15 01:30:00")
 
 
 class RenderHtmlTest(unittest.TestCase):
