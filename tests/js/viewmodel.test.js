@@ -487,6 +487,14 @@ function readJson(rel) {
   return JSON.parse(fs.readFileSync(path.join(__dirname, rel), 'utf8'));
 }
 
+/* page-data.golden.json порождён питоновским render.py на тех же
+   фикстурах rich-old.json/rich-new.json — эталон паритета, с которым
+   сверяется buildPageData. Раньше его пересчитывал и сторожил
+   tests/test_parity.py (python3 -m tests.test_parity --update); тот
+   файл ушёл вместе с render.py в Задаче 9 переноса представления в
+   браузер, автоматического пересчёта больше нет. Править эталон теперь
+   можно только руками и осознанно — тесты ниже об этом не предупредят,
+   они лишь сверяют то, что в файле уже лежит. */
 test('данные страницы совпадают с питоновским эталоном', function () {
   var snaps = [].concat(readJson('../fixtures/rich-old.json'),
                         readJson('../fixtures/rich-new.json'));
@@ -495,4 +503,24 @@ test('данные страницы совпадают с питоновским
      тест обязан ловить. */
   var actual = JSON.parse(JSON.stringify(vm.buildPageData(snaps)));
   assert.deepStrictEqual(actual, readJson('./fixtures/page-data.golden.json'));
+});
+
+test('эталон паритета содержит интересные случаи, а не только совпадает с собой', function () {
+  // побайтовая сверка выше ничего не говорит о том, что в эталоне вообще
+  // есть случаи, на которых порт способен сломаться — молчаливое обеднение
+  // фикстур или эталона осталось бы незамеченным. Перенесено из
+  // tests/test_parity.py: test_golden_covers_the_interesting_cases
+  var golden = readJson('./fixtures/page-data.golden.json');
+  var pair = golden.pairs[0];
+  var statuses = {}, i;
+  for (i = 0; i < pair.rows.length; i++) statuses[pair.rows[i].status] = true;
+  assert.deepStrictEqual(Object.keys(statuses).sort(),
+                         ['added', 'downgraded', 'removed', 'unchanged',
+                          'upgraded']);
+  assert.ok(pair.counts.tag_changed);
+  assert.ok(pair.counts.repackaged);
+  assert.ok(pair.counts.branch_changed);
+  var rows = golden.snapshots[0].builds;
+  assert.ok(rows.some(function (r) { return r.tagged_in === null; }));
+  assert.ok(rows.some(function (r) { return r.inherited === true; }));
 });
