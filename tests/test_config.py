@@ -151,6 +151,21 @@ class DefaultRulesOnRealNamesTest(unittest.TestCase):
             self.classifier.classify("httpd-2.4.62-dast-scan.patch.new"),
             "DAST")
 
+    def test_fuzz_goes_to_dast(self):
+        # фаззинг — то же динамическое тестирование, отдельной категорией
+        # он бы только дробил отчёт
+        self.assertEqual(self.classifier.classify("FUZZ-parser.patch.new"),
+                         "DAST")
+
+    def test_fuzz_lowercase_and_in_the_middle(self):
+        self.assertEqual(
+            self.classifier.classify("httpd-2.4.62-fuzz-parser.patch.new"),
+            "DAST")
+
+    def test_cve_still_wins_over_fuzz(self):
+        self.assertEqual(
+            self.classifier.classify("fuzz-cve-2024-42516.patch.new"), "CVE")
+
     def test_sast_after_an_underscore(self):
         self.assertEqual(self.classifier.classify("httpd_sast_fix.patch.new"),
                          "SAST")

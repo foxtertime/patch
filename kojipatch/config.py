@@ -19,7 +19,9 @@ DEFAULT_PATCH_CLASSES = [
     # и в начале (SAST-src.core.ngx_file.c.patch.new), и в середине
     # (httpd-2.4.62-sast-src.core.c.patch.new)
     ("SAST", r"(?i)sast"),
-    ("DAST", r"(?i)dast"),
+    # Фаззинг попадает сюда же: это то же динамическое тестирование, и
+    # отдельной категорией он бы только дробил отчёт
+    ("DAST", r"(?i)(?:dast|fuzz)"),
     # Патч на спек: имя вида nginx.spec.patch. Точки обязательны — без них
     # правило ловило бы specialcase.patch и respec-fix.patch. Правило стоит
     # последним из содержательных: спек-патч, закрывающий CVE, — прежде

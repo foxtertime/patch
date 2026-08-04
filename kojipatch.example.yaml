@@ -22,7 +22,9 @@ patch_classes:
   # Если понадобится строже — чтобы маркер не ловился внутри слова, — возьмите
   # '(?i)(?:^|[^a-z0-9])sast(?:[^a-z0-9]|$)'
   - { name: SAST, pattern: '(?i)sast' }
-  - { name: DAST, pattern: '(?i)dast' }
+  # Фаззинг — то же динамическое тестирование, поэтому FUZZ/fuzz идёт в DAST,
+  # а не отдельной категорией: иначе отчёт дробился бы без пользы.
+  - { name: DAST, pattern: '(?i)(?:dast|fuzz)' }
   # Патч на спек: nginx.spec.patch, httpd-2.4.62.spec.patch.new. Точки в
   # шаблоне обязательны, иначе сюда уедут specialcase.patch и respec-fix.patch.
   # Правило стоит после CVE/SAST/DAST: спек-патч, закрывающий CVE, — прежде

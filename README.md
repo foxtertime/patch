@@ -130,7 +130,10 @@ python3 -m kojipatch --config kojipatch.yaml run --tag os-9.1 --tag os-9.2 \
 идентификатору в любом месте имени (`httpd-2.4.62-cve-2024-42516.patch.new`),
 SAST и DAST — по вхождению маркера, тоже в любом месте
 (`SAST-src.core.ngx_file.c.patch.new` и `httpd-2.4.62-sast-src.core.c.patch.new`
-оба попадут в SAST), SPEC — по `.spec.` с точками
+оба попадут в SAST). В DAST кроме `dast` попадает и `fuzz`
+(`FUZZ-parser.patch.new`, `httpd-2.4.62-fuzz-parser.patch.new`): фаззинг — то
+же динамическое тестирование, и отдельной категорией он бы только дробил
+отчёт. SPEC опознаётся по `.spec.` с точками
 (`nginx.spec.patch`, `httpd-2.4.62.spec.patch.new`), а CHANGELOG — по
 `changelog.yaml` (короткое `.yml` тоже ловится). Точки в правиле SPEC
 обязательны: без них в класс попали бы `specialcase.patch` и `respec-fix.patch`.
