@@ -206,6 +206,24 @@ class DefaultRulesOnRealNamesTest(unittest.TestCase):
         self.assertEqual(self.classifier.classify("specialcase.patch"),
                          "other")
 
+    def test_tarball_is_a_file_not_a_patch(self):
+        self.assertEqual(self.classifier.classify("nginx-1.24.0.tar.gz"),
+                         "FILES")
+
+    def test_tarball_with_the_projects_new_suffix(self):
+        # в каталоге встречается соглашение *.new — архив с ним тоже архив
+        self.assertEqual(self.classifier.classify("nginx-1.24.0.tar.gz.new"),
+                         "FILES")
+
+    def test_tar_without_gz_is_not_matched_yet(self):
+        # категория заведена под tar.gz; остальные расширения добавляются
+        # в это же правило по мере того, как встречаются
+        self.assertEqual(self.classifier.classify("nginx-1.24.0.tar"), "other")
+
+    def test_cve_still_wins_over_files(self):
+        self.assertEqual(
+            self.classifier.classify("cve-2024-42516-sources.tar.gz"), "CVE")
+
     def test_changelog(self):
         self.assertEqual(self.classifier.classify("changelog.yaml"),
                          "CHANGELOG")
