@@ -227,11 +227,18 @@ a.link:hover { border-color: var(--accent); background: var(--bg); }
 .tag.calm { color: var(--muted); }
 
 /* Полоска состава патчей: доли классов в одной сборке. В колонке из сотен
-   строк по ней видно, где стек патчей — это CVE, а где — «прочее». */
-.meter { display: inline-flex; height: 6px; border-radius: 999px;
-  overflow: hidden; margin-left: .45rem; vertical-align: middle;
+   строк по ней видно, где стек патчей — это CVE, а где — «прочее».
+   Ширина одна для всех строк: доли сравнимы между сборками только тогда,
+   когда полоски одной длины. Радиус скругления небольшой — при пилюле
+   крайние сегменты срезались бы, и доля читалась бы меньше настоящей. */
+.meter { display: inline-flex; width: 120px; height: 10px; border-radius: 3px;
+  overflow: hidden; margin-left: .55rem; vertical-align: middle;
   background: var(--line); }
-.meter i { display: block; height: 100%; background: currentColor; }
+/* Класс, представленный одним патчем из сотни, даёт долю тоньше пикселя.
+   Пол в 2px оставляет его видимым: «класс есть, но его не видно» — худшая
+   из ошибок этой полоски, а точные числа всё равно в подсказке. */
+.meter i { display: block; height: 100%; background: currentColor;
+  min-width: 2px; }
 
 .hit { background: var(--hit); color: var(--hitfg); border-radius: 2px; }
 
@@ -358,7 +365,7 @@ tr.detail-row > td { background: var(--card); padding: .85rem .7rem 1.1rem 2.2re
         <th data-sort="evr" data-tip="Сортировка лексикографическая: 1.10 встанет выше 1.9. Так и задумано — в соседних строках версии принадлежат разным компонентам, и сравнивать их по правилам rpm было бы не осмысленнее.">version-release <span class="arrow"></span></th>
         <th data-sort="tagged_in" data-tip="Koji-тег, в котором билд действительно затегован. Прочерк — билд затегован прямо в выбранный тег; имя — билд унаследован из этого тега. Вопросительный знак — снапшот собран версией, которая тег ещё не записывала.">тег <span class="arrow"></span></th>
         <th data-sort="branch" data-tip="Ветка GitLab, из которой собран билд. Если сборка шла с коммита, а не с ветки, рядом стоит тег from-commit.">ветка <span class="arrow"></span></th>
-        <th data-sort="patches" data-tip="Сколько файлов лежит в каталоге PATCH ветки. Полоска показывает доли классов патчей в этой сборке.">патчи <span class="arrow"></span></th>
+        <th data-sort="patches" data-tip="Сколько файлов лежит в каталоге PATCH ветки. Полоска показывает, из каких классов они состоят: цвет занимает долю, равную доле класса. Длина полоски одна у всех строк — сколько патчей, говорит число слева. Наведите на полоску, чтобы увидеть точные числа.">патчи <span class="arrow"></span></th>
         <th data-sort="rpms">RPM <span class="arrow"></span></th>
         <th data-sort="completed" data-tip="Когда koji завершил сборку, в московском времени. Хаб отдаёт UTC, в снапшоте хранится он же — перевод делается при построении дашборда. Сортировка показывает самые залежавшиеся.">собран <span class="arrow"></span></th>
         <th>теги</th>
@@ -822,7 +829,12 @@ function linkHtml(url, text) {
 /* Полоска патчей: длина — размер стека относительно самого большого в
    выдаче, доли внутри — классы. Одна метка отвечает сразу на «много ли» и
    «чего именно», а точные числа даёт подсказка. */
-function meterHtml(row, max) {
+/* Полоска состава патчей. Ширина у неё постоянная, и это осознанно: раньше
+   длина полоски означала «сколько патчей относительно самой обвешанной
+   сборки», а доли цветов — состав, и две величины в одной картинке читались
+   как одна непонятная. Сколько патчей — говорит число слева от полоски;
+   полоска отвечает только на вопрос «из чего они». */
+function meterHtml(row) {
   var total = row.patches.length;
   if (!total) return '';
   var order = classOrder(row.patch_counts), parts = [], bars = '', i, n;
@@ -832,10 +844,8 @@ function meterHtml(row, max) {
     bars += '<i class="' + classCls(order[i]) + '" style="width:'
          + (100 * n / total).toFixed(2) + '%"></i>';
   }
-  var width = 12 + 52 * (total / (max || total));
-  return '<span class="meter" style="width:' + width.toFixed(1) + 'px"'
-       + ' data-tip="' + esc(parts.join(' · ')) + ', всего ' + total + '">'
-       + bars + '</span>';
+  return '<span class="meter" data-tip="' + esc(parts.join(' · '))
+       + ', всего ' + total + '">' + bars + '</span>';
 }
 
 function kv(k, v) {
@@ -1002,17 +1012,14 @@ function stateDetail(row, q) {
 }
 
 function stateRowsHtml(items) {
-  var q = st.q, html = '', i, max = 0;
-  for (i = 0; i < items.length; i++) {
-    if (items[i].row.patches.length > max) max = items[i].row.patches.length;
-  }
+  var q = st.q, html = '', i;
   for (i = 0; i < items.length; i++) {
     var row = items[i].row;
     var key = rowKey(row);
     var open = openOf(key, items[i].open);
     var bad = row.problems.length || row.tags.indexOf('no-source') !== -1;
     var patches = row.patches.length
-      ? row.patches.length + meterHtml(row, max)
+      ? row.patches.length + meterHtml(row)
       : '<span class="zero">0</span>';
     html += '<tr class="main-row' + (bad ? ' bad' : '') + '" data-row="' + esc(key) + '">'
          + '<td class="src"><span class="chev" role="button" tabindex="0"'
