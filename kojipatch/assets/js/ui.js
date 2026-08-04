@@ -1120,6 +1120,11 @@
     syncCards();
     renderChips();
     syncArrows();
+    /* Рельс показывает текущий выбор, а он меняется и без смены состава:
+       переключили тег, пару или вкладку — рельс обязан это отразить.
+       Список источников при этом не трогаем: перерисовывать его на каждое
+       нажатие клавиши в поиске значит забирать фокус с его кнопок. */
+    renderChain();
 
     if (!items.length) {
       body.innerHTML = '<tr><td class="empty" colspan="' + colCount(st.tab) + '">'
@@ -1630,18 +1635,36 @@
     }
   }
 
-  function renderSources() {
-    var items = store.list(), parts = [], i;
-    /* В цепочке у тегов-двойников стоит дата: «os-9.2 → os-9.2» не говорит
-       человеку, что с чем сравнивается. */
-    var when = whenLabels(items);
+  /* Рельс цепочки: снапшоты — узлы на линии, идущей слева направо, от
+     старого к новому. На «Состоянии» залит узел, который сейчас в
+     таблице; на «Изменениях» — отрезок между концами сравниваемой пары,
+     включая сводную, растянутую на всю цепочку. Одна картинка отвечает
+     сразу на три вопроса: что загружено, в каком порядке сравнивается и
+     где я сейчас нахожусь.
+
+     В подписи у тегов-двойников стоит дата: «os-9.2 → os-9.2» не сказало
+     бы человеку, что с чем сравнивается. */
+  function renderChain() {
+    var items = store.list(), when = whenLabels(items), out = '', i, here;
+    var ends = st.tab === 'diff' ? pairEnds(st.pair) : null;
+    if (!items.length) { chainBox.innerHTML = ''; return; }
     for (i = 0; i < items.length; i++) {
-      parts.push(esc(items[i].tag)
-        + (when[i] ? ' <span class="when">' + esc(when[i]) + '</span>' : ''));
+      if (i) {
+        out += '<span class="rl'
+            + (ends && i > ends[0] && i <= ends[1] ? ' on' : '') + '"></span>';
+      }
+      here = ends ? (i === ends[0] || i === ends[1]) : i === st.tag;
+      out += '<span class="stop' + (here ? ' on' : '') + '">'
+          + '<span class="node"></span><span class="nm">' + esc(items[i].tag)
+          + (when[i] ? ' <span class="when">' + esc(when[i]) + '</span>' : '')
+          + '</span></span>';
     }
-    chainBox.innerHTML = parts.length
-      ? '<span class="l">снапшоты:</span> ' + parts.join(' <span class="arrow">→</span> ')
-      : '';
+    chainBox.innerHTML = '<span class="l">цепочка</span>' + out;
+  }
+
+  function renderSources() {
+    var items = store.list(), i;
+    renderChain();
     var out = '';
     for (i = 0; i < items.length; i++) {
       out += '<li><span class="mono">' + esc(items[i].tag) + '</span>'
@@ -1782,20 +1805,17 @@
   /* Шапку рисует applyData, а не старт: набор снапшотов меняется на лету,
      и подпись обязана меняться вместе с ним. */
   function renderMeta() {
-    var meta = document.getElementById('meta'), tags = [], i;
-    /* Ничего не загружено — шапке нечего сказать. Три прочерка над зоной
+    var meta = document.getElementById('meta');
+    /* Ничего не загружено — шапке нечего сказать. Прочерки над зоной
        загрузки выглядели бы сломанной страницей, а не пустой. */
     if (!SNAPS.length) { meta.innerHTML = ''; return; }
-    /* «теги: os-9.2, os-9.2» читается как опечатка, а не как два прогона
-       одного тега, поэтому у двойников в скобках стоит время сбора. */
-    var when = whenLabels(SNAPS);
-    for (i = 0; i < SNAPS.length; i++) {
-      tags.push(SNAPS[i].tag + (when[i] ? ' (' + when[i] + ')' : ''));
-    }
-    meta.innerHTML =
-        '<div><b>теги:</b> ' + (tags.length ? esc(tags.join(', ')) : '—') + '</div>'
-      + '<div><b>собрано:</b> ' + esc(DATA.generated || '—') + '</div>'
-      + '<div><b>классы патчей:</b> ' + esc(CLASSES.join(', ') || '—') + '</div>';
+    /* Осталась одна строка из трёх. Теги ушли в рельс цепочки: он
+       показывает их в порядке сравнения и отмечает текущий, чего перечень
+       через запятую не умел. «Собрано» ушло совсем — там стояло время
+       первого снапшота, а их на странице несколько и собраны они в разные
+       дни; время каждого честно стоит в списке источников. */
+    meta.innerHTML = '<div><b>классы патчей:</b> '
+      + esc(CLASSES.join(', ') || '—') + '</div>';
   }
 
   (function start() {

@@ -244,9 +244,6 @@ test('одинаковые теги видно по датам в цепочке
   var picks = dom.id('tag-select').innerHTML;
   assert.ok(/class="sub">2026-07-01/.test(picks), picks);
   assert.ok(/class="sub">2026-08-01/.test(picks), picks);
-  /* В шапке «теги: os-9.2, os-9.2» выглядит опечаткой, а не двумя прогонами. */
-  assert.ok(/теги:<\/b> os-9\.2 \(2026-07-01\), os-9\.2 \(2026-08-01\)/
-              .test(dom.id('meta').innerHTML), dom.id('meta').innerHTML);
 });
 
 test('у разных тегов даты в подписи нет — она там шум', function () {
@@ -905,4 +902,43 @@ test('новое сообщение продлевает срок, а не на�
     t.mock.timers.tick(9000);                 /* прежний срок уже истёк бы */
     assert.match(dom.id('load-errors').innerHTML, /b\.json/,
                  'свежее сообщение не должно гаснуть по чужому таймеру');
+  });
+
+/* Рельс цепочки — единственное место, где видно сразу и что загружено, и
+   что с чем сравнивается. Ошибись он отметкой — человек будет уверен, что
+   смотрит не на тот снапшот. */
+function threeSnapshots() {
+  return [snap('os-9.1', '2026-06-01T00:00:00+03:00'),
+          snap('os-9.2', '2026-07-01T00:00:00+03:00'),
+          snap('os-9.3', '2026-08-01T00:00:00+03:00')];
+}
+
+test('на «Состоянии» рельс отмечает снапшот, который сейчас в таблице',
+  function () {
+    var dom = load();
+    store.add(threeSnapshots(), 'a.json');
+    var chain = dom.id('chain').innerHTML;
+    assert.strictEqual(chain.split('class="stop').length - 1, 3,
+                       'три узла на рельсе: ' + chain);
+    /* Отмечен ровно один, и это свежий снапшот — тот, что открывается по
+       умолчанию. Отрезки на «Состоянии» не подсвечиваются: сравнение
+       живёт на другой вкладке. */
+    assert.strictEqual(chain.split('class="stop on"').length - 1, 1, chain);
+    assert.ok(chain.indexOf('class="stop on"') > chain.indexOf('os-9.2'),
+              'отмечен должен быть os-9.3: ' + chain);
+    assert.strictEqual(chain.indexOf('class="rl on"'), -1, chain);
+  });
+
+test('на «Изменениях» рельс отмечает отрезок сравниваемой пары',
+  function () {
+    var dom = load();
+    store.add(threeSnapshots(), 'a.json');
+    dom.fire(dom.document.querySelectorAll('.tab')[1], 'click', {});
+    var chain = dom.id('chain').innerHTML;
+    /* Пара по умолчанию — сводная: от первого снапшота до последнего,
+       значит отмечены оба конца и оба отрезка между ними. */
+    assert.strictEqual(chain.split('class="rl on"').length - 1, 2,
+                       'оба отрезка сводной пары: ' + chain);
+    assert.strictEqual(chain.split('class="stop on"').length - 1, 2,
+                       'оба конца пары: ' + chain);
   });
