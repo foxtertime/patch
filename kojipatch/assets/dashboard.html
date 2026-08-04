@@ -244,9 +244,6 @@ tr.detail-row > td { background: var(--card); padding: .85rem .7rem 1.1rem 2.2re
 .plist .ppath { color: var(--muted); font-size: .74rem; }
 /* Знак дублирует цвет — на случай, если цвет не различим. */
 .sign { font-weight: 700; margin-right: .15rem; }
-.cveid { display: inline-block; font-size: .68rem; padding: .02rem .3rem;
-  border-radius: 3px; border: 1px solid var(--cve); color: var(--cve);
-  margin-left: .25rem; white-space: nowrap; }
 .rpms { display: grid; gap: .1rem .8rem;
   grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
 .rpms span { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -730,14 +727,6 @@ function signHtml(markCls) {
   return '<span class="sign">' + (markCls === 'is-added' ? '+' : '−') + '</span>';
 }
 
-function cveHtml(list, q) {
-  var out = '';
-  for (var i = 0; i < (list || []).length; i++) {
-    out += '<span class="cveid">' + hl(list[i], q) + '</span>';
-  }
-  return out;
-}
-
 /* Патчи одной стороны, сгруппированные по классам. mark — множество путей,
    которые нужно выделить как пришедшие или ушедшие. */
 function patchesHtml(patches, q, mark, markCls) {
@@ -764,7 +753,6 @@ function patchesHtml(patches, q, mark, markCls) {
           + hl(p.name, q) + '</a>'
         : '<span class="mono">' + hl(p.name, q) + '</span>';
       out += '<li' + li + '>' + (hot ? signHtml(markCls) : '') + title
-          + cveHtml(p.cves, q)
           + '<div class="ppath">' + hl(p.path, q) + '</div></li>';
     }
     out += '</ul></div>';
