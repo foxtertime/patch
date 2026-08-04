@@ -373,6 +373,17 @@ tr.detail-row > td { background: var(--card); padding: .85rem .7rem 1.1rem 2.2re
 .empty { padding: 2rem; text-align: center; color: var(--muted); }
 /* Подсказка живёт одна на всю страницу и позиционируется скриптом,
    иначе у крайних карточек она вылезала бы за край окна. */
+/* Кнопка «наверх». Тег в тысячу сборок — это метры прокрутки, а фильтры и
+   вкладки остались вверху. Появляется ниже первого экрана: на нетронутой
+   странице она была бы пятном поверх таблицы и ничего не решала. Ниже
+   подсказки по z-index — та всплывает поверх всего. */
+#totop { position: fixed; right: 1.25rem; bottom: 1.25rem; z-index: 90;
+  width: 2.6rem; height: 2.6rem; border-radius: 50%; cursor: pointer;
+  border: 1px solid var(--line); background: var(--card); color: var(--fg);
+  font: inherit; font-size: 1.1rem; line-height: 1;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .18); }
+#totop:hover { border-color: var(--accent); color: var(--accent); }
+#totop[hidden] { display: none; }
 #tip { position: fixed; display: none; z-index: 100; max-width: 320px;
   background: var(--fg); color: var(--bg); font-size: .78rem; line-height: 1.45;
   padding: .5rem .65rem; border-radius: 6px; pointer-events: none;
@@ -453,6 +464,8 @@ tr.detail-row > td { background: var(--card); padding: .85rem .7rem 1.1rem 2.2re
     </table></div>
   </section>
 </div>
+<button type="button" id="totop" hidden aria-label="Наверх"
+        data-tip="Вернуться к началу страницы">↑</button>
 <div id="tip" role="tooltip"></div>
 <!--__SCRIPTS__-->
 </body>

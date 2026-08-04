@@ -783,3 +783,30 @@ test('в раскрытой строке RPM стоят под koji, а патч
   assert.deepStrictEqual(blocks.slice(0, 4),
                          ['koji', 'gitlab', 'RPM', 'патчи']);
 });
+
+/* Кнопка «наверх» появляется, только когда наверх действительно надо:
+   на нетронутой странице она была бы лишним пятном поверх таблицы. */
+test('кнопка «наверх» прячется на нетронутой странице', function () {
+  var dom = load();
+  assert.strictEqual(dom.id('totop').hidden, true);
+});
+
+test('кнопка «наверх» появляется ниже первого экрана и уходит обратно',
+  function () {
+    var dom = load();
+    dom.window.pageYOffset = dom.window.innerHeight + 1;
+    dom.fireWindow('scroll');
+    assert.strictEqual(dom.id('totop').hidden, false);
+
+    dom.window.pageYOffset = 0;
+    dom.fireWindow('scroll');
+    assert.strictEqual(dom.id('totop').hidden, true);
+  });
+
+test('щелчок по кнопке «наверх» поднимает страницу', function () {
+  var dom = load();
+  dom.window.pageYOffset = 2000;
+  dom.fireWindow('scroll');
+  dom.fire(dom.id('totop'), 'click', {});
+  assert.strictEqual(dom.window.pageYOffset, 0);
+});

@@ -1564,6 +1564,30 @@
     window.addEventListener('resize', syncStickyOffset);
   }
 
+  /* ---------- кнопка «наверх» ---------- */
+
+  var toTop = document.getElementById('totop');
+
+  /* Порог — высота окна, а не круглое число точек: «ниже первого экрана»
+     человек видит глазами, а «ниже шестисот точек» ни о чём не говорит и
+     на разных окнах срабатывает по-разному. */
+  function syncToTop() {
+    toTop.hidden = window.pageYOffset <= window.innerHeight;
+  }
+
+  toTop.addEventListener('click', function () {
+    /* Плавную прокрутку понимают не все браузеры, и её отдельно просят
+       отключить те, кому от движения плохо. В обоих случаях поднимаемся
+       прыжком: доехать важнее, чем доехать красиво. */
+    var smooth = 'scrollBehavior' in document.documentElement.style
+      && !(window.matchMedia
+           && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    if (smooth) window.scrollTo({ top: 0, behavior: 'smooth' });
+    else window.scrollTo(0, 0);
+  });
+
+  window.addEventListener('scroll', syncToTop);
+
   /* ---------- загрузка снапшотов ---------- */
 
   /* Пустой дашборд показывает только зону загрузки: вкладки без данных
@@ -1718,6 +1742,10 @@
     syncEmpty();
     renderSources();
     syncStickyOffset();
+    /* Браузер восстанавливает прокрутку при перезагрузке, и страница может
+       открыться уже внизу — тогда кнопка нужна сразу, не дожидаясь, пока
+       человек тронет колесо. */
+    syncToTop();
   }());
 
   return { applyData: applyData };

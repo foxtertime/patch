@@ -262,6 +262,14 @@ function install(options) {
     handlers: {},
     innerWidth: 1200,
     innerHeight: 800,
+    /* Прокрутка: заглушка её не делает, но помнит. Тест ставит
+       pageYOffset руками и стреляет событием — так же, как это выглядит
+       для скрипта в браузере. */
+    pageYOffset: 0,
+    scrollTo: function (arg) {
+      window.scrolledTo = arg;
+      window.pageYOffset = (arg && typeof arg === 'object') ? arg.top : 0;
+    },
     addEventListener: Node.prototype.addEventListener
   };
   var location = { hash: options.hash || '' };
