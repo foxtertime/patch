@@ -114,6 +114,21 @@ class SerialisationTest(unittest.TestCase):
         with self.assertRaises(SnapshotError):
             snapshot_from_dict(data)
 
+    def test_patch_classes_are_serialized(self):
+        snapshot = sample_snapshot()
+        snapshot.patch_classes = ["CVE", "SAST", "other"]
+        data = snapshot_to_dict(snapshot)
+        self.assertEqual(data["patch_classes"], ["CVE", "SAST", "other"])
+        self.assertEqual(
+            snapshot_from_dict(data).patch_classes, ["CVE", "SAST", "other"])
+
+    def test_snapshot_without_patch_classes_still_reads(self):
+        """Снапшот прежней версии обязан читаться: список классов в нём
+        просто не записан, и выдумывать его нельзя."""
+        data = snapshot_to_dict(sample_snapshot())
+        del data["patch_classes"]
+        self.assertEqual(snapshot_from_dict(data).patch_classes, [])
+
 
 class FileIoTest(unittest.TestCase):
     def path(self):

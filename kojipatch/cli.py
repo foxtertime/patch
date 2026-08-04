@@ -1,4 +1,4 @@
-"""Точка входа: collect, render, run."""
+"""Точка входа: collect, dashboard."""
 import argparse
 import logging
 import os
@@ -6,13 +6,11 @@ import time
 from typing import List, Optional
 
 from . import logs
-from .classify import Classifier
+from .build import BuildError, build_html
 from .collect import collect_tag
 from .config import ConfigError, load_config
-from .diff import diff_chain
 from .gitlabclient import GitlabClient
-from .model import SnapshotError, dump_snapshots, load_snapshots
-from .render import RenderError, render_html
+from .model import dump_snapshots
 
 EXIT_OK = 0
 EXIT_PROBLEMS = 1
@@ -47,23 +45,20 @@ def _parser() -> argparse.ArgumentParser:
                          help="koji-тег; можно указать несколько раз")
     collect.add_argument("-o", "--output", default="snapshot.json")
 
-    render = subparsers.add_parser("render", help="построить HTML из снапшотов")
-    render.add_argument("snapshots", nargs="+")
-    render.add_argument("-o", "--output", default="dashboard.html")
-
-    run = subparsers.add_parser("run", help="собрать и сразу построить HTML")
-    run.add_argument("--tag", action="append", required=True, dest="tags")
-    run.add_argument("-o", "--output", default="dashboard.html")
-    run.add_argument("--save-snapshots", help="дополнительно сохранить JSON")
+    dashboard = subparsers.add_parser(
+        "dashboard",
+        help="положить дашборд на диск (данные подгружаются в нём)")
+    dashboard.add_argument("-o", "--output", default="dashboard.html")
     return parser
 
 
 def _load_config(args):
     overrides = {"koji_hub": args.koji_hub, "gitlab_api": args.gitlab_api,
                  "patch_dir": args.patch_dir}
-    # render работает из снапшотов, koji.hub ему не нужен
+    # дашборд пуст, пока в него не подгрузят снапшоты руками — koji.hub
+    # ему не нужен
     return load_config(args.config, overrides,
-                       require_hub=args.command != "render")
+                       require_hub=args.command != "dashboard")
 
 
 def _collect(args, cfg):
@@ -77,14 +72,6 @@ def _collect(args, cfg):
                           default_host=cfg.gitlab_default_host)
     return [collect_tag(tag, cfg, koji_client, gitlab, jobs=args.jobs)
             for tag in args.tags]
-
-
-def _render(snapshots, cfg, output) -> None:
-    pairs = diff_chain(snapshots)
-    html = render_html(snapshots, pairs, Classifier.from_config(cfg))
-    with open(output, "w", encoding="utf-8") as handle:
-        handle.write(html)
-    logger.info("написан %s", output)
 
 
 def _fatal(message, exc) -> int:
@@ -107,22 +94,15 @@ def main(argv: Optional[List[str]] = None) -> int:
         return _fatal("фатальная ошибка", exc)
 
     try:
-        if args.command == "render":
-            snapshots = []
-            for path in args.snapshots:
-                snapshots.extend(load_snapshots(path))
-            _render(snapshots, cfg, args.output)
-            logger.info("всего за %.1f с", time.monotonic() - started)
+        if args.command == "dashboard":
+            with open(args.output, "w", encoding="utf-8") as handle:
+                handle.write(build_html())
+            logger.info("написан %s", args.output)
             return EXIT_OK
 
         snapshots = _collect(args, cfg)
-        if args.command == "collect":
-            dump_snapshots(snapshots, args.output)
-            logger.info("написан %s", args.output)
-        else:
-            if args.save_snapshots:
-                dump_snapshots(snapshots, args.save_snapshots)
-            _render(snapshots, cfg, args.output)
+        dump_snapshots(snapshots, args.output)
+        logger.info("написан %s", args.output)
         logger.info("всего за %.1f с", time.monotonic() - started)
 
         if args.max_problems is not None:
@@ -132,10 +112,8 @@ def main(argv: Optional[List[str]] = None) -> int:
                                args.max_problems)
                 return EXIT_PROBLEMS
         return EXIT_OK
-    except SnapshotError as exc:
-        return _fatal("ошибка снапшота", exc)
-    except RenderError as exc:
-        return _fatal("ошибка отрисовки", exc)
+    except BuildError as exc:
+        return _fatal("ошибка сборки страницы", exc)
     except OSError as exc:
         return _fatal("ошибка ввода-вывода", exc)
     except Exception as exc:  # koji недоступен и прочие фатальные случаи
