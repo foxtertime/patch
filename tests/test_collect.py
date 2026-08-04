@@ -1,7 +1,7 @@
 import unittest
 
 from kojipatch.classify import Classifier
-from kojipatch.collect import collect_tag, problem_summary
+from kojipatch.collect import _completed, collect_tag, problem_summary
 from kojipatch.config import Config, GitlabHost
 from kojipatch.gitlabclient import GitlabClient
 from kojipatch.kojiclient import KojiClient
@@ -100,7 +100,7 @@ class CollectTagTest(unittest.TestCase):
         self.assertEqual(build.nvr, "nginx-1.24.0-3.el9")
         self.assertEqual(build.task_id, 11)
         self.assertEqual(build.owner, "builder")
-        self.assertEqual(build.completed, "2026-05-14")
+        self.assertEqual(build.completed, "2026-05-14 10:00:00")
         self.assertEqual(build.rpms, ["nginx-1.24.0-3.el9.x86_64"])
 
     def test_tag_name_comes_from_list_tagged(self):
@@ -265,7 +265,7 @@ class CollectTagTest(unittest.TestCase):
         self.assertEqual(ghost.epoch, 1)
         self.assertEqual(ghost.task_id, 77)
         self.assertEqual(ghost.owner, "builder")
-        self.assertEqual(ghost.completed, "2026-02-02")
+        self.assertEqual(ghost.completed, "2026-02-02 10:00:00")
         self.assertIsNone(ghost.source)
         self.assertIsNone(ghost.patch_dir_present)
         # тег известен и здесь: он пришёл из того же listTagged
@@ -293,6 +293,35 @@ class CollectTagTest(unittest.TestCase):
         self.assertEqual(len(build.problems), 1)
         self.assertIn("old.example.com", build.problems[0])
         self.assertIn(HOST, build.problems[0])
+
+class CompletedTimeTest(unittest.TestCase):
+    """Время сборки. koji отдаёт его в нескольких видах, наружу нужен один."""
+
+    def test_plain_string(self):
+        self.assertEqual(_completed("2026-05-14 10:11:12"),
+                         "2026-05-14 10:11:12")
+
+    def test_fractional_seconds_and_zone_are_cut(self):
+        # доли секунды ничего не решают, а строку удлиняют
+        self.assertEqual(_completed("2026-05-14 10:11:12.123456+00:00"),
+                         "2026-05-14 10:11:12")
+
+    def test_iso_t_becomes_a_space(self):
+        self.assertEqual(_completed("2026-05-14T10:11:12"),
+                         "2026-05-14 10:11:12")
+
+    def test_epoch_number(self):
+        # 1778760672 == 2026-05-14 12:11:12 UTC (calendar.timegm обратно)
+        self.assertEqual(_completed(1778760672.0), "2026-05-14 12:11:12")
+
+    def test_date_without_time_survives(self):
+        # у иных хабов время может не прийти вовсе — падать на этом нельзя
+        self.assertEqual(_completed("2026-05-14"), "2026-05-14")
+
+    def test_empty_values(self):
+        self.assertIsNone(_completed(None))
+        self.assertIsNone(_completed(""))
+
 
 class LoggingTest(unittest.TestCase):
     def setUp(self):

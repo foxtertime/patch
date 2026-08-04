@@ -20,12 +20,21 @@ def _now_iso() -> str:
 
 
 def _completed(raw) -> Optional[str]:
-    """koji отдаёт completion_time строкой или float; нужна дата YYYY-MM-DD."""
+    """Время сборки в виде «YYYY-MM-DD HH:MM:SS».
+
+    koji отдаёт completion_time то строкой ('2026-05-14 10:00:00.123456+00:00'
+    или через 'T'), то числом epoch — приводим к одному виду. Доли секунды
+    режем: они ничего не решают, а строку удлиняют. Время остаётся тем же
+    UTC, в котором его хранит koji: перевод в местное сделал бы один и тот же
+    снапшот разным у разных людей, а снапшотами обмениваются.
+    """
     if raw in (None, ""):
         return None
     if isinstance(raw, (int, float)):
-        return datetime.utcfromtimestamp(raw).strftime("%Y-%m-%d")
-    return str(raw)[:10]
+        return datetime.utcfromtimestamp(raw).strftime("%Y-%m-%d %H:%M:%S")
+    # хаб может не прислать время вовсе — тогда останется одна дата, и это
+    # нормально: срез по длине ничего не ломает
+    return str(raw).replace("T", " ", 1)[:19].strip()
 
 
 def _original_url(info: dict) -> Optional[str]:

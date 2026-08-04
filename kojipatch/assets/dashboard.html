@@ -187,6 +187,9 @@ tr.removed td.dir { color: var(--removed); }
 td.num, td.built { text-align: right; font-variant-numeric: tabular-nums;
   color: var(--muted); white-space: nowrap; }
 td.built { font-size: .82rem; }
+/* Время рядом с датой: та же строка, но бледнее, чтобы колонка читалась
+   по датам, а точное время не мешало их сравнивать. */
+td.built .tm { opacity: .65; }
 td.pat { white-space: nowrap; font-variant-numeric: tabular-nums; }
 td.pat .zero { color: var(--muted); }
 td.links { text-align: right; white-space: nowrap; }
@@ -357,7 +360,7 @@ tr.detail-row > td { background: var(--card); padding: .85rem .7rem 1.1rem 2.2re
         <th data-sort="branch" data-tip="Ветка GitLab, из которой собран билд. Если сборка шла с коммита, а не с ветки, рядом стоит тег from-commit.">ветка <span class="arrow"></span></th>
         <th data-sort="patches" data-tip="Сколько файлов лежит в каталоге PATCH ветки. Полоска показывает доли классов патчей в этой сборке.">патчи <span class="arrow"></span></th>
         <th data-sort="rpms">RPM <span class="arrow"></span></th>
-        <th data-sort="completed" data-tip="Когда koji завершил сборку. Сортировка показывает самые залежавшиеся.">собран <span class="arrow"></span></th>
+        <th data-sort="completed" data-tip="Когда koji завершил сборку, в UTC — как отдаёт хаб. В местное время не переводится: снапшотом делятся, и он должен читаться у всех одинаково. Сортировка показывает самые залежавшиеся.">собран <span class="arrow"></span></th>
         <th>теги</th>
         <th>ссылки</th>
       </tr></thead>
@@ -747,6 +750,16 @@ function taggedCell(row, q) {
   return hl(row.tagged_in, q);
 }
 
+/* Время сборки в таблице: дата обычная, время бледнее. Колонку сканируют
+   по дате — секунды нужны, когда до строки уже дошли. Снапшоты, собранные
+   до появления времени, несут одну дату: тогда второй половины просто нет. */
+function builtHtml(value, q) {
+  if (!value) return '';
+  var date = value.slice(0, 10), time = value.slice(11);
+  return hl(date, q)
+       + (time ? ' <span class="tm">' + hl(time, q) + '</span>' : '');
+}
+
 /* Все koji-теги билда. Основной — тот, через который билд попал в этот
    снапшот, — выделен цветом и насыщенностью: остальные только сообщают,
    где билд висит ещё, и соперничать за внимание с ним не должны.
@@ -940,7 +953,10 @@ function stateDetail(row, q) {
   out += '<div class="block"><div class="bl">koji</div>'
       + kv('NVR', '<span class="mono">' + hl(row.nvr, q) + '</span>')
       + kv('теги', kojiTagsHtml(row, q))
-      + kv('собран', hl(row.completed || '—', q))
+      + kv('собран', row.completed
+            ? hl(row.completed, q) + (row.completed.length > 10
+                ? '<span class="note">UTC</span>' : '')
+            : '<span class="none">—</span>')
       + kv('владелец', hl(row.owner || '—', q))
       + kv('build id', esc(row.build_id === null ? '—' : row.build_id))
       + kv('task id', esc(row.task_id === null ? '—' : row.task_id))
@@ -1002,7 +1018,7 @@ function stateRowsHtml(items) {
               : '<span class="none">—</span>') + '</td>'
          + '<td class="pat">' + patches + '</td>'
          + '<td class="num">' + row.rpms.length + '</td>'
-         + '<td class="built">' + hl(row.completed || '', q) + '</td>'
+         + '<td class="built">' + builtHtml(row.completed, q) + '</td>'
          + '<td class="tags">' + tagsHtml(row.tags) + '</td>'
          + '<td class="links">' + linkHtml(row.koji_url, 'koji')
          + linkHtml(row.source_url, 'git') + '</td></tr>';
