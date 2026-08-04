@@ -141,6 +141,39 @@ test('падение отрисовки при перестановке отка
   assert.match(store.warnings().join(' '), /пара не рисуется/);
 });
 
+test('удачная перестановка убирает предупреждение о неудачной', function () {
+  /* Предупреждение об откате говорит о том порядке, которого на странице
+     нет. Пережив удачную перестановку, оно висело бы над новым и
+     правильным порядком и врало бы про него. */
+  store.reset();
+  store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
+  store.add([snap('os-9.2', '2026-08-01T00:00:00+03:00')], 'b.json');
+  var refuse = true;
+  store.onChange(function () {
+    if (refuse && store.list()[0].tag === 'os-9.2') throw new Error('не рисуется');
+  });
+  store.move(1, -1);
+  assert.strictEqual(store.warnings().length, 1);
+  refuse = false;
+  store.move(1, -1);
+  assert.deepStrictEqual(store.list().map(function (i) { return i.tag; }),
+                         ['os-9.2', 'os-9.1']);
+  assert.deepStrictEqual(store.warnings(), []);
+});
+
+test('вторая неудачная перестановка не копит вторую строку', function () {
+  store.reset();
+  store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
+  store.add([snap('os-9.2', '2026-08-01T00:00:00+03:00')], 'b.json');
+  store.onChange(function () {
+    if (store.list()[0].tag === 'os-9.2') throw new Error('не рисуется');
+  });
+  store.move(1, -1);
+  store.move(1, -1);
+  store.move(1, -1);
+  assert.strictEqual(store.warnings().length, 1, store.warnings().join(' | '));
+});
+
 test('удаление, на котором падает отрисовка, откатывается', function () {
   store.reset();
   store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
