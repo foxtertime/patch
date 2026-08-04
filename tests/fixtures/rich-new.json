@@ -1,0 +1,191 @@
+[
+ {
+  "builds": [
+   {
+    "build_id": 111,
+    "completed": "2026-07-30 23:45:00",
+    "epoch": null,
+    "name": "nginx",
+    "nvr": "nginx-1.26.0-1.el9",
+    "owner": "builder",
+    "patch_dir_present": true,
+    "patches": [
+     {
+      "class": "CVE",
+      "cves": [
+       "CVE-2024-7347"
+      ],
+      "name": "CVE-2024-7347.patch",
+      "path": "PATCH/CVE-2024-7347.patch",
+      "web_url": "https://gl/blob/PATCH/CVE-2024-7347.patch"
+     },
+     {
+      "class": "CHANGELOG",
+      "cves": [],
+      "name": "changelog.yaml",
+      "path": "PATCH/changelog.yaml",
+      "web_url": "https://gl/blob/PATCH/changelog.yaml"
+     },
+     {
+      "class": "DAST",
+      "cves": [],
+      "name": "dast-fuzz.patch",
+      "path": "PATCH/dast-fuzz.patch",
+      "web_url": "https://gl/blob/PATCH/dast-fuzz.patch"
+     }
+    ],
+    "problems": [],
+    "release": "1.el9",
+    "rpms": [
+     "nginx-1.26.0-1.el9.x86_64",
+     "nginx-core-1.26.0-1.el9.x86_64",
+     "nginx-1.26.0-1.el9.src",
+     "nginx-mod-http-1.26.0-1.el9.aarch64"
+    ],
+    "source": {
+     "host": "gl",
+     "project": "web/nginx",
+     "raw": "git+https://gl/web/nginx?#os-9.2",
+     "ref": "os-9.2",
+     "ref_kind": "branch",
+     "web_url": "https://gl/web/nginx/-/tree/os-9.2"
+    },
+    "tag_name": "os-9.2",
+    "tags": [
+     "os-9.2"
+    ],
+    "task_id": 211,
+    "version": "1.26.0"
+   },
+   {
+    "build_id": 102,
+    "completed": "2026-04-01 10:00:00",
+    "epoch": 1,
+    "name": "httpd",
+    "nvr": "httpd-2.4.62-1.el9",
+    "owner": "apache",
+    "patch_dir_present": false,
+    "patches": [],
+    "problems": [
+     "gitlab: 404 на дереве ветки"
+    ],
+    "release": "1.el9",
+    "rpms": [
+     "httpd-2.4.62-1.el9.x86_64"
+    ],
+    "source": {
+     "host": "gl",
+     "project": "web/httpd",
+     "raw": "git+https://gl/web/httpd?#abc123",
+     "ref": "abc123",
+     "ref_kind": "commit",
+     "web_url": "https://gl/web/httpd/-/tree/abc123"
+    },
+    "tag_name": "os-9.2",
+    "tags": [
+     "os-9.2"
+    ],
+    "task_id": 202,
+    "version": "2.4.62"
+   },
+   {
+    "build_id": 114,
+    "completed": "никогда",
+    "epoch": null,
+    "name": "zlib",
+    "nvr": "zlib-1.3-1.el9",
+    "owner": "builder",
+    "patch_dir_present": true,
+    "patches": [
+     {
+      "class": "SAST",
+      "cves": [],
+      "name": "sast-zlib.patch",
+      "path": "PATCH/sast-zlib.patch",
+      "web_url": "https://gl/blob/PATCH/sast-zlib.patch"
+     },
+     {
+      "class": "other",
+      "cves": [],
+      "name": "weird.diff",
+      "path": "PATCH/weird.diff",
+      "web_url": "https://gl/blob/PATCH/weird.diff"
+     }
+    ],
+    "problems": [],
+    "release": "1.el9",
+    "rpms": [
+     "zlib-1.3-1.el9.x86_64",
+     "zlib-1.3-1.el9.src"
+    ],
+    "source": {
+     "host": "gl",
+     "project": "core/zlib",
+     "raw": "git+https://gl/core/zlib?#os-9.1",
+     "ref": "os-9.1",
+     "ref_kind": "branch",
+     "web_url": "https://gl/core/zlib/-/tree/os-9.1"
+    },
+    "tag_name": "os-9.2",
+    "tags": [
+     "os-9.2"
+    ],
+    "task_id": null,
+    "version": "1.3"
+   },
+   {
+    "build_id": 115,
+    "completed": "2026-07-31 00:10:00",
+    "epoch": null,
+    "name": "curl",
+    "nvr": "curl-8.0-1.el9",
+    "owner": "net",
+    "patch_dir_present": true,
+    "patches": [
+     {
+      "class": "FILES",
+      "cves": [],
+      "name": "source.tar.gz",
+      "path": "PATCH/source.tar.gz",
+      "web_url": "https://gl/blob/PATCH/source.tar.gz"
+     }
+    ],
+    "problems": [],
+    "release": "1.el9",
+    "rpms": [
+     "curl-8.0-1.el9.x86_64"
+    ],
+    "source": {
+     "host": "gl",
+     "project": "core/curl",
+     "raw": "git+https://gl/core/curl?#os-9.2",
+     "ref": "os-9.2",
+     "ref_kind": "branch",
+     "web_url": "https://gl/core/curl/-/tree/os-9.2"
+    },
+    "tag_name": "os-9.2",
+    "tags": [
+     "os-9.2"
+    ],
+    "task_id": null,
+    "version": "8.0"
+   }
+  ],
+  "generated": "2026-08-01T00:00:00+03:00",
+  "koji_hub": "https://hub/kojihub",
+  "koji_web": "https://hub/koji",
+  "patch_classes": [
+   "AUTOGEN",
+   "CVE",
+   "SAST",
+   "DAST",
+   "COVERAGE",
+   "SPEC",
+   "CHANGELOG",
+   "FILES",
+   "other"
+  ],
+  "schema": 1,
+  "tag": "os-9.2"
+ }
+]
