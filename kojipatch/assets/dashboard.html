@@ -174,6 +174,11 @@ td.ver { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var
 td.ver.new { color: var(--fg); }
 td.branch, td.tagged { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: .85em; overflow-wrap: break-word; }
+/* Имя koji-тега не переносим: разорванное посередине, оно перестаёт быть
+   именем, а искать его глазами приходится в каждой унаследованной строке.
+   Колонка при auto-раскладке возьмёт ширину самого длинного тега — а он
+   стоит не в каждой строке, у затегованных прямо здесь прочерк. */
+td.tagged { white-space: nowrap; overflow-wrap: normal; }
 td.dir { text-align: center; font-weight: 700; white-space: nowrap; }
 tr.upgraded td.dir { color: var(--up); }
 tr.downgraded td.dir { color: var(--down); }
@@ -193,7 +198,9 @@ td.tags { white-space: nowrap; }
 @media (max-width: 900px) {
   .tablewrap { overflow-x: auto; }
   thead th { position: static; }
-  td.src, td.ver, td.branch, td.tagged { overflow-wrap: anywhere; }
+  /* td.tagged здесь не трогаем: таблица уже скроллится, и целое имя тега
+     полезнее сэкономленных пикселей. */
+  td.src, td.ver, td.branch { overflow-wrap: anywhere; }
   td.tags { white-space: normal; }
 }
 a.link { display: inline-block; padding: .12rem .5rem; border-radius: 999px;
