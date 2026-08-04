@@ -24,11 +24,12 @@ class ComponentDiff:
     rpms_removed: List[str] = field(default_factory=list)
     branch_changed: bool = False
     repackaged: bool = False
+    tag_changed: bool = False
 
     def changed(self) -> bool:
         return bool(self.status != "unchanged" or self.patches_added
                     or self.patches_removed or self.repackaged
-                    or self.branch_changed)
+                    or self.branch_changed or self.tag_changed)
 
 
 @dataclass
@@ -49,6 +50,31 @@ def _status(old: Build, new: Build) -> str:
 
 def _ref(build: Optional[Build]) -> Optional[str]:
     return build.source.ref if build and build.source else None
+
+
+def _tag_changed(old: Build, new: Build) -> bool:
+    """Один и тот же билд переехал между тегами.
+
+    Три оговорки, каждая — против ложной пометки.
+
+    Сравниваем сам tag_name, а не «прямой/унаследованный»: второе зависит от
+    того, какой тег мы сейчас смотрим. Когда os-9.2 наследует os-9.1,
+    нетронутый билд в старом снапшоте прямой, а в новом унаследованный — и
+    такое сравнение пометило бы переездом полтега.
+
+    Сравниваем только при совпадающем NVR. Обновлённый компонент — это
+    другой билд, и лежать в другом теге для него нормально; про него всё уже
+    сказано меткой upgraded. Переезд интересен ровно тогда, когда сам билд
+    остался прежним: значит, его вытащили из родительского тега и затеговали
+    напрямую (или наоборот).
+
+    Неизвестный тег (снапшот прежней версии) сравнивать не с чем: молчим.
+    """
+    if old.tag_name is None or new.tag_name is None:
+        return False
+    if old.nvr != new.nvr:
+        return False
+    return old.tag_name != new.tag_name
 
 
 def _rpm_key(build: Build, nvra: str) -> str:
@@ -154,7 +180,8 @@ def diff_snapshots(old: Snapshot, new: Snapshot,
             rpms_added=_rpm_delta(new_rpms, old_rpms),
             rpms_removed=_rpm_delta(old_rpms, new_rpms),
             branch_changed=_ref(old_build) != _ref(new_build),
-            repackaged=set(old_rpms) != set(new_rpms)))
+            repackaged=set(old_rpms) != set(new_rpms),
+            tag_changed=_tag_changed(old_build, new_build)))
 
     return PairDiff(old_tag=old.tag, new_tag=new.tag, is_summary=is_summary,
                     components=components, counts=_counts(components))
@@ -163,7 +190,8 @@ def diff_snapshots(old: Snapshot, new: Snapshot,
 def _counts(components: List[ComponentDiff]) -> Dict[str, int]:
     counts = {status: 0 for status in STATUSES}
     counts.update({"patches_added": 0, "patches_removed": 0,
-                   "repackaged": 0, "branch_changed": 0, "changed": 0})
+                   "repackaged": 0, "branch_changed": 0, "tag_changed": 0,
+                   "changed": 0})
     for component in components:
         counts[component.status] += 1
         if component.patches_added:
@@ -174,6 +202,8 @@ def _counts(components: List[ComponentDiff]) -> Dict[str, int]:
             counts["repackaged"] += 1
         if component.branch_changed:
             counts["branch_changed"] += 1
+        if component.tag_changed:
+            counts["tag_changed"] += 1
         if component.changed():
             counts["changed"] += 1
     return counts

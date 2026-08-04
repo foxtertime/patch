@@ -41,12 +41,26 @@ def slug(name: str) -> str:
     return _SLUG_RE.sub("-", str(name).lower())
 
 
-def _build_tags(build) -> List[str]:
+def _inherited(build, tag: Optional[str]) -> Optional[bool]:
+    """Унаследован ли билд в этот тег. None — тег билда неизвестен.
+
+    Неизвестность отдельным значением, а не False: снапшот прежней версии
+    не знает про tag_name, и объявить такие билды прямыми значило бы
+    показать в дашборде утверждение, которого никто не проверял.
+    """
+    if build.tag_name is None or not tag:
+        return None
+    return build.tag_name != tag
+
+
+def _build_tags(build, tag: Optional[str]) -> List[str]:
     tags = []
     for patch in build.patches:
-        tag = slug(patch.cls)
-        if tag not in tags:
-            tags.append(tag)
+        tag_key = slug(patch.cls)
+        if tag_key not in tags:
+            tags.append(tag_key)
+    if _inherited(build, tag):
+        tags.append("inherited")
     if build.source is None:
         tags.append("no-source")
     elif build.source.ref_kind == "commit":
@@ -66,7 +80,7 @@ def _patch_dict(patch) -> Dict[str, object]:
             "cves": list(patch.cves), "url": patch.web_url}
 
 
-def _build_row(build, koji_web) -> Dict[str, object]:
+def _build_row(build, koji_web, tag: Optional[str] = None) -> Dict[str, object]:
     counts = {}
     for patch in build.patches:
         counts[patch.cls] = counts.get(patch.cls, 0) + 1
@@ -81,19 +95,25 @@ def _build_row(build, koji_web) -> Dict[str, object]:
         "koji_url": _koji_url(koji_web, build.nvr),
         "completed": build.completed, "owner": build.owner,
         "build_id": build.build_id, "task_id": build.task_id,
+        "tagged_in": build.tag_name, "inherited": _inherited(build, tag),
         "patches": [_patch_dict(p) for p in build.patches],
         # порядок задаём здесь: дашборд режет список на блоки по смене
         # архитектуры и сам ничего не пересортировывает
         "patch_counts": counts, "rpms": sort_rpms(build.rpms),
         "patch_dir_present": build.patch_dir_present,
-        "problems": list(build.problems), "tags": _build_tags(build),
+        "problems": list(build.problems), "tags": _build_tags(build, tag),
     }
 
 
 def _snapshot_counts(rows, class_names) -> Dict[str, object]:
     by_class = {name: {"builds": 0, "files": 0} for name in class_names}
     with_patches = without_patches = problems = files = 0
+    inherited = direct = 0
     for row in rows:
+        if row["inherited"] is True:
+            inherited += 1
+        elif row["inherited"] is False:
+            direct += 1
         if row["patches"]:
             with_patches += 1
         if row["patch_dir_present"] is False:
@@ -106,6 +126,7 @@ def _snapshot_counts(rows, class_names) -> Dict[str, object]:
             bucket["builds"] += 1
             bucket["files"] += count
     return {"builds": len(rows), "with_patches": with_patches,
+            "inherited": inherited, "direct": direct,
             "without_patches": without_patches, "problems": problems,
             "patch_files": files, "by_class": by_class}
 
@@ -120,13 +141,19 @@ def _diff_tags(component) -> List[str]:
         tags.append("patches-")
     if component.branch_changed:
         tags.append("branch-changed")
+    if component.tag_changed:
+        tags.append("tag-changed")
     return tags
 
 
-def _diff_row(component, koji_web) -> Dict[str, object]:
+def _diff_row(component, koji_web, old_tag=None, new_tag=None) -> Dict[str, object]:
     old, new = component.old, component.new
     shown = new or old
     return {
+        "old_tagged_in": old.tag_name if old else None,
+        "new_tagged_in": new.tag_name if new else None,
+        "old_inherited": _inherited(old, old_tag) if old else None,
+        "new_inherited": _inherited(new, new_tag) if new else None,
         "name": component.name, "status": component.status,
         "changed": bool(component.changed()),
         "old_evr": _evr(old) if old else None,
@@ -156,7 +183,7 @@ def build_page_data(snapshots, pairs, classifier) -> Dict[str, object]:
     snapshot_blocks = []
     for snapshot in snapshots:
         # порядок билдов в снапшоте не гарантирован — сортируем здесь
-        rows = sorted((_build_row(b, snapshot.koji_web)
+        rows = sorted((_build_row(b, snapshot.koji_web, snapshot.tag)
                        for b in snapshot.builds),
                       key=lambda row: row["name"])
         snapshot_blocks.append({
@@ -170,7 +197,8 @@ def build_page_data(snapshots, pairs, classifier) -> Dict[str, object]:
     pair_blocks = [{
         "old": pair.old_tag, "new": pair.new_tag, "summary": pair.is_summary,
         "counts": dict(pair.counts),
-        "rows": [_diff_row(c, koji_web) for c in pair.components],
+        "rows": [_diff_row(c, koji_web, pair.old_tag, pair.new_tag)
+                 for c in pair.components],
     } for pair in pairs]
 
     logger.debug("страница: %d снапшотов, %d строк, %d пар",

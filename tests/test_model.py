@@ -72,6 +72,22 @@ class SerialisationTest(unittest.TestCase):
         self.assertIs(again.builds[0].patch_dir_present, False)
         self.assertEqual(again.builds[0].epoch, 2)
 
+    def test_roundtrip_preserves_the_tag_the_build_is_in(self):
+        build = sample_build()
+        build.tag_name = "os-9-base"
+        snap = Snapshot(tag="os-9.2", generated="g", koji_hub="h",
+                        koji_web=None, builds=[build])
+        again = snapshot_from_dict(snapshot_to_dict(snap))
+        self.assertEqual(again.builds[0].tag_name, "os-9-base")
+
+    def test_snapshot_without_tag_name_reads_as_unknown(self):
+        # снапшот, собранный прежней версией: «не знаем, откуда билд» — это
+        # не то же самое, что «затегован прямо», и подменять одно другим
+        # нельзя, иначе дашборд соврёт про наследование
+        data = snapshot_to_dict(sample_snapshot())
+        del data["builds"][0]["tag_name"]
+        self.assertIsNone(snapshot_from_dict(data).builds[0].tag_name)
+
     def test_missing_raw_in_source_raises(self):
         data = snapshot_to_dict(sample_snapshot())
         del data["builds"][0]["source"]["raw"]

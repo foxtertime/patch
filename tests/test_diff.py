@@ -11,13 +11,14 @@ def nvra(sub, version, release, arch="x86_64"):
 
 
 def build(name, version="1.0", release="1.el9", patches=(), rpms=(),
-          ref="main", epoch=None, subpackages=None):
+          ref="main", epoch=None, subpackages=None, tag_name=None):
     # подпакеты задаём именами, а NVRA собираем из версии билда — так же,
     # как это делает koji: иначе тест сравнивал бы то, чего в жизни нет.
     if subpackages is not None:
         rpms = [nvra(sub, version, release) for sub in subpackages]
     return Build(nvr="%s-%s-%s" % (name, version, release), name=name,
                  version=version, release=release, epoch=epoch,
+                 tag_name=tag_name,
                  source=Source(raw="r", host="h", project="g/" + name, ref=ref,
                                ref_kind="branch"),
                  patch_dir_present=True,
@@ -147,6 +148,62 @@ class DetailsTest(unittest.TestCase):
         got = self.diff_of([], [build("nginx", patches=["a.patch"])])
         self.assertEqual(got["nginx"].patches_added, [])
         self.assertFalse(got["nginx"].repackaged)
+
+
+class TagChangedTest(unittest.TestCase):
+    """Переезд билда между тегами. Сравнивается сам tag_name, а не
+    «прямой/унаследованный»: последнее зависит от того, какой тег мы сейчас
+    рассматриваем, и меняется само собой при обычном наследовании."""
+
+    def diff_of(self, old_tag, old_builds, new_tag, new_builds):
+        pair = diff_snapshots(snap(old_tag, old_builds), snap(new_tag, new_builds))
+        return {c.name: c for c in pair.components}
+
+    def test_retagged_directly_into_the_new_tag(self):
+        got = self.diff_of("os-9.1", [build("nginx", tag_name="os-9-base")],
+                           "os-9.2", [build("nginx", tag_name="os-9.2")])
+        self.assertTrue(got["nginx"].tag_changed)
+
+    def test_same_tag_on_both_sides_is_not_a_change(self):
+        got = self.diff_of("os-9.1", [build("nginx", tag_name="os-9-base")],
+                           "os-9.2", [build("nginx", tag_name="os-9-base")])
+        self.assertFalse(got["nginx"].tag_changed)
+
+    def test_plain_inheritance_of_the_older_tag_is_not_a_change(self):
+        # os-9.2 наследует os-9.1: нетронутый билд в старом снапшоте прямой,
+        # в новом — унаследованный, но сам он никуда не переезжал, и
+        # помечать такое переездом значило бы пометить полтега
+        got = self.diff_of("os-9.1", [build("nginx", tag_name="os-9.1")],
+                           "os-9.2", [build("nginx", tag_name="os-9.1")])
+        self.assertFalse(got["nginx"].tag_changed)
+
+    def test_a_new_version_in_a_new_tag_is_not_a_move(self):
+        # обновлённый компонент — это другой билд, и лежать в новом теге для
+        # него нормально. Пометить такое переездом значило бы поставить
+        # метку каждому обновлению в теге
+        got = self.diff_of("os-9.1", [build("nginx", "1.0", tag_name="os-9.1")],
+                           "os-9.2", [build("nginx", "1.1", tag_name="os-9.2")])
+        self.assertEqual(got["nginx"].status, "upgraded")
+        self.assertFalse(got["nginx"].tag_changed)
+
+    def test_unknown_tag_on_either_side_is_not_a_change(self):
+        # снапшот прежней версии: сказать нечего, и выдумывать нельзя
+        got = self.diff_of("os-9.1", [build("nginx", tag_name=None)],
+                           "os-9.2", [build("nginx", tag_name="os-9.2")])
+        self.assertFalse(got["nginx"].tag_changed)
+
+    def test_tag_change_alone_makes_the_component_changed(self):
+        got = self.diff_of("os-9.1", [build("nginx", tag_name="os-9-base")],
+                           "os-9.2", [build("nginx", tag_name="os-9.2")])
+        self.assertIs(got["nginx"].changed(), True)
+
+    def test_counts_have_a_bucket(self):
+        pair = diff_snapshots(
+            snap("os-9.1", [build("nginx", tag_name="os-9-base"),
+                            build("curl", tag_name="os-9-base")]),
+            snap("os-9.2", [build("nginx", tag_name="os-9.2"),
+                            build("curl", tag_name="os-9-base")]))
+        self.assertEqual(pair.counts["tag_changed"], 1)
 
 
 class AlignRpmsTest(unittest.TestCase):

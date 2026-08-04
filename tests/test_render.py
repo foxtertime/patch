@@ -18,7 +18,7 @@ def patch(name, cls):
 
 
 def build(name, version="1.0", patches=(), problems=(), present=True,
-          ref="main", ref_kind="branch", rpms=("a.x86_64",)):
+          ref="main", ref_kind="branch", rpms=("a.x86_64",), tag_name=None):
     source = None
     if ref is not None:
         source = Source(raw="git+ssh://git@h/g/%s?#origin/%s" % (name, ref),
@@ -26,6 +26,7 @@ def build(name, version="1.0", patches=(), problems=(), present=True,
                         ref_kind=ref_kind, web_url="https://gl/tree")
     return Build(nvr="%s-%s-1.el9" % (name, version), name=name,
                  version=version, release="1.el9", build_id=1, task_id=2,
+                 tag_name=tag_name,
                  owner="builder", completed="2026-05-14", source=source,
                  patch_dir_present=present, patches=list(patches),
                  rpms=list(rpms), problems=list(problems))
@@ -64,6 +65,41 @@ class PageDataTest(unittest.TestCase):
         self.assertEqual(counts["patch_files"], 2)
         self.assertEqual(counts["by_class"]["CVE"], {"builds": 1, "files": 1})
         self.assertEqual(counts["by_class"]["DAST"], {"builds": 0, "files": 0})
+
+    def test_direct_and_inherited_builds_are_told_apart(self):
+        rows = self.data([snap("os-9.2", [
+            build("nginx", tag_name="os-9.2"),
+            build("curl", tag_name="os-9-base"),
+            build("vim", tag_name=None)])])["snapshots"][0]["builds"]
+        by_name = {r["name"]: r for r in rows}
+        self.assertEqual(by_name["nginx"]["tagged_in"], "os-9.2")
+        self.assertIs(by_name["nginx"]["inherited"], False)
+        self.assertEqual(by_name["curl"]["tagged_in"], "os-9-base")
+        self.assertIs(by_name["curl"]["inherited"], True)
+        self.assertIn("inherited", by_name["curl"]["tags"])
+        self.assertNotIn("inherited", by_name["nginx"]["tags"])
+        # неизвестно — это не «прямой»: ни поля, ни метки
+        self.assertIsNone(by_name["vim"]["tagged_in"])
+        self.assertIsNone(by_name["vim"]["inherited"])
+        self.assertNotIn("inherited", by_name["vim"]["tags"])
+
+    def test_inherited_builds_are_counted(self):
+        counts = self.data([snap("os-9.2", [
+            build("nginx", tag_name="os-9.2"),
+            build("curl", tag_name="os-9-base"),
+            build("vim", tag_name="os-9-base")])])["snapshots"][0]["counts"]
+        self.assertEqual(counts["inherited"], 2)
+        self.assertEqual(counts["direct"], 1)
+
+    def test_pair_rows_carry_both_tags(self):
+        old = snap("os-9.1", [build("nginx", tag_name="os-9-base")])
+        new = snap("os-9.2", [build("nginx", tag_name="os-9.2")])
+        row = self.data([old, new], diff_chain([old, new]))["pairs"][0]["rows"][0]
+        self.assertEqual(row["old_tagged_in"], "os-9-base")
+        self.assertEqual(row["new_tagged_in"], "os-9.2")
+        self.assertIs(row["old_inherited"], True)
+        self.assertIs(row["new_inherited"], False)
+        self.assertIn("tag-changed", row["tags"])
 
     def test_build_rpms_come_grouped_by_arch(self):
         # дашборд режет список на блоки по смене архитектуры, поэтому

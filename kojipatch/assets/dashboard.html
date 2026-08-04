@@ -159,7 +159,7 @@ td.src { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weigh
 td.ver { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted);
   overflow-wrap: break-word; }
 td.ver.new { color: var(--fg); }
-td.branch { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+td.branch, td.tagged { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: .85em; overflow-wrap: break-word; }
 td.dir { text-align: center; font-weight: 700; white-space: nowrap; }
 tr.upgraded td.dir { color: var(--up); }
@@ -175,12 +175,12 @@ td.links { text-align: right; white-space: nowrap; }
 td.tags { white-space: nowrap; }
 .plus { color: var(--added); }
 .minus { color: var(--removed); }
-/* На узком экране восемь колонок не помещаются. Пусть скроллится таблица,
+/* На узком экране девять колонок не помещаются. Пусть скроллится таблица,
    а не вся страница вместе с панелью поиска; sticky-шапкой жертвуем. */
 @media (max-width: 900px) {
   .tablewrap { overflow-x: auto; }
   thead th { position: static; }
-  td.src, td.ver, td.branch { overflow-wrap: anywhere; }
+  td.src, td.ver, td.branch, td.tagged { overflow-wrap: anywhere; }
   td.tags { white-space: normal; }
 }
 a.link { display: inline-block; padding: .12rem .5rem; border-radius: 999px;
@@ -270,6 +270,8 @@ tr.detail-row > td { background: var(--card); padding: .85rem .7rem 1.1rem 2.2re
 .problems li { color: var(--removed); font-size: .82rem; padding: .1rem 0;
   overflow-wrap: anywhere; }
 .none { color: var(--muted); font-size: .82rem; }
+/* Приписка к значению: «прямой», «унаследован». */
+.note { color: var(--muted); font-size: .74rem; margin-left: .4rem; }
 /* «Было / стало» — две колонки одинаковой ширины, чтобы взгляд сравнивал
    строки по горизонтали, а не искал соответствие. */
 .sides { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem 1.6rem; }
@@ -302,7 +304,7 @@ tr.detail-row > td { background: var(--card); padding: .85rem .7rem 1.1rem 2.2re
     <div class="cards global" id="state-cards"></div>
     <div class="cards diff" id="class-cards"></div>
     <div class="controls" id="controls">
-      <input type="search" id="q" placeholder="Компонент, ветка, патч, CVE, RPM…" autocomplete="off">
+      <input type="search" id="q" placeholder="Компонент, тег, ветка, патч, CVE, RPM…" autocomplete="off">
       <button id="expand" class="toggle" data-tip="Развернуть или свернуть все строки, которые сейчас видны. Фильтры и поиск учитываются.">Expand all</button>
       <button id="copy-nvr" class="toggle" data-tip="Скопировать NVR отфильтрованных строк">Copy NVR</button>
       <span class="count" id="count"></span>
@@ -312,6 +314,7 @@ tr.detail-row > td { background: var(--card); padding: .85rem .7rem 1.1rem 2.2re
       <thead><tr>
         <th data-sort="name">компонент <span class="arrow">▲</span></th>
         <th data-sort="evr" data-tip="Сортировка лексикографическая: 1.10 встанет выше 1.9. Так и задумано — в соседних строках версии принадлежат разным компонентам, и сравнивать их по правилам rpm было бы не осмысленнее.">version-release <span class="arrow"></span></th>
+        <th data-sort="tagged_in" data-tip="Koji-тег, в котором билд действительно затегован. Прочерк — билд затегован прямо в выбранный тег; имя — билд унаследован из этого тега. Вопросительный знак — снапшот собран версией, которая тег ещё не записывала.">тег <span class="arrow"></span></th>
         <th data-sort="branch" data-tip="Ветка GitLab, из которой собран билд. Если сборка шла с коммита, а не с ветки, рядом стоит тег from-commit.">ветка <span class="arrow"></span></th>
         <th data-sort="patches" data-tip="Сколько файлов лежит в каталоге PATCH ветки. Полоска показывает доли классов патчей в этой сборке.">патчи <span class="arrow"></span></th>
         <th data-sort="rpms">RPM <span class="arrow"></span></th>
@@ -356,6 +359,8 @@ var LABELS = {
   "no-patch": "нет каталога PATCH", "no-source": "нет источника",
   "from-commit": "собран с коммита", "gitlab-error": "ошибка GitLab",
   "internal-error": "внутренняя ошибка",
+  "inherited": "унаследован из другого тега",
+  "tag-changed": "переехал между тегами",
   "added": "появился", "removed": "исчез", "unchanged": "версия та же",
   "upgraded": "версия выросла", "downgraded": "версия упала",
   "repackaged": "состав RPM изменился", "patches+": "патчи пришли",
@@ -374,7 +379,7 @@ var ARROW = { added: "+", removed: "−", upgraded: "↑",
 var KNOWN_CLASS = { "cve": 1, "sast": 1, "dast": 1, "other": 1 };
 var CALM_TAGS = { "from-commit": "warn", "no-patch": "calm",
                   "no-source": "bad", "gitlab-error": "bad",
-                  "internal-error": "bad" };
+                  "internal-error": "bad", "inherited": "calm" };
 var STATUS_TAGS = { "added": 1, "removed": 1, "unchanged": 1, "upgraded": 1,
                     "downgraded": 1, "repackaged": 1 };
 
@@ -533,7 +538,7 @@ function diffMatches(row) {
 function scanState(row, q) {
   if (!q) return { show: true, deep: false };
   var shallow = has(row.name, q) || has(row.nvr, q) || has(row.branch, q)
-             || has(row.evr, q);
+             || has(row.evr, q) || has(row.tagged_in, q);
   var deep = has(row.project, q) || has(row.completed, q) || has(row.owner, q);
   var i, j, p;
   for (i = 0; !deep && i < row.patches.length; i++) {
@@ -555,7 +560,8 @@ function scanState(row, q) {
 function scanDiff(row, q) {
   if (!q) return { show: true, deep: false };
   var shallow = has(row.name, q) || has(row.old_evr, q) || has(row.new_evr, q);
-  var deep = has(row.old_branch, q) || has(row.new_branch, q);
+  var deep = has(row.old_branch, q) || has(row.new_branch, q)
+          || has(row.old_tagged_in, q) || has(row.new_tagged_in, q);
   var lists = [row.old_patches, row.new_patches];
   var i, j, k, p;
   for (i = 0; !deep && i < lists.length; i++) {
@@ -679,13 +685,32 @@ function tagHtml(key) {
   var cls = 'tag';
   if (key === 'patches+') cls += ' added';
   else if (key === 'patches-') cls += ' removed';
-  else if (key === 'branch-changed') cls += ' warn';
+  else if (key === 'branch-changed' || key === 'tag-changed') cls += ' warn';
   else if (CALM_TAGS[key]) cls += ' ' + CALM_TAGS[key];
   else if (STATUS_TAGS[key]) cls += ' ' + key;
   else cls += ' ' + classCls(key);   /* остаётся класс патчей */
   return '<span class="' + cls + '" data-filter="' + esc(key) + '" role="button"'
        + ' tabindex="0" data-tip="' + esc(label(key)) + '. Клик — фильтр.">'
        + esc(key) + '</span>';
+}
+
+/* Колонка «тег»: прочерк — билд затегован прямо в выбранный тег, имя —
+   унаследован оттуда. Прочерк, а не повтор имени тега в каждой строке:
+   в теге на восемьсот сборок повторов было бы восемьсот. */
+function taggedCell(row, q) {
+  if (row.inherited === null) return '<span class="none">?</span>';
+  if (!row.inherited) return '<span class="none">—</span>';
+  return hl(row.tagged_in, q);
+}
+
+/* Развёрнутый вид того же: здесь есть место сказать словами. */
+function taggedText(taggedIn, inherited, q) {
+  if (inherited === null || !taggedIn) {
+    return '<span class="none">неизвестно</span>';
+  }
+  return '<span class="mono">' + hl(taggedIn, q) + '</span>'
+       + '<span class="note">' + (inherited ? 'унаследован' : 'прямой')
+       + '</span>';
 }
 
 function tagsHtml(tags) {
@@ -848,6 +873,7 @@ function stateDetail(row, q) {
 
   out += '<div class="block"><div class="bl">koji</div>'
       + kv('NVR', '<span class="mono">' + hl(row.nvr, q) + '</span>')
+      + kv('тег', taggedText(row.tagged_in, row.inherited, q))
       + kv('собран', hl(row.completed || '—', q))
       + kv('владелец', hl(row.owner || '—', q))
       + kv('build id', esc(row.build_id === null ? '—' : row.build_id))
@@ -904,6 +930,7 @@ function stateRowsHtml(items) {
          + ' aria-expanded="' + (open ? 'true' : 'false') + '">'
          + (open ? '▾' : '▸') + '</span> ' + hl(row.name, q) + '</td>'
          + '<td class="ver">' + hl(row.evr, q) + '</td>'
+         + '<td class="tagged">' + taggedCell(row, q) + '</td>'
          + '<td class="branch">' + (row.branch ? hl(row.branch, q)
               : '<span class="none">—</span>') + '</td>'
          + '<td class="pat">' + patches + '</td>'
@@ -913,7 +940,7 @@ function stateRowsHtml(items) {
          + '<td class="links">' + linkHtml(row.koji_url, 'koji')
          + linkHtml(row.source_url, 'git') + '</td></tr>';
     if (open) {
-      html += '<tr class="detail-row"><td colspan="8">' + stateDetail(row, q)
+      html += '<tr class="detail-row"><td colspan="9">' + stateDetail(row, q)
            + '</td></tr>';
     }
   }
@@ -922,35 +949,47 @@ function stateRowsHtml(items) {
 
 /* ---------- вкладка «Изменения» ---------- */
 
-function side(title, tag, evr, branch, patches, rpmRows, at, q, mark, markCls,
-              branchChanged) {
-  var out = '<div class="side"><div class="bl">' + esc(title) + ' · <b>'
-          + esc(tag) + '</b></div>';
-  out += kv('версия', evr ? '<span class="mono">' + hl(evr, q) + '</span>'
-                          : '<span class="none">—</span>');
-  out += kv('ветка', branch
-    ? '<span class="mono' + (branchChanged ? ' ' + markCls : '') + '">'
-      + hl(branch, q) + '</span>'
+/* Одна сторона «было/стало». Параметры собраны в объект: их тринадцать, и
+   позиционным списком такой вызов читался бы как шифровка. */
+function side(s, q) {
+  var out = '<div class="side"><div class="bl">' + esc(s.title) + ' · <b>'
+          + esc(s.tag) + '</b></div>';
+  out += kv('версия', s.evr ? '<span class="mono">' + hl(s.evr, q) + '</span>'
+                            : '<span class="none">—</span>');
+  out += kv('тег', s.tagChanged
+    ? '<span class="' + s.markCls + '">'
+      + taggedText(s.taggedIn, s.inherited, q) + '</span>'
+    : taggedText(s.taggedIn, s.inherited, q));
+  out += kv('ветка', s.branch
+    ? '<span class="mono' + (s.branchChanged ? ' ' + s.markCls : '') + '">'
+      + hl(s.branch, q) + '</span>'
     : '<span class="none">—</span>');
-  out += '<div class="bl" style="margin-top:.7rem">патчи · ' + patches.length
-      + '</div>' + patchesHtml(patches, q, mark, markCls);
+  out += '<div class="bl" style="margin-top:.7rem">патчи · ' + s.patches.length
+      + '</div>' + patchesHtml(s.patches, q, s.mark, s.markCls);
   out += '<div class="bl" style="margin-top:.7rem">RPM · '
-      + rpmSideCount(rpmRows, at)
-      + '</div>' + rpmSideHtml(rpmRows, at, q, markCls);
+      + rpmSideCount(s.rpmRows, s.at)
+      + '</div>' + rpmSideHtml(s.rpmRows, s.at, q, s.markCls);
   return out + '</div>';
 }
 
 function diffDetail(row, q) {
   var pair = curPair();
   var oldTag = pair ? pair.old : 'было', newTag = pair ? pair.new : 'стало';
-  var changed = row.tags.indexOf('branch-changed') !== -1;
+  var branchChanged = row.tags.indexOf('branch-changed') !== -1;
+  var tagChanged = row.tags.indexOf('tag-changed') !== -1;
   return '<div class="sides">'
-    + side('было', oldTag, row.old_evr, row.old_branch, row.old_patches,
-           row.rpm_rows, 0, q, setFrom(row.patches_removed), 'is-removed',
-           changed)
-    + side('стало', newTag, row.new_evr, row.new_branch, row.new_patches,
-           row.rpm_rows, 1, q, setFrom(row.patches_added), 'is-added',
-           changed)
+    + side({ title: 'было', tag: oldTag, evr: row.old_evr,
+             branch: row.old_branch, taggedIn: row.old_tagged_in,
+             inherited: row.old_inherited, patches: row.old_patches,
+             rpmRows: row.rpm_rows, at: 0, mark: setFrom(row.patches_removed),
+             markCls: 'is-removed', branchChanged: branchChanged,
+             tagChanged: tagChanged }, q)
+    + side({ title: 'стало', tag: newTag, evr: row.new_evr,
+             branch: row.new_branch, taggedIn: row.new_tagged_in,
+             inherited: row.new_inherited, patches: row.new_patches,
+             rpmRows: row.rpm_rows, at: 1, mark: setFrom(row.patches_added),
+             markCls: 'is-added', branchChanged: branchChanged,
+             tagChanged: tagChanged }, q)
     + '</div>';
 }
 
@@ -1057,6 +1096,12 @@ function renderStateCards() {
         + ' патчей', 'с патчами',
         'Сборки, у которых в каталоге PATCH ветки лежит хотя бы один файл. '
         + 'Клик оставит в таблице только их.')
+    + cardHtml('inherited', true, c.inherited,
+        plural(c.inherited, 'сборка', 'сборки', 'сборок'),
+        c.direct + ' затегованы прямо', 'унаследованы',
+        'Сборки, которые висят не в теге ' + snap.tag + ', а в одном из его '
+        + 'родителей, и попали сюда наследованием. В колонке «тег» видно, '
+        + 'из какого именно. Клик оставит в таблице только их.')
     + cardHtml('problem', true, c.problems,
         plural(c.problems, 'сборка', 'сборки', 'сборок'),
         c.without_patches + ' без каталога PATCH', 'с проблемами',
@@ -1099,7 +1144,12 @@ function renderDiffCards() {
     ['repackaged', c.repackaged, 'состав RPM',
      'Компонент остался, но набор его бинарных пакетов изменился.'],
     ['branch-changed', c.branch_changed, 'сменили ветку',
-     'Сборка приехала из другой ветки GitLab, чем в старом теге.']
+     'Сборка приехала из другой ветки GitLab, чем в старом теге.'],
+    ['tag-changed', c.tag_changed, 'переехали между тегами',
+     'Билд теперь висит в другом koji-теге: был унаследован — стал '
+     + 'затегован прямо, или наоборот. Обычное наследование сюда не '
+     + 'попадает: сравнивается сам тег билда, а не то, каким он выглядит '
+     + 'из выбранного.']
   ];
   var out = '';
   for (var i = 0; i < spec.length; i++) {
@@ -1203,8 +1253,8 @@ function showTab(name) {
   host.insertBefore(controls, anchor);
   host.insertBefore(chipsBox, anchor);
   search.placeholder = name === 'diff'
-    ? 'Компонент, версия, ветка, патч, CVE, RPM…'
-    : 'Компонент, ветка, патч, CVE, RPM…';
+    ? 'Компонент, версия, тег, ветка, патч, CVE, RPM…'
+    : 'Компонент, тег, ветка, патч, CVE, RPM…';
 }
 
 /* ---------- состояние в адресной строке ---------- */

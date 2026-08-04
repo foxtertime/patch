@@ -62,6 +62,11 @@ class Build:
     task_id: Optional[int] = None
     owner: Optional[str] = None
     completed: Optional[str] = None
+    # тег, в котором билд реально висит (listTagged с inherit=True отдаёт его
+    # у каждой записи). Совпал с тегом снапшота — билд затегован прямо, не
+    # совпал — унаследован оттуда. None означает «неизвестно»: так читаются
+    # снапшоты, собранные до появления поля.
+    tag_name: Optional[str] = None
     source: Optional[Source] = None
     patch_dir_present: Optional[bool] = None
     patches: List[Patch] = field(default_factory=list)
@@ -74,6 +79,7 @@ class Build:
             "release": self.release, "epoch": self.epoch,
             "build_id": self.build_id, "task_id": self.task_id,
             "owner": self.owner, "completed": self.completed,
+            "tag_name": self.tag_name,
             "source": self.source.to_dict() if self.source else None,
             "patch_dir_present": self.patch_dir_present,
             "patches": [p.to_dict() for p in self.patches],
@@ -88,6 +94,7 @@ class Build:
             release=data["release"], epoch=data.get("epoch"),
             build_id=data.get("build_id"), task_id=data.get("task_id"),
             owner=data.get("owner"), completed=data.get("completed"),
+            tag_name=data.get("tag_name"),
             source=Source.from_dict(source) if source else None,
             patch_dir_present=data.get("patch_dir_present"),
             patches=[Patch.from_dict(p) for p in data.get("patches") or []],

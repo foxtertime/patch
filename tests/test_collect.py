@@ -14,10 +14,12 @@ HOSTS = {HOST: GitlabHost(api="https://gitlab.example.com/api/v4",
 TREE = "https://gitlab.example.com/api/v4/projects/%s/repository/tree"
 COMMITS = "https://gitlab.example.com/api/v4/projects/%s/repository/commits/%s"
 
+# tag_name отдаёт listTagged у каждой записи: это тег, в котором билд
+# действительно висит. curl здесь унаследован из родительского тега.
 TAGGED = {"os-9.2": [
-    {"build_id": 1, "name": "nginx"},
-    {"build_id": 2, "name": "curl"},
-    {"build_id": 3, "name": "vim"},
+    {"build_id": 1, "name": "nginx", "tag_name": "os-9.2"},
+    {"build_id": 2, "name": "curl", "tag_name": "os-9-base"},
+    {"build_id": 3, "name": "vim", "tag_name": "os-9.2"},
 ]}
 BUILDS = {
     1: {"build_id": 1, "task_id": 11, "name": "nginx", "version": "1.24.0",
@@ -97,6 +99,25 @@ class CollectTagTest(unittest.TestCase):
         self.assertEqual(build.owner, "builder")
         self.assertEqual(build.completed, "2026-05-14")
         self.assertEqual(build.rpms, ["nginx-1.24.0-3.el9.x86_64"])
+
+    def test_tag_name_comes_from_list_tagged(self):
+        # getBuild такого поля не отдаёт вовсе — тег известен только из
+        # listTagged, и его нужно донести до билда
+        snap, _ = self.collect()
+        by_name = snap.by_name()
+        self.assertEqual(by_name["nginx"].tag_name, "os-9.2")
+        self.assertEqual(by_name["curl"].tag_name, "os-9-base")
+
+    def test_tag_name_absent_in_the_hub_answer_stays_unknown(self):
+        tagged = {"os-9.2": [{"build_id": 1, "name": "nginx"}]}
+        session = FakeKojiSession(tagged=tagged, builds={1: BUILDS[1]},
+                                  rpms={1: RPMS[1]})
+        transport = FakeTransport(self.routes)
+        gitlab = GitlabClient(HOSTS, token=None, transport=transport,
+                              sleeper=lambda _s: None)
+        snap = collect_tag("os-9.2", config(), KojiClient(session), gitlab,
+                           jobs=1, now="n")
+        self.assertIsNone(snap.by_name()["nginx"].tag_name)
 
     def test_source_is_parsed_with_web_url(self):
         snap, _ = self.collect()
@@ -212,10 +233,10 @@ class CollectTagTest(unittest.TestCase):
         # listTagged перечислил билд, а getBuild по нему ничего не вернул:
         # строка обязана остаться, но быть явно помеченной как неполная.
         tagged = {"os-9.2": [
-            {"build_id": 1, "name": "nginx"},
+            {"build_id": 1, "name": "nginx", "tag_name": "os-9.2"},
             {"build_id": 7, "name": "ghost", "version": "2.1",
              "release": "4.el9", "nvr": "ghost-2.1-4.el9", "epoch": 1,
-             "task_id": 77, "owner_name": "builder",
+             "task_id": 77, "owner_name": "builder", "tag_name": "os-9-base",
              "completion_time": "2026-02-02 10:00:00"},
         ]}
         session = FakeKojiSession(tagged=tagged, builds={1: BUILDS[1]},
@@ -237,6 +258,8 @@ class CollectTagTest(unittest.TestCase):
         self.assertEqual(ghost.completed, "2026-02-02")
         self.assertIsNone(ghost.source)
         self.assertIsNone(ghost.patch_dir_present)
+        # тег известен и здесь: он пришёл из того же listTagged
+        self.assertEqual(ghost.tag_name, "os-9-base")
         self.assertEqual(ghost.problems, ["koji: нет деталей билда"])
         self.assertEqual(problem_summary(snap)["koji: нет деталей билда"], 1)
 

@@ -86,7 +86,11 @@ def collect_tag(tag: str, cfg, koji_client, gitlab_client, jobs: int = 8,
                     100 * current // max(1, total), problems, rate, left)
 
     def handle(info) -> Build:
-        build = _build_from_info(info, rpms.get(info.get("build_id"), []))
+        # тег, в котором билд висит, знает только listTagged: getBuild такого
+        # поля не отдаёт вовсе
+        entry = tagged_by_id.get(info.get("build_id")) or {}
+        build = _build_from_info(info, rpms.get(info.get("build_id"), []),
+                                 entry.get("tag_name"))
         try:
             _attach_patches(build, info, cfg, gitlab_client, classifier)
         except Exception as exc:
@@ -119,8 +123,9 @@ def collect_tag(tag: str, cfg, koji_client, gitlab_client, jobs: int = 8,
     return snapshot
 
 
-def _build_from_info(info: dict, rpms) -> Build:
+def _build_from_info(info: dict, rpms, tag_name: Optional[str] = None) -> Build:
     return Build(
+        tag_name=tag_name,
         nvr=info.get("nvr") or "%s-%s-%s" % (info.get("name"),
                                              info.get("version"),
                                              info.get("release")),
@@ -138,7 +143,7 @@ def _placeholder_build(info: dict, rpms) -> Build:
     Строка остаётся в снапшоте — с проблемой и без сведений об источнике,
     чтобы было видно: данные по ней неполные, а не «патчей нет».
     """
-    build = _build_from_info(info, rpms)
+    build = _build_from_info(info, rpms, info.get("tag_name"))
     build.patch_dir_present = None
     build.problems.append("koji: нет деталей билда")
     return build
