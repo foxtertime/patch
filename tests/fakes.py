@@ -42,11 +42,12 @@ class _MultiCall:
 class FakeKojiSession:
     """Считает вызовы и отдаёт заранее заданные ответы."""
 
-    def __init__(self, tagged=None, builds=None, rpms=None,
+    def __init__(self, tagged=None, builds=None, rpms=None, tags=None,
                  supports_multicall=True):
         self.tagged = tagged or {}
         self.builds = builds or {}
         self.rpms = rpms or {}
+        self.tags = tags or {}
         self.supports_multicall = supports_multicall
         self.calls = []
 
@@ -63,6 +64,12 @@ class FakeKojiSession:
     def listRPMs(self, buildID=None):
         self.calls.append(("listRPMs", buildID))
         return list(self.rpms.get(buildID, []))
+
+    def listTags(self, build=None):
+        # koji отдаёт словари тегов, а не строки: имя лежит в ключе name
+        self.calls.append(("listTags", build))
+        return [{"id": i, "name": name}
+                for i, name in enumerate(self.tags.get(build, []))]
 
     def multicall(self, batch=None, strict=False):
         if not self.supports_multicall:

@@ -80,6 +80,20 @@ class SerialisationTest(unittest.TestCase):
         again = snapshot_from_dict(snapshot_to_dict(snap))
         self.assertEqual(again.builds[0].tag_name, "os-9-base")
 
+    def test_roundtrip_preserves_all_tags_of_the_build(self):
+        build = sample_build()
+        build.tags = ["os-9-base", "os-9.2-candidate"]
+        snap = Snapshot(tag="os-9.2", generated="g", koji_hub="h",
+                        koji_web=None, builds=[build])
+        again = snapshot_from_dict(snapshot_to_dict(snap))
+        self.assertEqual(again.builds[0].tags,
+                         ["os-9-base", "os-9.2-candidate"])
+
+    def test_snapshot_without_tags_reads_as_empty(self):
+        data = snapshot_to_dict(sample_snapshot())
+        del data["builds"][0]["tags"]
+        self.assertEqual(snapshot_from_dict(data).builds[0].tags, [])
+
     def test_snapshot_without_tag_name_reads_as_unknown(self):
         # снапшот, собранный прежней версией: «не знаем, откуда билд» — это
         # не то же самое, что «затегован прямо», и подменять одно другим

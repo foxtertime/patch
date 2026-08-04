@@ -48,6 +48,7 @@ def collect_tag(tag: str, cfg, koji_client, gitlab_client, jobs: int = 8,
                 len(build_ids))
     details = koji_client.build_details(build_ids)
     rpms = koji_client.rpms_for(build_ids)
+    tags = koji_client.tags_for(build_ids)
 
     infos = [details[bid] for bid in build_ids if bid in details]
     # оба числа в одной строке: прогресс считает полученные детали, а размер
@@ -90,7 +91,8 @@ def collect_tag(tag: str, cfg, koji_client, gitlab_client, jobs: int = 8,
         # поля не отдаёт вовсе
         entry = tagged_by_id.get(info.get("build_id")) or {}
         build = _build_from_info(info, rpms.get(info.get("build_id"), []),
-                                 entry.get("tag_name"))
+                                 entry.get("tag_name"),
+                                 tags.get(info.get("build_id"), []))
         try:
             _attach_patches(build, info, cfg, gitlab_client, classifier)
         except Exception as exc:
@@ -111,7 +113,8 @@ def collect_tag(tag: str, cfg, koji_client, gitlab_client, jobs: int = 8,
             builds = list(pool.map(handle, infos))
 
     for item in missing:
-        build = _placeholder_build(item, rpms.get(item.get("build_id"), []))
+        build = _placeholder_build(item, rpms.get(item.get("build_id"), []),
+                                   tags.get(item.get("build_id"), []))
         logger.warning("%s: %s", build.name, build.problems[0])
         builds.append(build)
     builds.sort(key=lambda b: b.name or "")
@@ -123,9 +126,10 @@ def collect_tag(tag: str, cfg, koji_client, gitlab_client, jobs: int = 8,
     return snapshot
 
 
-def _build_from_info(info: dict, rpms, tag_name: Optional[str] = None) -> Build:
+def _build_from_info(info: dict, rpms, tag_name: Optional[str] = None,
+                     tags=()) -> Build:
     return Build(
-        tag_name=tag_name,
+        tag_name=tag_name, tags=list(tags),
         nvr=info.get("nvr") or "%s-%s-%s" % (info.get("name"),
                                              info.get("version"),
                                              info.get("release")),
@@ -137,13 +141,13 @@ def _build_from_info(info: dict, rpms, tag_name: Optional[str] = None) -> Build:
         rpms=list(rpms), patches=[], problems=[])
 
 
-def _placeholder_build(info: dict, rpms) -> Build:
+def _placeholder_build(info: dict, rpms, tags=()) -> Build:
     """Билд, по которому пришёл только ответ listTagged.
 
     Строка остаётся в снапшоте — с проблемой и без сведений об источнике,
     чтобы было видно: данные по ней неполные, а не «патчей нет».
     """
-    build = _build_from_info(info, rpms, info.get("tag_name"))
+    build = _build_from_info(info, rpms, info.get("tag_name"), tags)
     build.patch_dir_present = None
     build.problems.append("koji: нет деталей билда")
     return build

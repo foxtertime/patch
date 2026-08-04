@@ -67,6 +67,11 @@ class Build:
     # совпал — унаследован оттуда. None означает «неизвестно»: так читаются
     # снапшоты, собранные до появления поля.
     tag_name: Optional[str] = None
+    # все koji-теги билда (listTags). tag_name — тот из них, через который
+    # билд попал в этот снапшот; остальные показывают, где он висит ещё.
+    # Пустой список означает «не спрашивали» — так читаются снапшоты,
+    # собранные до появления поля.
+    tags: List[str] = field(default_factory=list)
     source: Optional[Source] = None
     patch_dir_present: Optional[bool] = None
     patches: List[Patch] = field(default_factory=list)
@@ -79,7 +84,7 @@ class Build:
             "release": self.release, "epoch": self.epoch,
             "build_id": self.build_id, "task_id": self.task_id,
             "owner": self.owner, "completed": self.completed,
-            "tag_name": self.tag_name,
+            "tag_name": self.tag_name, "tags": list(self.tags),
             "source": self.source.to_dict() if self.source else None,
             "patch_dir_present": self.patch_dir_present,
             "patches": [p.to_dict() for p in self.patches],
@@ -95,6 +100,7 @@ class Build:
             build_id=data.get("build_id"), task_id=data.get("task_id"),
             owner=data.get("owner"), completed=data.get("completed"),
             tag_name=data.get("tag_name"),
+            tags=list(data.get("tags") or []),
             source=Source.from_dict(source) if source else None,
             patch_dir_present=data.get("patch_dir_present"),
             patches=[Patch.from_dict(p) for p in data.get("patches") or []],

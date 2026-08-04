@@ -40,10 +40,13 @@ BUILDS = {
 RPMS = {1: [{"name": "nginx", "version": "1.24.0", "release": "3.el9",
              "arch": "x86_64"}],
         2: [], 3: []}
+# listTags: все теги билда, а не только тот, через который он попал в выборку
+TAGS = {1: ["os-9.2", "os-9.2-candidate"], 2: ["os-9-base", "os-9.2"], 3: []}
 
 
 def make_clients(routes):
-    session = FakeKojiSession(tagged=TAGGED, builds=BUILDS, rpms=RPMS)
+    session = FakeKojiSession(tagged=TAGGED, builds=BUILDS, rpms=RPMS,
+                              tags=TAGS)
     transport = FakeTransport(routes)
     gitlab = GitlabClient(HOSTS, token=None, transport=transport,
                           sleeper=lambda _s: None)
@@ -107,6 +110,13 @@ class CollectTagTest(unittest.TestCase):
         by_name = snap.by_name()
         self.assertEqual(by_name["nginx"].tag_name, "os-9.2")
         self.assertEqual(by_name["curl"].tag_name, "os-9-base")
+
+    def test_all_koji_tags_of_the_build_are_collected(self):
+        snap, _ = self.collect()
+        by_name = snap.by_name()
+        self.assertEqual(by_name["nginx"].tags, ["os-9.2", "os-9.2-candidate"])
+        self.assertEqual(by_name["curl"].tags, ["os-9-base", "os-9.2"])
+        self.assertEqual(by_name["vim"].tags, [])
 
     def test_tag_name_absent_in_the_hub_answer_stays_unknown(self):
         tagged = {"os-9.2": [{"build_id": 1, "name": "nginx"}]}

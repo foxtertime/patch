@@ -119,7 +119,10 @@ def _build_row(build, koji_web, tag: Optional[str] = None,
         "koji_url": _koji_url(koji_web, build.nvr),
         "completed": build.completed, "owner": build.owner,
         "build_id": build.build_id, "task_id": build.task_id,
+        # koji_tags, а не tags: ключ tags в строке занят вычисляемыми
+        # метками дашборда, и путать их нельзя
         "tagged_in": build.tag_name, "inherited": _inherited(build, tag),
+        "koji_tags": list(build.tags),
         "patches": [_patch_dict(p) for p in build.patches],
         # порядок задаём здесь: дашборд режет список на блоки по смене
         # архитектуры и сам ничего не пересортировывает

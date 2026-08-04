@@ -18,7 +18,8 @@ def patch(name, cls):
 
 
 def build(name, version="1.0", patches=(), problems=(), present=True,
-          ref="main", ref_kind="branch", rpms=("a.x86_64",), tag_name=None):
+          ref="main", ref_kind="branch", rpms=("a.x86_64",), tag_name=None,
+          tags=()):
     source = None
     if ref is not None:
         source = Source(raw="git+ssh://git@h/g/%s?#origin/%s" % (name, ref),
@@ -26,7 +27,7 @@ def build(name, version="1.0", patches=(), problems=(), present=True,
                         ref_kind=ref_kind, web_url="https://gl/tree")
     return Build(nvr="%s-%s-1.el9" % (name, version), name=name,
                  version=version, release="1.el9", build_id=1, task_id=2,
-                 tag_name=tag_name,
+                 tag_name=tag_name, tags=list(tags),
                  owner="builder", completed="2026-05-14", source=source,
                  patch_dir_present=present, patches=list(patches),
                  rpms=list(rpms), problems=list(problems))
@@ -114,6 +115,18 @@ class PageDataTest(unittest.TestCase):
         self.assertIsNone(by_name["vim"]["tagged_in"])
         self.assertIsNone(by_name["vim"]["inherited"])
         self.assertNotIn("inherited", by_name["vim"]["tags"])
+
+    def test_row_carries_the_other_koji_tags(self):
+        row = self.data([snap("os-9.2", [build(
+            "nginx", tag_name="os-9-base",
+            tags=["os-9-base", "os-9.2-candidate"])])])["snapshots"][0]["builds"][0]
+        self.assertEqual(row["koji_tags"], ["os-9-base", "os-9.2-candidate"])
+        self.assertEqual(row["tagged_in"], "os-9-base")
+
+    def test_koji_tags_are_empty_when_the_snapshot_has_none(self):
+        row = self.data([snap("os-9.2", [build("nginx", tag_name="os-9.2")])]
+                        )["snapshots"][0]["builds"][0]
+        self.assertEqual(row["koji_tags"], [])
 
     def test_inherited_builds_are_counted(self):
         counts = self.data([snap("os-9.2", [

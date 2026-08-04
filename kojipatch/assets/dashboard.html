@@ -304,6 +304,13 @@ tr.detail-row > td { background: var(--card); padding: .85rem .7rem 1.1rem 2.2re
 .none { color: var(--muted); font-size: .82rem; }
 /* Приписка к значению: «прямой», «унаследован». */
 .note { color: var(--muted); font-size: .74rem; margin-left: .4rem; }
+/* Список koji-тегов билда. Основной набран цветом текста и жирным, прочие
+   приглушены: глаз должен находить «где билд сейчас» без чтения списка. */
+.ktags { display: flex; flex-wrap: wrap; gap: .05rem .55rem;
+  align-items: baseline; }
+.ktag { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .8rem; color: var(--muted); overflow-wrap: anywhere; }
+.ktag.main { color: var(--fg); font-weight: 700; }
 /* «Было / стало» — две колонки одинаковой ширины, чтобы взгляд сравнивал
    строки по горизонтали, а не искал соответствие. */
 .sides { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem 1.6rem; }
@@ -575,6 +582,9 @@ function scanState(row, q) {
              || has(row.evr, q) || has(row.tagged_in, q);
   var deep = has(row.project, q) || has(row.completed, q) || has(row.owner, q);
   var i, j, p;
+  for (i = 0; !deep && i < (row.koji_tags || []).length; i++) {
+    if (has(row.koji_tags[i], q)) deep = true;
+  }
   for (i = 0; !deep && i < row.patches.length; i++) {
     p = row.patches[i];
     if (has(p.name, q) || has(p.path, q) || has(p['class'], q)) deep = true;
@@ -735,6 +745,28 @@ function taggedCell(row, q) {
   if (row.inherited === null) return '<span class="none">?</span>';
   if (!row.inherited) return '<span class="none">—</span>';
   return hl(row.tagged_in, q);
+}
+
+/* Все koji-теги билда. Основной — тот, через который билд попал в этот
+   снапшот, — выделен цветом и насыщенностью: остальные только сообщают,
+   где билд висит ещё, и соперничать за внимание с ним не должны.
+   Если listTags ничего не дал (старый снапшот), показываем то, что знаем
+   из listTagged, — но не выдаём это за полный список. */
+function kojiTagsHtml(row, q) {
+  var list = (row.koji_tags || []).slice(), main = row.tagged_in;
+  if (main && list.indexOf(main) === -1) list.unshift(main);
+  if (!list.length) return '<span class="none">неизвестно</span>';
+  var out = '<div class="ktags">';
+  for (var i = 0; i < list.length; i++) {
+    var isMain = Boolean(main) && list[i] === main;
+    out += '<span class="ktag' + (isMain ? ' main' : '') + '">'
+        + hl(list[i], q) + '</span>';
+    if (isMain && row.inherited !== null) {
+      out += '<span class="note">'
+          + (row.inherited ? 'унаследован' : 'прямой') + '</span>';
+    }
+  }
+  return out + '</div>';
 }
 
 /* Развёрнутый вид того же: здесь есть место сказать словами. */
@@ -907,7 +939,7 @@ function stateDetail(row, q) {
 
   out += '<div class="block"><div class="bl">koji</div>'
       + kv('NVR', '<span class="mono">' + hl(row.nvr, q) + '</span>')
-      + kv('тег', taggedText(row.tagged_in, row.inherited, q))
+      + kv('теги', kojiTagsHtml(row, q))
       + kv('собран', hl(row.completed || '—', q))
       + kv('владелец', hl(row.owner || '—', q))
       + kv('build id', esc(row.build_id === null ? '—' : row.build_id))

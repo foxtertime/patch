@@ -41,6 +41,16 @@ class KojiClient:
             out[bid] = sorted(names)
         return out
 
+    def tags_for(self, build_ids: List[int]) -> Dict[int, List[str]]:
+        """Все koji-теги каждого билда.
+
+        listTagged отдаёт только тот тег, через который билд попал в выборку;
+        остальные («висит ещё и там») знает только listTags.
+        """
+        raw = self._call_batched("listTags", build_ids, keyword="build")
+        return {bid: sorted(t.get("name") for t in tags or [] if t.get("name"))
+                for bid, tags in raw.items()}
+
     def _call_batched(self, method: str, build_ids: List[int],
                       keyword: str = None) -> Dict[int, object]:
         ids = list(build_ids)

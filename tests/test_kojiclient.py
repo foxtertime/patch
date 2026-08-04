@@ -63,6 +63,25 @@ class KojiClientTest(unittest.TestCase):
                                    "nginx-core-1.24.0-3.el9.x86_64"])
         self.assertEqual(rpms[2], [])
 
+    def test_tags_for_returns_names_sorted(self):
+        session = FakeKojiSession(tagged=TAGGED, builds=BUILDS, rpms=RPMS,
+                                  tags={1: ["os-9.2", "os-9-base"], 2: []})
+        client = KojiClient(session, batch=10)
+        self.assertEqual(client.tags_for([1, 2]),
+                         {1: ["os-9-base", "os-9.2"], 2: []})
+
+    def test_tags_for_asks_by_build_keyword(self):
+        # listTags принимает build как именованный аргумент; позиционный
+        # первый параметр у него другой, и перепутать их значит спросить не то
+        session = FakeKojiSession(tagged=TAGGED, builds=BUILDS, rpms=RPMS,
+                                  tags={1: ["os-9.2"]})
+        KojiClient(session, batch=10).tags_for([1])
+        self.assertIn(("listTags", 1), session.calls)
+
+    def test_tags_for_survives_a_build_without_tags(self):
+        session = FakeKojiSession(tagged=TAGGED, builds=BUILDS, rpms=RPMS)
+        self.assertEqual(KojiClient(session, batch=10).tags_for([1]), {1: []})
+
     def test_falls_back_when_multicall_missing(self):
         session = FakeKojiSession(tagged=TAGGED, builds=BUILDS, rpms=RPMS,
                                   supports_multicall=False)
