@@ -105,20 +105,22 @@ class LoadConfigTest(unittest.TestCase):
         self.assertEqual(cfg.koji_hub, "")
         self.assertEqual(cfg.patch_classes[-1], ("other", ".*"))
 
+    def cve_rule(self, cfg):
+        # ищем по имени, а не по позиции: порядок правил меняется по мере
+        # появления новых классов, и тесты не должны на него опираться
+        return dict(cfg.patch_classes)["CVE"]
+
     def test_default_cve_rule_is_case_insensitive(self):
-        cfg = load_config(write(MINIMAL))
-        name, pattern = cfg.patch_classes[0]
-        self.assertEqual(name, "CVE")
+        pattern = self.cve_rule(load_config(write(MINIMAL)))
         self.assertTrue(re.compile(pattern).search("cve-2024-1234.patch"))
 
     def test_default_cve_rule_comes_from_classify(self):
         # выражение для CVE в проекте одно: правило по умолчанию — это
         # ровно CVE_RE, иначе конфиг и классификатор разъехались бы
-        cfg = load_config(write(MINIMAL))
-        self.assertEqual(cfg.patch_classes[0][1], "(?i)" + CVE_RE.pattern)
-        self.assertEqual(
-            re.compile(cfg.patch_classes[0][1]).findall("CVE-2024-1234"),
-            CVE_RE.findall("CVE-2024-1234"))
+        pattern = self.cve_rule(load_config(write(MINIMAL)))
+        self.assertEqual(pattern, "(?i)" + CVE_RE.pattern)
+        self.assertEqual(re.compile(pattern).findall("CVE-2024-1234"),
+                         CVE_RE.findall("CVE-2024-1234"))
 
 
 class DefaultRulesOnRealNamesTest(unittest.TestCase):
@@ -126,6 +128,33 @@ class DefaultRulesOnRealNamesTest(unittest.TestCase):
 
     def setUp(self):
         self.classifier = Classifier.from_config(load_config(write(MINIMAL)))
+
+    def test_autogen_index_files(self):
+        for name in ("autogen-sast-patches.inc.new",
+                     "autogen-cve-patches.inc.new",
+                     "autogen-fuzz-patches.inc.new"):
+            self.assertEqual(self.classifier.classify(name), "AUTOGEN", name)
+
+    def test_autogen_wins_over_the_marker_inside_its_name(self):
+        # ради этого правило и стоит первым: в именах есть sast и fuzz, и без
+        # него сгенерированные списки накручивали бы счётчики SAST и DAST
+        self.assertNotEqual(
+            self.classifier.classify("autogen-sast-patches.inc.new"), "SAST")
+        self.assertNotEqual(
+            self.classifier.classify("autogen-fuzz-patches.inc.new"), "DAST")
+
+    def test_autogen_wins_even_over_cve(self):
+        # автосписок остаётся автосписком, даже если в имени полный CVE-ID:
+        # это не исправление, а перечень исправлений
+        self.assertEqual(
+            self.classifier.classify("autogen-cve-2024-42516-patches.inc.new"),
+            "AUTOGEN")
+
+    def test_autogen_is_anchored_to_the_start(self):
+        # «autogen» в середине имени — обычный патч, а не сгенерированный
+        # список: правило не должно съедать такие имена
+        self.assertEqual(
+            self.classifier.classify("httpd-autogen-fix.patch.new"), "other")
 
     def test_cve_id_in_the_middle_of_the_name(self):
         self.assertEqual(
