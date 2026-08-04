@@ -23,9 +23,10 @@
      здесь именно пересчитывается, а не дописывается. */
   function applyData(pageData) {
     /* Держим выбор именами: после перестановки или удаления номер
-       показал бы другой тег, ничем не выдав подмены. */
-    var wantTag = SNAPS[st.tag] ? SNAPS[st.tag].tag : null;
-    var wantPair = PAIRS[st.pair] ? pairKey(PAIRS[st.pair]) : null;
+       показал бы другой снапшот, ничем не выдав подмены. Имя — полное,
+       с временем сбора: одного тега мало, см. snapKey(). */
+    var wantTag = SNAPS[st.tag] ? snapKey(SNAPS[st.tag]) : null;
+    var wantPair = PAIRS[st.pair] ? pairKey(st.pair) : null;
     var ci;
     DATA = pageData;
     SNAPS = pageData.snapshots || [];
@@ -44,10 +45,10 @@
     st.tag = SNAPS.length ? SNAPS.length - 1 : 0;
     st.pair = PAIRS.length ? PAIRS.length - 1 : 0;
     for (ci = 0; wantTag !== null && ci < SNAPS.length; ci++) {
-      if (SNAPS[ci].tag === wantTag) st.tag = ci;
+      if (snapKey(SNAPS[ci]) === wantTag) st.tag = ci;
     }
     for (ci = 0; wantPair !== null && ci < PAIRS.length; ci++) {
-      if (pairKey(PAIRS[ci]) === wantPair) st.pair = ci;
+      if (pairKey(ci) === wantPair) st.pair = ci;
     }
     syncTabs();
     readHash();
@@ -182,6 +183,45 @@
     return many;
   }
 
+  /* Время сбора для подписи: обычно хватает даты, но два прогона одного тега
+     случаются и в один день — тогда к дате добавляется время. Строку режем,
+     а не разбираем: «неизвестно» из неё выдумывать нечего, а формат задан
+     самим kojipatch. */
+  function stampOf(value, withTime) {
+    var text = String(value === null || value === undefined ? '' : value);
+    return withTime ? text.slice(0, 16).replace('T', ' ') : text.slice(0, 10);
+  }
+
+  /* Подписи «когда собран» для списка снапшотов — по одной на элемент,
+     пустая там, где дата не нужна. Дату получают только теги-двойники: у
+     тега, который на странице один, она ничего не различает и мешает
+     читать цепочку. */
+  function whenLabels(items) {
+    var byTag = {}, out = [], tag, group, seen, withTime, i, day;
+    for (i = 0; i < items.length; i++) {
+      out.push('');
+      tag = items[i].tag;
+      if (!byTag.hasOwnProperty(tag)) byTag[tag] = [];
+      byTag[tag].push(i);
+    }
+    for (tag in byTag) {
+      if (!byTag.hasOwnProperty(tag)) continue;
+      group = byTag[tag];
+      if (group.length < 2) continue;
+      seen = {};
+      withTime = false;
+      for (i = 0; i < group.length; i++) {
+        day = stampOf(items[group[i]].generated, false);
+        if (seen.hasOwnProperty(day)) withTime = true;
+        seen[day] = 1;
+      }
+      for (i = 0; i < group.length; i++) {
+        out[group[i]] = stampOf(items[group[i]].generated, withTime);
+      }
+    }
+    return out;
+  }
+
   function keys(obj) {
     var out = [];
     for (var k in obj) { if (obj.hasOwnProperty(k)) out.push(k); }
@@ -306,8 +346,35 @@
   function curSnap() { return SNAPS[st.tag] || null; }
   function curPair() { return PAIRS[st.pair] || null; }
 
-  /* Имя перехода для адресной строки: «старый..новый». */
-  function pairKey(pair) { return pair ? pair.old + '..' + pair.new : ''; }
+  /* Имя снапшота — тег и время сбора. Одного тега мало: один и тот же тег
+     законно приходит из разных прогонов («тот же тег месяц назад против
+     сегодняшнего» — самый частый способ сравнения), и по имени тега такие
+     снапшоты неразличимы. Любое добавление, удаление или перестановка молча
+     переводили бы выбор на другой прогон, а ссылка «tag=os-9.2» всегда
+     открывала бы последний. */
+  function snapKey(snap) {
+    return snap ? snap.tag + '@' + (snap.generated || '') : '';
+  }
+
+  /* Номера снапшотов, которые сравнивает пара. Их задаёт diffChain: сперва
+     соседи по цепочке в её порядке, затем — сводная пара «первый против
+     последнего». Порядок пар здесь и порядок снапшотов — один и тот же,
+     других пар в цепочке не бывает. */
+  function pairEnds(index) {
+    var pair = PAIRS[index];
+    if (!pair) return null;
+    if (pair.summary) return [0, SNAPS.length - 1];
+    return [index, index + 1];
+  }
+
+  /* Имя перехода для адресной строки: имена обоих снапшотов, а не их тегов.
+     У трёх прогонов одного тега все переходы назывались бы
+     «os-9.2..os-9.2», и ссылка на любой из них открывала бы последний. */
+  function pairKey(index) {
+    var ends = pairEnds(index);
+    if (!ends || !SNAPS[ends[0]] || !SNAPS[ends[1]]) return '';
+    return snapKey(SNAPS[ends[0]]) + '..' + snapKey(SNAPS[ends[1]]);
+  }
 
   function visibleRows() {
     var q = st.q, out = [], i, row, scan;
@@ -341,13 +408,12 @@
     return s ? s.builds.length : 0;
   }
 
+  /* Ключ раскрытой строки. Снапшот и пара названы полными именами по той же
+     причине, что и в адресе: у двух прогонов одного тега иначе было бы одно
+     состояние раскрытия на двоих. */
   function rowKey(row) {
-    if (st.tab === 'diff') {
-      var p = curPair();
-      return 'diff:' + (p ? p.old + '→' + p.new : '') + ':' + row.name;
-    }
-    var s = curSnap();
-    return 'state:' + (s ? s.tag : '') + ':' + row.name;
+    if (st.tab === 'diff') return 'diff:' + pairKey(st.pair) + ':' + row.name;
+    return 'state:' + snapKey(curSnap()) + ':' + row.name;
   }
 
   /* Единственное место, где решается, раскрыта ли строка: явно выбранное
@@ -814,28 +880,43 @@
 
   function renderTagSelect() {
     var box = document.getElementById('tag-select'), out = '', i;
+    /* У двух прогонов одного тега кнопки различает дата: без неё в селекторе
+       стояли бы две одинаковые. */
+    var when = whenLabels(SNAPS);
     for (i = 0; i < SNAPS.length; i++) {
       var s = SNAPS[i];
       out += '<button type="button" class="pick" data-tag="' + i + '" aria-pressed="'
           + (i === st.tag ? 'true' : 'false') + '" data-tip="Снимок тега '
           + esc(s.tag) + ' от ' + esc(s.generated) + '">' + esc(s.tag)
-          + '<span class="sub">' + s.counts.builds + ' '
+          + '<span class="sub">' + (when[i] ? esc(when[i]) + ' · ' : '')
+          + s.counts.builds + ' '
           + plural(s.counts.builds, 'сборка', 'сборки', 'сборок') + '</span></button>';
     }
     box.innerHTML = out || '<span class="none">снимков нет</span>';
   }
 
+  /* Подпись конца пары: тег, а у тегов-двойников — ещё и дата, иначе переход
+     читался бы как «os-9.2 → os-9.2». Дату берём у того снапшота, который
+     пара сравнивает, и только если тег на нём тот же: приписать тегу чужое
+     время сбора значило бы соврать. */
+  function endHtml(when, at, tag) {
+    var mine = SNAPS[at] && SNAPS[at].tag === tag ? when[at] : '';
+    return esc(tag) + (mine ? ' <span class="when">' + esc(mine) + '</span>' : '');
+  }
+
   function renderPairSelect() {
     var box = document.getElementById('pair-select'), out = '', i;
+    var when = whenLabels(SNAPS), ends;
     for (i = 0; i < PAIRS.length; i++) {
       var p = PAIRS[i];
+      ends = pairEnds(i);
       out += '<button type="button" class="pick" data-pair="' + i + '" aria-pressed="'
           + (i === st.pair ? 'true' : 'false')
           + '" data-tip="' + (p.summary
               ? 'Сводная пара: первый тег прогона против последнего.'
               : 'Соседние теги прогона.')
           + ' Изменилось компонентов: ' + p.counts.changed + ' из ' + p.rows.length + '.">'
-          + esc(p.old) + ' → ' + esc(p.new)
+          + endHtml(when, ends[0], p.old) + ' → ' + endHtml(when, ends[1], p['new'])
           + (p.summary ? '<span class="sum">итог</span>' : '')
           + '<span class="sub">' + p.counts.changed + ' изм.</span></button>';
     }
@@ -1035,11 +1116,12 @@
 
   function writeHash() {
     var parts = ['tab=' + st.tab];
-    if (SNAPS.length) parts.push('tag=' + encodeURIComponent(SNAPS[st.tag] ? SNAPS[st.tag].tag : ''));
-    /* Пару храним именами тегов, а не номером: набор тегов от прогона к
-       прогону меняется, и присланная ссылка «pair=1» показала бы другой
-       переход, ничем не выдав подмены. */
-    if (PAIRS.length) parts.push('pair=' + encodeURIComponent(pairKey(curPair())));
+    /* Снапшот храним именем, а не номером: набор снапшотов на странице
+       меняется, и присланная ссылка «tag=1» показала бы другой снапшот,
+       ничем не выдав подмены. Имя полное, с временем сбора, — иначе два
+       прогона одного тега на такую ссылку отвечали бы одинаково. */
+    if (SNAPS.length) parts.push('tag=' + encodeURIComponent(snapKey(SNAPS[st.tag])));
+    if (PAIRS.length) parts.push('pair=' + encodeURIComponent(pairKey(st.pair)));
     /* f= пишем всегда, в том числе пустой: у вкладки «Изменения» фильтр по
        умолчанию непустой, и без явного «фильтров нет» ссылка на таблицу со
        снятым фильтром при открытии снова показывала бы только изменившиеся. */
@@ -1102,13 +1184,20 @@
         tab = (val === 'diff' && PAIRS.length) ? 'diff' : 'state';
         if (val === 'diff' && !PAIRS.length) dropped = true;
       } else if (key === 'tag') {
+        /* Ссылку правят руками, и «tag=os-9.2» без времени сбора — её
+           законная форма. Два прогона одного тега она не различает: берём
+           последний по цепочке, самый свежий. Сама страница пишет всегда
+           полное имя, поэтому её ссылки однозначны. */
         for (var j = 0; j < SNAPS.length; j++) {
-          if (SNAPS[j].tag === val) st.tag = j;
+          if (snapKey(SNAPS[j]) === val || SNAPS[j].tag === val) st.tag = j;
         }
       } else if (key === 'pair') {
-        /* Не нашли перехода с такими тегами — остаёмся на паре по умолчанию. */
+        /* Не нашли такого перехода — остаёмся на паре по умолчанию.
+           Форма «os-9.1..os-9.2» из одних тегов тоже принимается и по тому
+           же правилу: при двойниках выигрывает последний переход. */
         for (var p = 0; p < PAIRS.length; p++) {
-          if (pairKey(PAIRS[p]) === val) st.pair = p;
+          if (pairKey(p) === val
+              || PAIRS[p].old + '..' + PAIRS[p]['new'] === val) st.pair = p;
         }
       } else if (key === 'f') filters = val ? val.split(',') : [];
       else if (key === 'q') st.q = val.trim().toLowerCase();
@@ -1408,7 +1497,13 @@
 
   function renderSources() {
     var items = store.list(), parts = [], i;
-    for (i = 0; i < items.length; i++) parts.push(esc(items[i].tag));
+    /* В цепочке у тегов-двойников стоит дата: «os-9.2 → os-9.2» не говорит
+       человеку, что с чем сравнивается. */
+    var when = whenLabels(items);
+    for (i = 0; i < items.length; i++) {
+      parts.push(esc(items[i].tag)
+        + (when[i] ? ' <span class="when">' + esc(when[i]) + '</span>' : ''));
+    }
     chainBox.innerHTML = parts.length
       ? '<span class="l">снапшоты:</span> ' + parts.join(' <span class="arrow">→</span> ')
       : '';
@@ -1523,7 +1618,12 @@
     /* Ничего не загружено — шапке нечего сказать. Три прочерка над зоной
        загрузки выглядели бы сломанной страницей, а не пустой. */
     if (!SNAPS.length) { meta.innerHTML = ''; return; }
-    for (i = 0; i < SNAPS.length; i++) tags.push(SNAPS[i].tag);
+    /* «теги: os-9.2, os-9.2» читается как опечатка, а не как два прогона
+       одного тега, поэтому у двойников в скобках стоит время сбора. */
+    var when = whenLabels(SNAPS);
+    for (i = 0; i < SNAPS.length; i++) {
+      tags.push(SNAPS[i].tag + (when[i] ? ' (' + when[i] + ')' : ''));
+    }
     meta.innerHTML =
         '<div><b>теги:</b> ' + (tags.length ? esc(tags.join(', ')) : '—') + '</div>'
       + '<div><b>собрано:</b> ' + esc(DATA.generated || '—') + '</div>'
@@ -1535,7 +1635,10 @@
        ждёт, пока снапшоты принесут ему снаружи. Путь один и тот же: и
        запечённое, и подгруженное проходит через хранилище. */
     var raw = (typeof window !== 'undefined' && window.KP_SNAPSHOTS) || [];
-    if (raw.length) store.add(raw, 'встроено в файл');
+    /* Запечённое сборщиком тоже бывает негодным — и отказ ему нужно
+       показать там же, где отказ принесённому файлу: молча пустая страница
+       выглядела бы как страница, которой ничего не давали. */
+    if (raw.length) showErrors(store.add(raw, 'встроено в файл').rejected);
     syncEmpty();
     renderSources();
     syncStickyOffset();

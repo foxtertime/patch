@@ -99,3 +99,57 @@ test('подписчика зовут после изменения', function (
   store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
   assert.strictEqual(calls, 1);
 });
+
+test('снапшот, на котором падает отрисовка, в хранилище не остаётся', function () {
+  /* Проверка при загрузке нарочно неглубокая, и негодный внутри снапшот её
+     проходит: builds: [null] — это массив, значит «снапшот». Падает уже
+     отрисовка, то есть подписчик. Без отката такой снапшот оставался бы в
+     хранилище, а страница — недорисованной: убрать его было бы нечем. */
+  store.reset();
+  store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
+  var seen = [];
+  store.onChange(function () {
+    seen.push(store.list().length);
+    if (store.list().length > 1) {
+      throw new TypeError("Cannot read properties of null (reading 'patches')");
+    }
+  });
+  var out = store.add([snap('os-9.2', '2026-08-01T00:00:00+03:00')], 'b.json');
+  assert.strictEqual(out.added, 0);
+  assert.deepStrictEqual(store.list().map(function (i) { return i.tag; }),
+                         ['os-9.1']);
+  assert.strictEqual(out.rejected.length, 1);
+  assert.match(out.rejected[0], /b\.json/);
+  assert.match(out.rejected[0], /patches/, 'причина отказа потеряна');
+  /* Подписчика позвали второй раз — на прежнем составе, иначе страница
+     осталась бы с полурисованными данными отвергнутого снапшота. */
+  assert.deepStrictEqual(seen, [2, 1]);
+});
+
+test('падение отрисовки при перестановке откатывается и объясняется', function () {
+  store.reset();
+  store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
+  store.add([snap('os-9.2', '2026-08-01T00:00:00+03:00')], 'b.json');
+  store.onChange(function () {
+    if (store.list()[0].tag === 'os-9.2') throw new Error('пара не рисуется');
+  });
+  store.move(1, -1);
+  assert.deepStrictEqual(store.list().map(function (i) { return i.tag; }),
+                         ['os-9.1', 'os-9.2']);
+  /* У перестановки нет своего места для ошибок, поэтому причина уходит
+     в предупреждения — они на странице видны всегда. */
+  assert.match(store.warnings().join(' '), /пара не рисуется/);
+});
+
+test('удаление, на котором падает отрисовка, откатывается', function () {
+  store.reset();
+  store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
+  store.add([snap('os-9.2', '2026-08-01T00:00:00+03:00')], 'b.json');
+  store.onChange(function () {
+    if (store.list().length === 1) throw new Error('один снапшот не рисуется');
+  });
+  store.remove(0);
+  assert.deepStrictEqual(store.list().map(function (i) { return i.tag; }),
+                         ['os-9.1', 'os-9.2']);
+  assert.match(store.warnings().join(' '), /один снапшот не рисуется/);
+});

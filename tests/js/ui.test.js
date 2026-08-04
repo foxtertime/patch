@@ -176,6 +176,138 @@ test('выбранный тег держится именем, а не номе�
   assert.strictEqual(pressedTag(dom.id('tag-select').innerHTML), 'os-9.2');
 });
 
+/* Кнопки селекторов скрипт тоже рисует строкой — ставим такую же узлом.
+   Проверяется делегированный обработчик, а не отрисовка кнопки. */
+function pressPick(dom, host, name, value) {
+  var node = dom.document.createElement('button');
+  node.setAttribute('class', 'pick');
+  node.setAttribute(name, value);
+  dom.id(host).appendChild(node);
+  dom.fire(node, 'click', {});
+}
+
+function pressedPair(html) {
+  var m = /data-pair="(\d+)" aria-pressed="true"/.exec(html);
+  return m ? m[1] : null;
+}
+
+/* Два прогона одного тега — самый частый способ сравнения: «тот же тег
+   месяц назад против сегодняшнего». Различать их дашборд обязан не глазами
+   человека, а сам: по тегу и времени сбора. */
+var JUL = '2026-07-01T00:00:00+03:00';
+var AUG = '2026-08-01T00:00:00+03:00';
+var SEP = '2026-09-01T00:00:00+03:00';
+
+test('выбор снапшота держится тегом и временем сбора', function () {
+  var dom = load();
+  store.add([snap('os-9.1', '2026-06-01T00:00:00+03:00',
+                  { builds: [build('nginx')] })], 'a.json');
+  store.add([snap('os-9.2', JUL, { builds: [build('apache')] })], 'b.json');
+  store.add([snap('os-9.2', AUG, { builds: [build('httpd')] })], 'c.json');
+  pressPick(dom, 'tag-select', 'data-tag', '1');   /* os-9.2 от 1 июля */
+  assert.ok(dom.id('state-rows').innerHTML.indexOf('apache') !== -1,
+            dom.id('state-rows').innerHTML);
+  store.remove(0);                                  /* цепочка сдвинулась */
+  assert.ok(dom.id('state-rows').innerHTML.indexOf('apache') !== -1,
+            'выбор молча переехал на другой прогон того же тега: '
+            + dom.id('state-rows').innerHTML);
+});
+
+test('в адресе у снапшота стоит и тег, и время сбора', function () {
+  var dom = load();
+  store.add([snap('os-9.2', JUL, { builds: [build('apache')] })], 'b.json');
+  store.add([snap('os-9.2', AUG, { builds: [build('httpd')] })], 'c.json');
+  pressPick(dom, 'tag-select', 'data-tag', '0');
+  assert.ok(dom.location.hash.indexOf(encodeURIComponent('os-9.2@' + JUL)) !== -1,
+            dom.location.hash);
+});
+
+test('ссылка со временем сбора открывает тот же прогон', async function () {
+  var dom = load();
+  store.add([snap('os-9.2', JUL, { builds: [build('apache')] })], 'b.json');
+  store.add([snap('os-9.2', AUG, { builds: [build('httpd')] })], 'c.json');
+  pressPick(dom, 'tag-select', 'data-tag', '1');   /* открыт августовский */
+  assert.ok(dom.id('state-rows').innerHTML.indexOf('httpd') !== -1);
+  /* Свою же запись в адрес страница пропускает, и ждать её приходится
+     тику: иначе присланная ссылка была бы прочитана как эхо. */
+  await dom.tick();
+  dom.location.hash = '#tab=state&tag='
+                    + encodeURIComponent('os-9.2@' + JUL) + '&f=';
+  dom.fireWindow('hashchange');
+  assert.ok(dom.id('state-rows').innerHTML.indexOf('apache') !== -1,
+            dom.id('state-rows').innerHTML);
+});
+
+test('одинаковые теги видно по датам в цепочке и в селекторе', function () {
+  var dom = load();
+  store.add([snap('os-9.2', JUL)], 'b.json');
+  store.add([snap('os-9.2', AUG)], 'c.json');
+  var chain = dom.id('chain').innerHTML;
+  assert.ok(/class="when">2026-07-01</.test(chain), chain);
+  assert.ok(/class="when">2026-08-01</.test(chain), chain);
+  var picks = dom.id('tag-select').innerHTML;
+  assert.ok(/class="sub">2026-07-01/.test(picks), picks);
+  assert.ok(/class="sub">2026-08-01/.test(picks), picks);
+  /* В шапке «теги: os-9.2, os-9.2» выглядит опечаткой, а не двумя прогонами. */
+  assert.ok(/теги:<\/b> os-9\.2 \(2026-07-01\), os-9\.2 \(2026-08-01\)/
+              .test(dom.id('meta').innerHTML), dom.id('meta').innerHTML);
+});
+
+test('у разных тегов даты в подписи нет — она там шум', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL)], 'a.json');
+  store.add([snap('os-9.2', AUG)], 'b.json');
+  assert.strictEqual(dom.id('chain').innerHTML.indexOf('class="when"'), -1,
+                     dom.id('chain').innerHTML);
+  /* В селекторе дата остаётся только в подсказке, а не в подписи кнопки. */
+  assert.ok(!/class="sub">2026-/.test(dom.id('tag-select').innerHTML),
+            dom.id('tag-select').innerHTML);
+});
+
+test('в селекторе пар одинаковые теги тоже подписаны датой', function () {
+  var dom = load();
+  store.add([snap('os-9.2', JUL)], 'b.json');
+  store.add([snap('os-9.2', AUG)], 'c.json');
+  var picks = dom.id('pair-select').innerHTML;
+  assert.ok(/class="when">2026-07-01</.test(picks), picks);
+  assert.ok(/class="when">2026-08-01</.test(picks), picks);
+});
+
+test('у разных тегов в селекторе пар даты нет', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL)], 'a.json');
+  store.add([snap('os-9.2', AUG)], 'b.json');
+  assert.strictEqual(dom.id('pair-select').innerHTML.indexOf('class="when"'), -1,
+                     dom.id('pair-select').innerHTML);
+});
+
+test('пары одинаковых тегов различимы в адресе', function () {
+  var dom = load();
+  store.add([snap('os-9.2', JUL)], 'b.json');
+  store.add([snap('os-9.2', AUG)], 'c.json');
+  store.add([snap('os-9.2', SEP)], 'd.json');
+  pressPick(dom, 'pair-select', 'data-pair', '0');
+  var first = dom.location.hash;
+  pressPick(dom, 'pair-select', 'data-pair', '1');
+  assert.notStrictEqual(first, dom.location.hash,
+                        'у двух разных переходов один и тот же адрес: ' + first);
+});
+
+test('ссылка на пару открывает тот же переход', async function () {
+  var dom = load();
+  store.add([snap('os-9.2', JUL)], 'b.json');
+  store.add([snap('os-9.2', AUG)], 'c.json');
+  store.add([snap('os-9.2', SEP)], 'd.json');
+  pressPick(dom, 'pair-select', 'data-pair', '0');
+  var link = dom.location.hash;
+  pressPick(dom, 'pair-select', 'data-pair', '2');
+  await dom.tick();
+  dom.location.hash = link;
+  dom.fireWindow('hashchange');
+  assert.strictEqual(pressedPair(dom.id('pair-select').innerHTML), '0',
+                     dom.id('pair-select').innerHTML);
+});
+
 test('файл роняют на страницу — снапшот загружается', async function () {
   var dom = load();
   var text = JSON.stringify([snap('os-9.1', '2026-07-01T00:00:00+03:00')]);
@@ -250,6 +382,62 @@ test('тот же файл дважды — отказ, цепочка не уд
   await dom.tick();
   assert.strictEqual(store.list().length, 1);
   assert.ok(dom.id('load-errors').innerHTML.indexOf('уже загружен') !== -1,
+            dom.id('load-errors').innerHTML);
+});
+
+test('негодный снапшот не вешает страницу', async function () {
+  /* Проверку при загрузке этот файл проходит: builds — массив. Падает
+     отрисовка, и падает она внутри store.add, вызванного из FileReader.
+     Раньше исключение уносило done(), панель источников и весь дашборд:
+     страница выглядела нетронутой, а живой не была. */
+  var dom = load();
+  var poison = '{"schema": 1, "tag": "t", "generated": '
+             + '"2026-08-01T00:00:00+03:00", "builds": [null]}';
+  dom.fire(dom.id('drop'), 'drop',
+           { dataTransfer: { files: [domstub.file('bad.json', poison)] } });
+  await dom.tick();
+  assert.strictEqual(store.list().length, 0, 'негодный снапшот остался в хранилище');
+  assert.ok(dom.id('load-errors').innerHTML.indexOf('bad.json') !== -1,
+            'причина не написана на экране: ' + dom.id('load-errors').innerHTML);
+  assert.strictEqual(dom.id('tab-empty').hidden, false);
+  /* Дашборд должен остаться рабочим: следующий годный файл загружается. */
+  dom.fire(dom.id('drop'), 'drop',
+           { dataTransfer: { files: [domstub.file('a.json',
+               JSON.stringify(snap('os-9.1', '2026-07-01T00:00:00+03:00')))] } });
+  await dom.tick();
+  assert.strictEqual(store.list().length, 1);
+  assert.strictEqual(dom.id('tab-empty').hidden, true);
+  assert.ok(dom.id('state-rows').innerHTML.indexOf('nginx') !== -1);
+});
+
+test('негодная прелюдия объясняется, а не пропадает молча', function () {
+  /* Снапшот, запечённый сборщиком, проходит тот же путь через хранилище и
+     так же может не отрисоваться. Пустая страница без единого слова о том,
+     почему она пуста, — не ответ. */
+  var dom = load({ snapshots: [{ schema: 1, tag: 't',
+                                 generated: '2026-08-01T00:00:00+03:00',
+                                 builds: [null] }] });
+  assert.strictEqual(store.list().length, 0);
+  assert.strictEqual(dom.id('tab-empty').hidden, false);
+  assert.ok(dom.id('load-errors').innerHTML.indexOf('встроено в файл') !== -1,
+            dom.id('load-errors').innerHTML);
+});
+
+test('негодный снапшот не уносит соседей по загрузке', async function () {
+  /* Один файл из двух отравлен: второй обязан доехать, а первый —
+     объясниться. Счётчик pending без этого застревал на первом же. */
+  var dom = load();
+  var poison = '{"schema": 1, "tag": "t", "generated": '
+             + '"2026-08-01T00:00:00+03:00", "builds": [null]}';
+  dom.fire(dom.id('drop'), 'drop', { dataTransfer: { files: [
+    domstub.file('bad.json', poison),
+    domstub.file('a.json',
+                 JSON.stringify(snap('os-9.1', '2026-07-01T00:00:00+03:00')))
+  ] } });
+  await dom.tick();
+  assert.deepStrictEqual(store.list().map(function (i) { return i.tag; }),
+                         ['os-9.1']);
+  assert.ok(dom.id('load-errors').innerHTML.indexOf('bad.json') !== -1,
             dom.id('load-errors').innerHTML);
 });
 

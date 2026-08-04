@@ -52,6 +52,9 @@ h1 { font-size: 1.5rem; margin: 0 0 .75rem; }
 .chain .l { color: var(--muted); font-size: .7rem; text-transform: uppercase;
   letter-spacing: .03em; }
 .chain .arrow { color: var(--muted); }
+/* Дата стоит только у тегов-двойников и читается как уточнение к тегу, а не
+   как ещё одно звено цепочки или отдельная кнопка. */
+.chain .when, .pick .when { color: var(--muted); font-size: .8em; }
 .sourcelist { list-style: none; margin: 0 0 1rem; padding: 0; }
 .sourcelist li { display: flex; flex-wrap: wrap; align-items: baseline;
   gap: .1rem .5rem; padding: .35rem .6rem; margin-bottom: .3rem;
@@ -103,7 +106,8 @@ h1 { font-size: 1.5rem; margin: 0 0 .75rem; }
 .pick .sub { color: var(--muted); font-size: .75rem; }
 .pick[aria-pressed=true] { border-color: var(--accent); color: var(--accent);
   box-shadow: inset 0 0 0 1px var(--accent); }
-.pick[aria-pressed=true] .sub { color: var(--accent); }
+.pick[aria-pressed=true] .sub,
+.pick[aria-pressed=true] .when { color: var(--accent); }
 .pick .sum { font-size: .68rem; text-transform: uppercase; letter-spacing: .05em;
   color: var(--major); }
 

@@ -45,6 +45,44 @@
 
   function fire() { for (var i = 0; i < listeners.length; i++) listeners[i](); }
 
+  /* Любое изменение состава — целиком или никак.
+
+     Проверка снапшота при загрузке нарочно неглубокая (иначе одна кривая
+     сборка отменяла бы файл на восемьсот годных), поэтому негодное внутри
+     доезжает до отрисовки и роняет её: builds: [null] — это массив, значит
+     «снапшот». Если такой снапшот останется в хранилище, страница застынет
+     недорисованной, а каждое следующее действие будет падать на нём же —
+     убрать его будет нечем. Поэтому подписчиков зовём под try: упали —
+     возвращаем прежний состав и зовём ещё раз, уже на нём.
+
+     Причину возвращаем строкой, а не бросаем дальше: она нужна человеку на
+     экране, а не в консоли, которую он не открывал. У add для неё есть свой
+     ответ, у remove и move ответа нет — им передают note, и причина уезжает
+     в предупреждения, которые страница показывает всегда.
+
+     change() возвращает, изменилось ли что-нибудь: на пустом изменении
+     подписчиков звать незачем, а перерисовка тега — это тысячи строк. */
+  function commit(change, note) {
+    var prevItems = items.slice(), prevWarns = warns.slice();
+    var prevManual = manual, message;
+    if (!change()) return null;
+    try {
+      fire();
+    } catch (e) {
+      items = prevItems;
+      warns = prevWarns;
+      manual = prevManual;
+      message = e && e.message ? String(e.message) : String(e);
+      if (note) warns.push(note + ' ' + message);
+      /* Прежний состав уже был отрисован — на нём подписчик не падал.
+         Если и он теперь падает, страница сломана не этим изменением, и
+         скрыть это хранилище не может: исключение уходит наружу. */
+      fire();
+      return message;
+    }
+    return null;
+  }
+
   /* Хаб у снапшотов разный — сравнивать их обычно бессмысленно, но бывает
      и наоборот (переезд хаба, зеркало), поэтому это предупреждение, а не
      отказ. Считаем заново от текущего состава: после удаления снапшота
@@ -106,50 +144,64 @@
   }
 
   function add(snapshots, fileName) {
-    var added = 0, rejected = [], i, snapshot;
+    var added = 0, rejected = [], failure;
     snapshots = snapshots || [];
-    for (i = 0; i < snapshots.length; i++) {
-      snapshot = snapshots[i];
-      /* add() зовут и мимо parseText — с прелюдией, запечённой сборщиком.
-         Проверяем ещё раз здесь, чтобы негодное не попало в хранилище. */
-      if (!isSnapshot(snapshot)) {
-        rejected.push(fileName + ': это не снапшот kojipatch — нужны tag, '
-                    + 'generated и builds');
-        continue;
+    failure = commit(function () {
+      var i, snapshot;
+      for (i = 0; i < snapshots.length; i++) {
+        snapshot = snapshots[i];
+        /* add() зовут и мимо parseText — с прелюдией, запечённой сборщиком.
+           Проверяем ещё раз здесь, чтобы негодное не попало в хранилище. */
+        if (!isSnapshot(snapshot)) {
+          rejected.push(fileName + ': это не снапшот kojipatch — нужны tag, '
+                      + 'generated и builds');
+          continue;
+        }
+        if (isDuplicate(snapshot)) {
+          rejected.push(fileName + ': снапшот ' + snapshot.tag + ' от '
+                      + snapshot.generated + ' уже загружен');
+          continue;
+        }
+        items.push({ snapshot: snapshot, file: fileName });
+        added += 1;
       }
-      if (isDuplicate(snapshot)) {
-        rejected.push(fileName + ': снапшот ' + snapshot.tag + ' от '
-                    + snapshot.generated + ' уже загружен');
-        continue;
-      }
-      items.push({ snapshot: snapshot, file: fileName });
-      added += 1;
+      if (added && !manual) items.sort(compareItems);
+      checkHubs();
+      return added > 0;
+    });
+    if (failure) {
+      /* Откат уже случился: в хранилище прежний состав, и отказ надо назвать
+         так же, как любой другой отказ файлу — строкой рядом с его именем. */
+      rejected.push(fileName + ': дашборд не смог показать эти данные — '
+                  + failure + '; файл не загружен');
+      added = 0;
     }
-    if (added && !manual) items.sort(compareItems);
-    checkHubs();
-    if (added) fire();
     return { added: added, rejected: rejected };
   }
 
   function remove(index) {
-    if (index < 0 || index >= items.length) return;
-    items.splice(index, 1);
-    checkHubs();
-    fire();
+    commit(function () {
+      if (index < 0 || index >= items.length) return false;
+      items.splice(index, 1);
+      checkHubs();
+      return true;
+    }, 'снапшот остался на месте: без него страница не рисуется —');
   }
 
   /* Ручной порядок включается только состоявшейся перестановкой: клик по
      крайней стрелке ничего не двигает и отменять автосортировку не должен. */
   function move(index, delta) {
-    var to = index + delta, item;
-    if (index < 0 || index >= items.length || to < 0 || to >= items.length) {
-      return;
-    }
-    manual = true;
-    item = items[index];
-    items.splice(index, 1);
-    items.splice(to, 0, item);
-    fire();
+    commit(function () {
+      var to = index + delta, item;
+      if (index < 0 || index >= items.length || to < 0 || to >= items.length) {
+        return false;
+      }
+      manual = true;
+      item = items[index];
+      items.splice(index, 1);
+      items.splice(to, 0, item);
+      return true;
+    }, 'порядок не изменён: в этом порядке страница не рисуется —');
   }
 
   function list() {
