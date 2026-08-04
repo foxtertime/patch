@@ -465,3 +465,16 @@ test('test_summary_compares_endpoints_not_steps', function () {
   var component = byName(summary).nginx;
   assert.strictEqual(component.status, 'unchanged');
 });
+
+/* Снапшот приходит из файла, который выбрал человек, и store.js проверяет
+   его неглубоко — имя пакета может оказаться не строкой. Раньше сравнение
+   падало на этом внутри store.add: откат отвергал файл, который принесли
+   вторым, тогда как виноват был первый, уже стоявший в цепочке. */
+test('нестроковое имя пакета не роняет сравнение', function () {
+  var older = snap2('a', [build2('nginx', { rpms: [123] })]);
+  var newer = snap2('b', [build2('nginx', { subpackages: ['nginx'] })]);
+  assert.doesNotThrow(function () { diff.diffSnapshots(older, newer); });
+  assert.doesNotThrow(function () {
+    diff.alignRpms(older.builds[0], newer.builds[0]);
+  });
+});

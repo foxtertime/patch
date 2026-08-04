@@ -58,10 +58,16 @@
    * надёжно.
    */
   function rpmKey(build, nvra) {
+    /* String(), а не сам nvra: снапшот приходит из файла, который выбрал
+       человек, и store.js проверяет его неглубоко — в rpms может лежать
+       что угодно. Падение здесь случалось бы внутри store.add, а его
+       откат отверг бы файл, принесённый вторым, тогда как виноват был бы
+       первый, уже стоящий в цепочке. Ключ и так строка по смыслу. */
+    var name = String(nvra);
     var tail = '-' + build.version + '-' + build.release + '.';
-    var index = nvra.lastIndexOf(tail);
-    if (index === -1) return nvra;
-    return nvra.slice(0, index) + '.' + nvra.slice(index + tail.length);
+    var index = name.lastIndexOf(tail);
+    if (index === -1) return name;
+    return name.slice(0, index) + '.' + name.slice(index + tail.length);
   }
 
   /* Ключ подпакета → NVRA, под которыми он встретился в снапшоте.
