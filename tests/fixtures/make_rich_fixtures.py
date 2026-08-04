@@ -126,11 +126,102 @@ def new_snapshot():
         ])
 
 
+def newer_snapshot():
+    """Третий тег цепочки. Он нужен не тестам, а глазам: на двух снапшотах
+    не видно ни сводной пары, ни рельса из трёх узлов, ни того, зачем
+    сводная пара вообще существует.
+
+    Поэтому здесь сознательно собраны случаи, которые видны только на
+    трёх тегах: vim уходил в os-9.2 и вернулся тем же билдом, zlib
+    откатывался и поднялся обратно на прежний релиз. По шагам оба
+    двигались, а сводная пара os-9.1 → os-9.3 честно скажет, что ничего
+    не изменилось.
+    """
+    return Snapshot(
+        tag="os-9.3", generated="2026-09-01T00:00:00+03:00",
+        koji_hub="https://hub/kojihub", koji_web="https://hub/koji",
+        patch_classes=list(CLASSES),
+        builds=[
+            # версия выросла ещё раз; spec-патч вернулся, fuzz ушёл
+            Build(nvr="nginx-1.26.2-1.el9", name="nginx", version="1.26.2",
+                  release="1.el9", build_id=121, task_id=221, owner="builder",
+                  completed="2026-08-28 09:15:00", tag_name="os-9.3",
+                  tags=["os-9.3"], source=src("web/nginx", "os-9.3"),
+                  patch_dir_present=True,
+                  patches=[patch("CVE-2024-7347.patch", "CVE",
+                                 ["CVE-2024-7347"]),
+                           patch("CVE-2025-1111.patch", "CVE",
+                                 ["CVE-2025-1111"]),
+                           patch("changelog.yaml", "CHANGELOG"),
+                           patch("nginx.spec.patch", "SPEC")],
+                  rpms=["nginx-1.26.2-1.el9.x86_64",
+                        "nginx-core-1.26.2-1.el9.x86_64",
+                        "nginx-1.26.2-1.el9.src",
+                        "nginx-mod-http-1.26.2-1.el9.aarch64"]),
+            # тот же билд снова унаследован: в os-9.2 он был затегован прямо
+            Build(nvr="httpd-2.4.62-1.el9", name="httpd", version="2.4.62",
+                  release="1.el9", epoch=1, build_id=102, task_id=202,
+                  owner="apache", completed="2026-04-01 10:00:00",
+                  tag_name="os-9.2", tags=["os-9.2", "os-9.3"],
+                  source=src("web/httpd", "abc123", kind="commit"),
+                  patch_dir_present=False, patches=[],
+                  rpms=["httpd-2.4.62-1.el9.x86_64"],
+                  problems=["gitlab: 404 на дереве ветки"]),
+            # релиз вернулся к тому, что был в os-9.1
+            Build(nvr="zlib-1.3-2.el9", name="zlib", version="1.3",
+                  release="2.el9", build_id=104, owner="builder",
+                  completed="никогда", tag_name="os-9.3", tags=["os-9.3"],
+                  source=src("core/zlib", "os-9.1"), patch_dir_present=True,
+                  patches=[patch("sast-zlib.patch", "SAST"),
+                           patch("weird.diff", "other")],
+                  rpms=["zlib-1.3-2.el9.x86_64", "zlib-1.3-2.el9.src"]),
+            # вернулся тем же билдом: тег по-прежнему неизвестен, но
+            # внутренняя ошибка ушла — видно по карточке «с проблемами»
+            Build(nvr="vim-9.0-1.el9", name="vim", version="9.0",
+                  release="1.el9", build_id=103, owner="editor",
+                  completed="2026-05-14", tag_name=None, tags=[],
+                  source=None, patch_dir_present=None,
+                  patches=[patch("coverage-vim.patch", "COVERAGE")],
+                  rpms=["vim-9.0-1.el9.x86_64"]),
+            # крупный компонент: стек патчей заметно двигает сводку, а
+            # подпакеты расходятся по четырём архитектурам
+            Build(nvr="kernel-5.14.0-611.el9", name="kernel",
+                  version="5.14.0", release="611.el9", build_id=130,
+                  task_id=230, owner="kernel",
+                  completed="2026-08-30 03:40:00", tag_name="os-9.3",
+                  tags=["os-9.3"], source=src("core/kernel", "os-9.3"),
+                  patch_dir_present=True,
+                  patches=[patch("autogen-cve-patches.inc.new", "AUTOGEN"),
+                           patch("CVE-2025-2001.patch", "CVE",
+                                 ["CVE-2025-2001"]),
+                           patch("CVE-2025-2002.patch", "CVE",
+                                 ["CVE-2025-2002"]),
+                           patch("CVE-2025-2003.patch", "CVE",
+                                 ["CVE-2025-2003"]),
+                           patch("sast-kernel-net.patch", "SAST"),
+                           patch("sast-kernel-fs.patch", "SAST"),
+                           patch("dast-kernel-fuzz.patch", "DAST"),
+                           patch("coverage-kernel.patch", "COVERAGE"),
+                           patch("kernel.spec.patch", "SPEC"),
+                           patch("linux-5.14.0.tar.gz", "FILES")],
+                  rpms=["kernel-5.14.0-611.el9.src",
+                        "kernel-doc-5.14.0-611.el9.noarch",
+                        "kernel-5.14.0-611.el9.x86_64",
+                        "kernel-core-5.14.0-611.el9.x86_64",
+                        "kernel-modules-5.14.0-611.el9.x86_64",
+                        "kernel-5.14.0-611.el9.aarch64"]),
+            # curl, появившийся в os-9.2, исчез: в сводную пару
+            # os-9.1 → os-9.3 он не попадёт вовсе — его нет ни на одном
+            # её конце
+        ])
+
+
 def main():
     here = os.path.dirname(os.path.abspath(__file__))
     dump_snapshots([old_snapshot()], os.path.join(here, "rich-old.json"))
     dump_snapshots([new_snapshot()], os.path.join(here, "rich-new.json"))
-    print("написаны rich-old.json и rich-new.json")
+    dump_snapshots([newer_snapshot()], os.path.join(here, "rich-newer.json"))
+    print("написаны rich-old.json, rich-new.json и rich-newer.json")
 
 
 if __name__ == "__main__":
