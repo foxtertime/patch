@@ -37,7 +37,7 @@
 - Порядок и семантику решает модуль представления (`viewmodel.js`), а не
   место отрисовки: `ui.js` только режет готовые списки на блоки.
 - Тесты Python: `python3 -m unittest discover -s tests -t . -q` из корня
-  репозитория. Тесты JS: `node --test tests/js/` оттуда же.
+  репозитория. Тесты JS: `node --test tests/js/*.test.js` оттуда же.
 - Каждая задача заканчивается зелёными обоими наборами и коммитом.
 
 ## Соглашение о модулях JS
@@ -567,7 +567,7 @@ test('тильда сортируется раньше всего', function () 
 
 - [ ] **Step 2: Убедиться, что тесты падают**
 
-Run: `node --test tests/js/`
+Run: `node --test tests/js/*.test.js`
 Expected: FAIL — `Cannot find module '../../kojipatch/assets/js/vercmp.js'`
 
 - [ ] **Step 3: Реализация**
@@ -672,7 +672,7 @@ Create `kojipatch/assets/js/vercmp.js` — построчный порт
 
 - [ ] **Step 4: Проверить, что тесты проходят**
 
-Run: `node --test tests/js/`
+Run: `node --test tests/js/*.test.js`
 Expected: PASS, 3 теста
 
 - [ ] **Step 5: Перенести остальные тесты**
@@ -713,7 +713,7 @@ test('две псевдоцифры не подвешивают цикл', funct
 
 - [ ] **Step 6: Проверить**
 
-Run: `node --test tests/js/`
+Run: `node --test tests/js/*.test.js`
 Expected: PASS, 18 тестов
 
 - [ ] **Step 7: Коммит**
@@ -849,7 +849,7 @@ Python.
 
 - [ ] **Step 6: Проверить**
 
-Run: `node --test tests/js/`
+Run: `node --test tests/js/*.test.js`
 Expected: PASS, 28 тестов (18 из Task 3 + 10)
 
 - [ ] **Step 7: Коммит**
@@ -1073,7 +1073,7 @@ Expected: PASS, 6 тестов
 
 - [ ] **Step 6: Проверить**
 
-Run: `node --test tests/js/`
+Run: `node --test tests/js/*.test.js`
 Expected: PASS, 71 тест
 
 - [ ] **Step 7: Коммит**
@@ -1385,7 +1385,7 @@ Expected: сначала FAIL с расхождением — читать diff 
 
 - [ ] **Step 8: Проверить оба набора**
 
-Run: `node --test tests/js/ && python3 -m unittest discover -s tests -t . -q`
+Run: `node --test tests/js/*.test.js && python3 -m unittest discover -s tests -t . -q`
 Expected: PASS, 104 теста JS; OK, 361 тест Python
 
 - [ ] **Step 9: Коммит**
@@ -1722,7 +1722,7 @@ Expected: ни одного «СЛОМАН»
 
 - [ ] **Step 8: Прогнать тесты**
 
-Run: `python3 -m unittest discover -s tests -t . -q && node --test tests/js/`
+Run: `python3 -m unittest discover -s tests -t . -q && node --test tests/js/*.test.js`
 Expected: OK Python; PASS 104 теста JS
 
 - [ ] **Step 9: Проверить глазами**
@@ -2150,7 +2150,7 @@ store:
 
 - [ ] **Step 9: Прогнать всё**
 
-Run: `python3 -m unittest discover -s tests -t . -q && node --test tests/js/`
+Run: `python3 -m unittest discover -s tests -t . -q && node --test tests/js/*.test.js`
 Expected: OK Python; PASS 115 тестов JS
 
 - [ ] **Step 10: Проверить руками**
@@ -2289,7 +2289,7 @@ git rm kojipatch/render.py kojipatch/diff.py kojipatch/rpms.py \
 
 - [ ] **Step 7: Прогнать всё**
 
-Run: `python3 -m unittest discover -s tests -t . -q && node --test tests/js/`
+Run: `python3 -m unittest discover -s tests -t . -q && node --test tests/js/*.test.js`
 Expected: OK Python (около 240 тестов — 121 переехал в JS); PASS 115 тестов JS
 
 - [ ] **Step 8: Проверить, что дашборд собирается и работает**
@@ -2328,7 +2328,7 @@ git commit -m "Убрать питоновский слой представле
    Объяснить, почему вычисления переехали в браузер: дифф между двумя
    произвольными подгруженными файлами взяться готовым не может.
 3. Раздел про тесты: два набора, две команды —
-   `python3 -m unittest discover -s tests -v` и `node --test tests/js/`.
+   `python3 -m unittest discover -s tests -v` и `node --test tests/js/*.test.js`.
    Сказать про эталон `page-data.golden.json`: что он такое и когда его
    правят.
 4. Формат снапшота: добавить `patch_classes` и оговорку, что поле
