@@ -15,15 +15,20 @@ function patch(name, cls) {
            web_url: null };
 }
 
+function has(over, key) {
+  return Object.prototype.hasOwnProperty.call(over, key);
+}
+
 function build(name, over) {
   over = over || {};
-  return { nvr: name + '-1.0-1.el9', name: name, version: '1.0',
-           release: Object.prototype.hasOwnProperty.call(over, 'release')
-             ? over.release : '1.el9',
+  var version = has(over, 'version') ? over.version : '1.0';
+  return { nvr: name + '-' + version + '-1.el9', name: name, version: version,
+           release: has(over, 'release') ? over.release : '1.el9',
            epoch: null, build_id: 1, task_id: 2, tag_name: null, tags: [],
-           owner: 'builder', completed: '2026-05-14 10:00:00', source: null,
+           owner: 'builder', completed: '2026-05-14 10:00:00',
+           source: has(over, 'source') ? over.source : null,
            patch_dir_present: true, patches: over.patches || [],
-           rpms: ['a.x86_64'], problems: [] };
+           rpms: has(over, 'rpms') ? over.rpms : ['a.x86_64'], problems: [] };
 }
 
 function snap(tag, generated, over) {
@@ -461,6 +466,193 @@ test('подписи классов не переживают выгрузку �
   dom.fireWindow('hashchange');
   assert.strictEqual(dom.id('chips').innerHTML, '',
                      'фильтр класса из выгруженного снапшота остался живым');
+});
+
+/* Файлы роняют на страницу по одному, и каждый — отдельный store.add, то
+   есть отдельный applyData. Обещание README «открывается на последнем
+   снапшоте цепочки и на самом широком переходе» обязано выполняться и
+   так — иначе самый частый способ загрузки даёт самый узкий вид. */
+test('снапшоты приехали по одному — открыт самый свежий и самый широкий переход',
+     async function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { builds: [build('nginx')] })], 'a.json');
+  await dom.tick();
+  store.add([snap('os-9.2', AUG, { builds: [build('nginx')] })], 'b.json');
+  await dom.tick();
+  store.add([snap('os-9.3', SEP, { builds: [build('nginx')] })], 'c.json');
+  await dom.tick();
+  assert.strictEqual(pressedTag(dom.id('tag-select').innerHTML), 'os-9.3',
+                     dom.id('tag-select').innerHTML);
+  /* Пар три: os-9.1→os-9.2, os-9.2→os-9.3 и сводная os-9.1→os-9.3. */
+  assert.strictEqual(pressedPair(dom.id('pair-select').innerHTML), '2',
+                     dom.id('pair-select').innerHTML);
+});
+
+test('свежий снапшот выбирается и когда файл пришёл вторым', function () {
+  /* Порядок цепочки задаёт время сбора, а не порядок загрузки: последним
+     в списке стоит августовский, его и надо открыть. */
+  var dom = load();
+  store.add([snap('os-9.2', AUG, { builds: [build('nginx')] })], 'b.json');
+  store.add([snap('os-9.1', JUL, { builds: [build('nginx')] })], 'a.json');
+  assert.strictEqual(pressedTag(dom.id('tag-select').innerHTML), 'os-9.2',
+                     dom.id('tag-select').innerHTML);
+});
+
+test('выбранный человеком снапшот переживает приход нового файла',
+     async function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { builds: [build('nginx')] })], 'a.json');
+  store.add([snap('os-9.2', AUG, { builds: [build('apache')] })], 'b.json');
+  pressPick(dom, 'tag-select', 'data-tag', '0');   /* явный выбор: os-9.1 */
+  await dom.tick();
+  store.add([snap('os-9.3', SEP, { builds: [build('httpd')] })], 'c.json');
+  await dom.tick();
+  assert.strictEqual(pressedTag(dom.id('tag-select').innerHTML), 'os-9.1',
+                     dom.id('tag-select').innerHTML);
+});
+
+test('выбранный человеком переход переживает приход нового файла',
+     async function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { builds: [build('nginx')] })], 'a.json');
+  store.add([snap('os-9.2', AUG, { builds: [build('nginx')] })], 'b.json');
+  store.add([snap('os-9.3', SEP, { builds: [build('nginx')] })], 'c.json');
+  pressPick(dom, 'pair-select', 'data-pair', '0');  /* явный выбор: 9.1→9.2 */
+  await dom.tick();
+  store.add([snap('os-9.4', '2026-10-01T00:00:00+03:00',
+                  { builds: [build('nginx')] })], 'd.json');
+  await dom.tick();
+  assert.strictEqual(pressedPair(dom.id('pair-select').innerHTML), '0',
+                     dom.id('pair-select').innerHTML);
+});
+
+test('выбранный снапшот убрали — снова открывается самый свежий', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { builds: [build('nginx')] })], 'a.json');
+  store.add([snap('os-9.2', AUG, { builds: [build('apache')] })], 'b.json');
+  store.add([snap('os-9.3', SEP, { builds: [build('httpd')] })], 'c.json');
+  pressPick(dom, 'tag-select', 'data-tag', '0');
+  store.remove(0);
+  assert.strictEqual(pressedTag(dom.id('tag-select').innerHTML), 'os-9.3',
+                     dom.id('tag-select').innerHTML);
+});
+
+/* Всё, что приходит из снапшота, попадает в разметку через innerHTML, и
+   единственный барьер — esc()/hl(). Снапшот выбирает человек, а имя
+   компонента в нём — любая строка, какую напишет чужой или испорченный
+   файл. */
+test('разметка из данных экранируется', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL,
+                  { builds: [build('<img src=x>&"')] })], 'a.json');
+  var html = dom.id('state-rows').innerHTML;
+  assert.strictEqual(html.indexOf('<img'), -1, html);
+  assert.ok(html.indexOf('&lt;img') !== -1, html);
+  assert.ok(html.indexOf('&amp;') !== -1, html);
+  assert.ok(html.indexOf('&quot;') !== -1, html);
+});
+
+test('подсветка поиска тоже экранирует, а не только режет строку',
+     async function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL,
+                  { builds: [build('<img src=x>')] })], 'a.json');
+  await dom.tick();
+  dom.location.hash = '#tab=state&q=src&f=';
+  dom.fireWindow('hashchange');
+  var html = dom.id('state-rows').innerHTML;
+  assert.ok(html.indexOf('class="hit"') !== -1, 'запрос не применился: ' + html);
+  assert.strictEqual(html.indexOf('<img'), -1, html);
+});
+
+test('в href пускают только http(s) и относительный путь', function () {
+  var dom = load();
+  var evil = { raw: 'git+ssh://git@h/g/x?#origin/main', host: 'h',
+               project: 'g/x', ref: 'main', ref_kind: 'branch',
+               web_url: 'javascript:alert(1)' };
+  var patches = [
+    { path: 'PATCH/a.patch', name: 'a.patch', 'class': 'CVE', cves: [],
+      web_url: 'javascript:alert(2)' },
+    { path: 'PATCH/b.patch', name: 'b.patch', 'class': 'CVE', cves: [],
+      web_url: '//evil.example/x' },
+    { path: 'PATCH/c.patch', name: 'c.patch', 'class': 'CVE', cves: [],
+      web_url: 'https://gl/blob/c.patch' }
+  ];
+  store.add([snap('os-9.1', JUL,
+                  { builds: [build('nginx', { source: evil,
+                                              patches: patches })] })],
+            'a.json');
+  dom.fire(dom.id('expand'), 'click', {});
+  var html = dom.id('state-rows').innerHTML;
+  assert.strictEqual(html.indexOf('javascript:'), -1, html);
+  assert.strictEqual(html.indexOf('//evil.example'), -1, html);
+  /* Годная ссылка при этом на месте: запрет не должен выключать ссылки. */
+  assert.ok(html.indexOf('https://gl/blob/c.patch') !== -1, html);
+});
+
+test('пакет не строкой не роняет раскрытие строки', function () {
+  /* Проверку хранилища такой снапшот проходит: builds — массив. Таблица
+     рисуется, а падает уже действие человека, когда откатывать нечего. */
+  var dom = load();
+  store.add([snap('os-9.1', JUL,
+                  { builds: [build('nginx', { rpms: [123] })] })], 'a.json');
+  dom.fire(dom.id('expand'), 'click', {});
+  var html = dom.id('state-rows').innerHTML;
+  assert.ok(html.indexOf('detail-row') !== -1, html);
+  assert.ok(html.indexOf('123') !== -1, html);
+});
+
+test('строка «ничего не найдено» шириной во всю таблицу', async function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { builds: [build('nginx')] })], 'a.json');
+  await dom.tick();
+  dom.location.hash = '#tab=state&q=такого-нет&f=';
+  dom.fireWindow('hashchange');
+  var cols = dom.id('state-table').querySelectorAll('th').length;
+  var html = dom.id('state-rows').innerHTML;
+  assert.ok(html.indexOf('class="empty" colspan="' + cols + '"') !== -1,
+            'в таблице ' + cols + ' колонок, а в строке: ' + html);
+});
+
+test('«Изменения» открываются на изменившихся компонентах', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { builds: [build('nginx'), build('curl')] })],
+            'a.json');
+  store.add([snap('os-9.2', AUG, { builds: [build('nginx'),
+                                            build('curl', { version: '1.1' })] })],
+            'b.json');
+  var tabs = dom.document.querySelectorAll('.tab'), i;
+  for (i = 0; i < tabs.length; i++) {
+    if (tabs[i].getAttribute('data-tab') === 'diff') dom.fire(tabs[i], 'click', {});
+  }
+  var html = dom.id('diff-rows').innerHTML;
+  assert.ok(html.indexOf('curl') !== -1, html);
+  assert.strictEqual(html.indexOf('nginx'), -1,
+                     'неизменившийся компонент виден под фильтром «changed»: '
+                     + html);
+});
+
+test('класс патчей с именем свойства Object рисуется как обычный', function () {
+  /* Имена классов задаёт конфиг, и «constructor» в нём — законное имя.
+     Голый объект-счётчик отдал бы на такой ключ функцию Object. */
+  var dom = load();
+  var one = build('nginx', { patches: [
+    { path: 'PATCH/a.patch', name: 'a.patch', 'class': 'constructor',
+      cves: [], web_url: null },
+    { path: 'PATCH/b.patch', name: 'b.patch', 'class': 'other',
+      cves: [], web_url: null }] });
+  var two = build('curl', { patches: [
+    { path: 'PATCH/c.patch', name: 'c.patch', 'class': 'other',
+      cves: [], web_url: null }] });
+  store.add([snap('os-9.1', JUL, { classes: ['constructor', 'other'],
+                                   builds: [one, two] })], 'a.json');
+  dom.fire(dom.id('expand'), 'click', {});
+  var rows = dom.id('state-rows').innerHTML;
+  var cards = dom.id('class-cards').innerHTML;
+  assert.strictEqual(rows.indexOf('native code'), -1, rows);
+  assert.strictEqual(rows.indexOf('NaN'), -1, rows);
+  assert.strictEqual(cards.indexOf('native code'), -1, cards);
+  assert.ok(cards.indexOf('constructor') !== -1, cards);
 });
 
 test('версии нет — в таблице прочерк, а не пустота', function () {

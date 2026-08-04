@@ -365,6 +365,40 @@ test('пары попадают в данные страницы', function () {
   assert.strictEqual(pair.counts.added, 1);
 });
 
+test('неизменившийся компонент помечен changed: false', function () {
+  // поле задаёт умолчательный фильтр вкладки «Изменения»: с ним человек
+  // первым делом видит только изменившиеся строки. Эталон паритета этого
+  // не сторожит — в нём изменились все пять компонентов
+  var old = snap('os-9.1', [build('nginx'), build('curl')]);
+  var fresh = snap('os-9.2', [build('nginx'), build('curl', { version: '1.1' })]);
+  var pair = data([old, fresh]).pairs[0];
+  var rows = byName(pair.rows);
+  assert.strictEqual(rows.nginx.changed, false);
+  assert.strictEqual(rows.curl.changed, true);
+  assert.strictEqual(pair.counts.changed, 1);
+});
+
+/* Имена классов патчей приходят из конфига, а голый объект несёт свойства
+   Object.prototype: счётчик по ключу «constructor» без охраны выдаёт не
+   ноль, а функцию, и она уезжает на экран. */
+test('класс патчей может называться свойством Object', function () {
+  var one = build('nginx', { patches: [patch('a.patch', 'constructor'),
+                                       patch('b.patch', 'constructor'),
+                                       patch('c.patch', 'CVE')] });
+  var block = data([snap('t', [one], ['constructor', 'CVE'])]).snapshots[0];
+  assert.deepStrictEqual(block.builds[0].patch_counts,
+                         { constructor: 2, CVE: 1 });
+  assert.deepStrictEqual(block.counts.by_class.constructor,
+                         { builds: 1, files: 2 });
+  assert.strictEqual(block.counts.patch_files, 3);
+});
+
+test('класс с таким именем не теряется и при выводе из патчей', function () {
+  var snaps = [{ builds: [{ patches: [{ 'class': 'constructor' },
+                                      { 'class': 'CVE' }] }] }];
+  assert.deepStrictEqual(vm.patchClassesOf(snaps), ['CVE', 'constructor']);
+});
+
 test('строки пары несут выровненные строки rpm', function () {
   // tests/test_render.py: test_pair_rows_carry_aligned_rpm_rows
   var old = snap('os-9.1', [build('nginx', {

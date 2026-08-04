@@ -22,6 +22,20 @@
      остаётся. */
   function orNull(value) { return value === undefined ? null : value; }
 
+  /* Ключи здешних словарей — имена классов патчей, а их задаёт конфиг. У
+     голого объекта есть свойства Object.prototype, и на ключ «constructor»
+     он отвечает функцией, а не «ничего нет»: счётчик тогда становится
+     строкой «function Object() { [native code] }1», а класс, выведенный из
+     патчей, молча пропадает из списка. Та же охрана уже стоит в
+     snapshotCounts — здесь она доведена до остальных мест. */
+  function own(map, key) {
+    return Object.prototype.hasOwnProperty.call(map, key) ? map[key] : undefined;
+  }
+
+  function bump(counts, key) {
+    counts[key] = (own(counts, key) || 0) + 1;
+  }
+
   /* Повторяет urllib.parse.quote с safe='/': всё, кроме букв, цифр и
      _.-~/ , уходит в проценты. Своя функция, а не encodeURIComponent:
      тот экранирует «/» и не трогает «!*'()», и ссылки разъехались бы. */
@@ -166,11 +180,8 @@
   }
 
   function buildRow(build, kojiWeb, tag, classOrder) {
-    var counts = {}, patches = build.patches || [], i, cls;
-    for (i = 0; i < patches.length; i++) {
-      cls = patches[i]['class'];
-      counts[cls] = (counts[cls] || 0) + 1;
-    }
+    var counts = {}, patches = build.patches || [], i;
+    for (i = 0; i < patches.length; i++) bump(counts, patches[i]['class']);
     var source = build.source || null;
     return {
       name: orNull(build.name), nvr: orNull(build.nvr),
@@ -289,7 +300,7 @@
       for (j = 0; j < builds.length; j++) {
         patches = builds[j].patches || [];
         for (k = 0; k < patches.length; k++) {
-          if (!seen[patches[k]['class']]) {
+          if (!own(seen, patches[k]['class'])) {
             seen[patches[k]['class']] = 1;
             derived.push(patches[k]['class']);
           }

@@ -3,13 +3,14 @@
    решает store.js; здесь это только рисуют и связывают с событиями. */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
-    module.exports = factory(require('./viewmodel.js'), require('./store.js'));
+    module.exports = factory(require('./viewmodel.js'), require('./store.js'),
+                             require('./rpms.js'));
   } else {
     root.KP = root.KP || {};
-    root.KP.ui = factory(root.KP.viewmodel, root.KP.store);
+    root.KP.ui = factory(root.KP.viewmodel, root.KP.store, root.KP.rpms);
   }
 }(typeof globalThis !== 'undefined' ? globalThis : this,
-  function (viewmodel, store) {
+  function (viewmodel, store, rpmsmod) {
   'use strict';
 
   /* Данные страницы считаются здесь же, из снапшотов, которые человек
@@ -24,9 +25,16 @@
   function applyData(pageData) {
     /* Держим выбор именами: после перестановки или удаления номер
        показал бы другой снапшот, ничем не выдав подмены. Имя — полное,
-       с временем сбора: одного тега мало, см. snapKey(). */
-    var wantTag = SNAPS[st.tag] ? snapKey(SNAPS[st.tag]) : null;
-    var wantPair = PAIRS[st.pair] ? pairKey(st.pair) : null;
+       с временем сбора: одного тега мало, см. snapKey().
+
+       Восстанавливаем только то, что человек выбрал сам. Снапшоты приезжают
+       по одному файлу, каждый файл — свой applyData, и «прежним выбором»
+       без picked оказывался бы тот, который дашборд выбрал сам на прошлом
+       шаге: после первого же файла умолчание «свежий снапшот и самый
+       широкий переход» не срабатывало бы больше никогда. */
+    var wantTag = picked.tag && SNAPS[st.tag] ? snapKey(SNAPS[st.tag]) : null;
+    var wantPair = picked.pair && PAIRS[st.pair] ? pairKey(st.pair) : null;
+    var foundTag = false, foundPair = false;
     var ci;
     DATA = pageData;
     SNAPS = pageData.snapshots || [];
@@ -42,16 +50,28 @@
     for (ci = 0; ci < CLASSES.length; ci++) {
       CLASS_LABELS[slug(CLASSES[ci])] = 'патчи ' + CLASSES[ci];
     }
+    /* Умолчание: последний снапшот цепочки и самый широкий переход. Именно
+       это обещает README, и обещание не должно зависеть от того, одним
+       файлом человек подгрузил снапшоты или пятью. */
     st.tag = SNAPS.length ? SNAPS.length - 1 : 0;
     st.pair = PAIRS.length ? PAIRS.length - 1 : 0;
     for (ci = 0; wantTag !== null && ci < SNAPS.length; ci++) {
-      if (snapKey(SNAPS[ci]) === wantTag) st.tag = ci;
+      if (snapKey(SNAPS[ci]) === wantTag) { st.tag = ci; foundTag = true; }
     }
     for (ci = 0; wantPair !== null && ci < PAIRS.length; ci++) {
-      if (pairKey(ci) === wantPair) st.pair = ci;
+      if (pairKey(ci) === wantPair) { st.pair = ci; foundPair = true; }
     }
+    /* Выбранного больше нет на странице — значит, нет и выбора: дальше снова
+       работает умолчание. Иначе следующий файл открылся бы «прежним
+       выбором», которого человек не делал. */
+    if (picked.tag && !foundTag) picked.tag = false;
+    if (picked.pair && !foundPair) picked.pair = false;
     syncTabs();
-    readHash();
+    /* Адрес читаем, только пока он чужой — тот, с которым страницу открыли.
+       Дальше в нём лежит наша же прошлая запись, и она вернула бы прежний
+       выбор в обход picked, снова похоронив умолчание. Ссылку, присланную
+       позже, приносит hashchange. */
+    if (!hashIsOurs) readHash();
     showTab(st.tab);
     rebuild();
     renderMeta();
@@ -132,6 +152,13 @@
      поиск. Явный ключ всегда сильнее: иначе такую строку было бы не свернуть. */
   var expanded = {};
   var hashLock = false;
+  /* Выбрал ли снапшот и переход человек — кликом по селектору или адресом,
+     который он открыл. Пока не выбрал, при каждом изменении состава действует
+     умолчание; см. applyData(). */
+  var picked = { tag: false, pair: false };
+  /* Писала ли страница адрес сама. С этого мгновения location.hash — её
+     собственное эхо, а не то, с чем её открыли. */
+  var hashIsOurs = false;
 
   /* ---------- вспомогательное ---------- */
 
@@ -155,6 +182,15 @@
     return out + esc(s.slice(from));
   }
 
+  /* Значение по ключу, который пришёл из данных. Голый объект несёт свойства
+     Object.prototype, и на ключ «constructor» — а так может называться класс
+     патчей, имена им задаёт конфиг — он отвечает функцией Object вместо
+     «ничего нет». Она уезжает прямо на экран: подписью в карточке, числом в
+     полоске (width:NaN%), именем css-класса. */
+  function own(map, key) {
+    return Object.prototype.hasOwnProperty.call(map, key) ? map[key] : undefined;
+  }
+
   function has(value, q) {
     return String(value === null || value === undefined ? '' : value)
       .toLowerCase().indexOf(q) !== -1;
@@ -168,11 +204,11 @@
      Незнакомый класс не должен остаться бесцветным — уводим его в c-x. */
   function classCls(name) {
     var key = slug(name);
-    return KNOWN_CLASS[key] ? 'c-' + key : 'c-x';
+    return own(KNOWN_CLASS, key) ? 'c-' + key : 'c-x';
   }
 
   function label(key) {
-    return LABELS[key] || CLASS_LABELS[key] || key;
+    return own(LABELS, key) || own(CLASS_LABELS, key) || key;
   }
 
   function plural(n, one, few, many) {
@@ -239,7 +275,7 @@
   function classOrder(counts) {
     var out = [], i;
     for (i = 0; i < CLASSES.length; i++) {
-      if (counts[CLASSES[i]]) out.push(CLASSES[i]);
+      if (own(counts, CLASSES[i])) out.push(CLASSES[i]);
     }
     var extra = keys(counts).sort();
     for (i = 0; i < extra.length; i++) {
@@ -255,7 +291,7 @@
   function toggleFilter(key) {
     var set = activeFilters();
     if (key === 'all') { st.filters[st.tab] = {}; }
-    else if (set[key]) { delete set[key]; }
+    else if (own(set, key)) { delete set[key]; }
     else {
       /* «версия та же» — не уточнение к «что-то изменилось», а другой срез
          той же таблицы. Складывать их по И значит показать «версия не
@@ -467,13 +503,22 @@
 
   /* ---------- кусочки разметки ---------- */
 
+  /* Сколько колонок в таблице вкладки. Считаем по самой разметке: строка на
+     всю ширину (деталь, «ничего не найдено») пишется числом, а колонку в
+     шаблон добавляют отдельно — и число молча остаётся от прежней таблицы. */
+  function colCount(tab) {
+    var table = document.getElementById(tab === 'diff' ? 'diff-table'
+                                                      : 'state-table');
+    return table.querySelectorAll('th').length;
+  }
+
   function tagHtml(key) {
     var cls = 'tag';
     if (key === 'patches+') cls += ' added';
     else if (key === 'patches-') cls += ' removed';
     else if (key === 'branch-changed' || key === 'tag-changed') cls += ' warn';
-    else if (CALM_TAGS[key]) cls += ' ' + CALM_TAGS[key];
-    else if (STATUS_TAGS[key]) cls += ' ' + key;
+    else if (own(CALM_TAGS, key)) cls += ' ' + CALM_TAGS[key];
+    else if (own(STATUS_TAGS, key)) cls += ' ' + key;
     else cls += ' ' + classCls(key);   /* остаётся класс патчей */
     return '<span class="' + cls + '" data-filter="' + esc(key) + '" role="button"'
          + ' tabindex="0" data-tip="' + esc(label(key)) + '. Клик — фильтр.">'
@@ -593,10 +638,10 @@
      которые нужно выделить как пришедшие или ушедшие. */
   function patchesHtml(patches, q, mark, markCls) {
     if (!patches.length) return '<div class="none">патчей нет</div>';
-    var counts = {}, i, p;
+    var counts = {}, i, p, cls;
     for (i = 0; i < patches.length; i++) {
-      p = patches[i];
-      counts[p['class']] = (counts[p['class']] || 0) + 1;
+      cls = patches[i]['class'];
+      counts[cls] = (own(counts, cls) || 0) + 1;
     }
     var order = classOrder(counts), out = '', ci, name;
     for (ci = 0; ci < order.length; ci++) {
@@ -622,12 +667,11 @@
     return out;
   }
 
-  /* Архитектура — хвост после последней точки: точки внутри версии и
-     релиза не мешают, архитектура в имени всегда последняя. */
-  function archOf(nvra) {
-    var at = nvra.lastIndexOf('.');
-    return at === -1 ? '?' : nvra.slice(at + 1);
-  }
+  /* Архитектуру считает rpms.js — тот же модуль, что раскладывает пакеты по
+     порядку. Своя копия здесь уже разошлась с ним и падала на пакете, который
+     не строка: снапшот приходит из файла, который выбрал человек, а падало это
+     не при отрисовке, а на раскрытии строки — там, где откатить нечего. */
+  var archOf = rpmsmod.archOf;
 
   function rowArch(row) {
     return archOf(row[0] === null ? row[1] : row[0]);
@@ -744,7 +788,7 @@
   }
 
   function stateRowsHtml(items) {
-    var q = st.q, html = '', i;
+    var q = st.q, html = '', i, cols = colCount('state');
     for (i = 0; i < items.length; i++) {
       var row = items[i].row;
       var key = rowKey(row);
@@ -771,7 +815,8 @@
            + '<td class="links">' + linkHtml(row.koji_url, 'koji')
            + linkHtml(row.source_url, 'git') + '</td></tr>';
       if (open) {
-        html += '<tr class="detail-row"><td colspan="9">' + stateDetail(row, q)
+        html += '<tr class="detail-row"><td colspan="' + cols + '">'
+             + stateDetail(row, q)
              + '</td></tr>';
       }
     }
@@ -833,7 +878,7 @@
   }
 
   function diffRowsHtml(items) {
-    var q = st.q, html = '', i;
+    var q = st.q, html = '', i, cols = colCount('diff');
     for (i = 0; i < items.length; i++) {
       var row = items[i].row;
       var key = rowKey(row);
@@ -843,7 +888,7 @@
            + ' aria-expanded="' + (open ? 'true' : 'false') + '">'
            + (open ? '▾' : '▸') + '</span> ' + hl(row.name, q) + '</td>'
            + '<td class="ver">' + (row.old_evr ? hl(row.old_evr, q) : '—') + '</td>'
-           + '<td class="dir">' + (ARROW[row.status] || '') + '</td>'
+           + '<td class="dir">' + (own(ARROW, row.status) || '') + '</td>'
            + '<td class="ver new">' + (row.new_evr ? hl(row.new_evr, q) : '—') + '</td>'
            + '<td class="pat">' + delta(row.patches_added.length,
                                         row.patches_removed.length) + '</td>'
@@ -853,7 +898,8 @@
            + '<td class="links">' + linkHtml(row.koji_url, 'koji')
            + linkHtml(row.source_url, 'git') + '</td></tr>';
       if (open) {
-        html += '<tr class="detail-row"><td colspan="8">' + diffDetail(row, q)
+        html += '<tr class="detail-row"><td colspan="' + cols + '">'
+             + diffDetail(row, q)
              + '</td></tr>';
       }
     }
@@ -1013,7 +1059,7 @@
     for (var i = 0; i < nodes.length; i++) {
       var key = nodes[i].getAttribute('data-filter');
       nodes[i].setAttribute('aria-pressed',
-        String(key === 'all' ? empty : Boolean(set[key])));
+        String(key === 'all' ? empty : Boolean(own(set, key))));
     }
   }
 
@@ -1064,7 +1110,7 @@
     syncArrows();
 
     if (!items.length) {
-      body.innerHTML = '<tr><td class="empty" colspan="8">'
+      body.innerHTML = '<tr><td class="empty" colspan="' + colCount(st.tab) + '">'
         + (total ? 'Под фильтры и запрос ничего не подходит'
                  : 'В этой выборке нет строк') + '</td></tr>';
     } else {
@@ -1131,6 +1177,7 @@
     var cfg = st.sort[st.tab];
     parts.push('sort=' + cfg.key + (cfg.asc ? '' : ':desc'));
     var next = '#' + parts.join('&');
+    hashIsOurs = true;
     if (location.hash === next) return;
     hashLock = true;
     try {
@@ -1189,7 +1236,12 @@
            последний по цепочке, самый свежий. Сама страница пишет всегда
            полное имя, поэтому её ссылки однозначны. */
         for (var j = 0; j < SNAPS.length; j++) {
-          if (snapKey(SNAPS[j]) === val || SNAPS[j].tag === val) st.tag = j;
+          /* Ссылка — такой же выбор человека, как клик по кнопке: он должен
+             пережить приход следующего файла. */
+          if (snapKey(SNAPS[j]) === val || SNAPS[j].tag === val) {
+            st.tag = j;
+            picked.tag = true;
+          }
         }
       } else if (key === 'pair') {
         /* Не нашли такого перехода — остаёмся на паре по умолчанию.
@@ -1197,7 +1249,10 @@
            же правилу: при двойниках выигрывает последний переход. */
         for (var p = 0; p < PAIRS.length; p++) {
           if (pairKey(p) === val
-              || PAIRS[p].old + '..' + PAIRS[p]['new'] === val) st.pair = p;
+              || PAIRS[p].old + '..' + PAIRS[p]['new'] === val) {
+            st.pair = p;
+            picked.pair = true;
+          }
         }
       } else if (key === 'f') filters = val ? val.split(',') : [];
       else if (key === 'q') st.q = val.trim().toLowerCase();
@@ -1326,12 +1381,14 @@
         if (tag !== null && tag !== undefined && node.className
             && String(node.className).indexOf('pick') !== -1) {
           st.tag = parseInt(tag, 10);
+          picked.tag = true;
           renderTagSelect(); renderStateCards(); render();
           return;
         }
         var pair = node.getAttribute('data-pair');
         if (pair !== null && pair !== undefined) {
           st.pair = parseInt(pair, 10);
+          picked.pair = true;
           renderPairSelect(); renderDiffCards(); render();
           return;
         }
