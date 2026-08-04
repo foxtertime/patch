@@ -5,16 +5,25 @@ var vercmp = require('../../kojipatch/assets/js/vercmp.js');
 
 test('одинаковые строки равны', function () {
   assert.strictEqual(vercmp.rpmvercmp('1.0', '1.0'), 0);
+  assert.strictEqual(vercmp.rpmvercmp('1.0-1.el9', '1.0-1.el9'), 0);
 });
 
 test('числовые сегменты сравниваются как числа', function () {
   assert.strictEqual(vercmp.rpmvercmp('1.10', '1.9'), 1);
   assert.strictEqual(vercmp.rpmvercmp('1.9', '1.10'), -1);
+  assert.strictEqual(vercmp.rpmvercmp('1.0.1', '1.0'), 1);
+  assert.strictEqual(vercmp.rpmvercmp('1.0', '1.0.1'), -1);
+  assert.strictEqual(vercmp.rpmvercmp('2.0', '1.9.9'), 1);
+  assert.strictEqual(vercmp.rpmvercmp('1.9.9', '2.0'), -1);
 });
 
 test('тильда сортируется раньше всего', function () {
   assert.strictEqual(vercmp.rpmvercmp('1.0~rc1', '1.0'), -1);
   assert.strictEqual(vercmp.rpmvercmp('1.0', '1.0~rc1'), 1);
+  assert.strictEqual(vercmp.rpmvercmp('1.0~rc2', '1.0~rc1'), 1);
+  assert.strictEqual(vercmp.rpmvercmp('1.0~rc1', '1.0~rc2'), -1);
+  assert.strictEqual(vercmp.rpmvercmp('1.0~rc1', '0.9'), 1);
+  assert.strictEqual(vercmp.rpmvercmp('0.9', '1.0~rc1'), -1);
 });
 
 /* Проверяет обе стороны сравнения разом — как check() в
@@ -72,6 +81,21 @@ test('псевдоцифра против буквы не роняет и не �
 test('две псевдоцифры не подвешивают цикл', function () {
   assert.ok(Number.isInteger(vercmp.rpmvercmp(SUP, CUBE)));
   assert.strictEqual(vercmp.rpmvercmp(SUP, SUP), 0);
+});
+
+/* На паре разных псевдоцифр у эталонного Python нет осмысленного ответа:
+   rpmvercmp('²','³') и rpmvercmp('³','²') оба возвращают 1 — антисимметрия
+   у оригинала здесь не держится, и его собственный тест
+   (test_two_pseudo_digits_do_not_hang) намеренно проверяет только тип
+   результата, а не значение. Повторять этот баг бит в бит незачем; порт
+   на этом входе идёт другим путём (ALNUM не считает ²/³ альфанумериками,
+   stripSeparators съедает их как разделители) и стабильно даёт 0 в обе
+   стороны. Тест ничего не утверждает про «правильность» — он лишь
+   фиксирует нынешний ответ, чтобы будущее изменение ALNUM/stripSeparators
+   было осознанным решением, а не случайной регрессией. */
+test('разные псевдоцифры: нынешний ответ JS зафиксирован явно', function () {
+  assert.strictEqual(vercmp.rpmvercmp(SUP, CUBE), 0);
+  assert.strictEqual(vercmp.rpmvercmp(CUBE, SUP), 0);
 });
 
 test('сравнение антисимметрично и на псевдоцифре', function () {
