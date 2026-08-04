@@ -244,12 +244,20 @@ tr.detail-row > td { background: var(--card); padding: .85rem .7rem 1.1rem 2.2re
 .plist .ppath { color: var(--muted); font-size: .74rem; }
 /* Знак дублирует цвет — на случай, если цвет не различим. */
 .sign { font-weight: 700; margin-right: .15rem; }
-.rpms { display: grid; gap: .1rem .8rem;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
-.rpms span { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: .78rem; overflow-wrap: anywhere; }
-.rpms span.is-added { color: var(--added); }
-.rpms span.is-removed { color: var(--removed); text-decoration: line-through; }
+/* Пакеты — такой же список, как патчи, по одному в строке. Строка ровно
+   одна: во вкладке «изменения» левая и правая колонки выравниваются по
+   номеру строки, и перенос длинного NVRA сдвинул бы всё, что ниже.
+   Поэтому не переносим, а даём списку горизонтальную прокрутку — полоса
+   появляется под всеми строками и высоту строк не трогает. */
+.rlist { list-style: none; margin: .2rem 0 0; padding: .1rem 0 .1rem .6rem;
+  border-left: 2px solid var(--line); overflow-x: auto; }
+.rlist li { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .78rem; padding: .1rem 0; white-space: nowrap; }
+.rlist li.is-added { color: var(--added); }
+.rlist li.is-removed { color: var(--removed); text-decoration: line-through; }
+/* Пустая ячейка напротив пришедшего или ушедшего пакета: строка обязана
+   занять место, иначе соседняя колонка уедет вверх. */
+.rlist li.rgap { color: var(--muted); opacity: .45; }
 /* Ветка, сменившаяся между тегами, красится тем же цветом, что и уехавший
    или приехавший патч: «эта сторона потеряла» / «эта сторона получила». */
 .is-added { color: var(--added); }
@@ -555,10 +563,9 @@ function scanDiff(row, q) {
       }
     }
   }
-  var rpms = [row.old_rpms, row.new_rpms];
-  for (i = 0; !deep && i < rpms.length; i++) {
-    for (j = 0; !deep && j < rpms[i].length; j++) {
-      if (has(rpms[i][j], q)) deep = true;
+  for (i = 0; !deep && i < row.rpm_rows.length; i++) {
+    for (j = 0; !deep && j < 2; j++) {
+      if (row.rpm_rows[i][j] && has(row.rpm_rows[i][j], q)) deep = true;
     }
   }
   return { show: shallow || deep, deep: !shallow && deep };
@@ -760,15 +767,41 @@ function patchesHtml(patches, q, mark, markCls) {
   return out;
 }
 
-function rpmsHtml(list, q, mark, markCls) {
+/* Пакеты одного билда: просто список, без выравнивания. */
+function rpmsHtml(list, q) {
   if (!list.length) return '<div class="none">пакетов нет</div>';
-  var out = '<div class="rpms">';
+  var out = '<ul class="rlist">';
   for (var i = 0; i < list.length; i++) {
-    var hot = mark && mark[list[i]];
-    out += '<span' + (hot ? ' class="' + markCls + '"' : '') + '>'
-        + (hot ? signHtml(markCls) : '') + hl(list[i], q) + '</span>';
+    out += '<li>' + hl(list[i], q) + '</li>';
   }
-  return out + '</div>';
+  return out + '</ul>';
+}
+
+/* Одна колонка выровненной таблицы пакетов. rows приходят из diff.py уже
+   спаренными: [было, стало], где null означает «на этой стороне пакета
+   нет». Обе стороны печатают одинаковое число строк, поэтому один и тот
+   же подпакет стоит слева и справа на одной высоте, а пустая ячейка
+   напротив соседа читается как «пропал» или «пришёл». */
+function rpmSideHtml(rows, at, q, markCls) {
+  if (!rows.length) return '<div class="none">пакетов нет</div>';
+  var out = '<ul class="rlist">';
+  for (var i = 0; i < rows.length; i++) {
+    var mine = rows[i][at], other = rows[i][1 - at];
+    if (mine === null) {
+      out += '<li class="rgap">·</li>';
+      continue;
+    }
+    var hot = other === null;
+    out += '<li' + (hot ? ' class="' + markCls + '"' : '') + '>'
+        + (hot ? signHtml(markCls) : '') + hl(mine, q) + '</li>';
+  }
+  return out + '</ul>';
+}
+
+function rpmSideCount(rows, at) {
+  var n = 0;
+  for (var i = 0; i < rows.length; i++) if (rows[i][at] !== null) n++;
+  return n;
 }
 
 /* ---------- вкладка «Состояние» ---------- */
@@ -804,7 +837,7 @@ function stateDetail(row, q) {
       + '</div>' + patchesHtml(row.patches, q, null, '') + '</div>';
 
   out += '<div class="block"><div class="bl">RPM · ' + row.rpms.length
-      + '</div>' + rpmsHtml(row.rpms, q, null, '') + '</div>';
+      + '</div>' + rpmsHtml(row.rpms, q) + '</div>';
 
   if (row.problems.length) {
     out += '<div class="block"><div class="bl">проблемы</div><ul class="problems">';
@@ -852,8 +885,8 @@ function stateRowsHtml(items) {
 
 /* ---------- вкладка «Изменения» ---------- */
 
-function side(title, tag, evr, branch, patches, rpms, q, mark, markCls,
-              rpmMark, branchChanged) {
+function side(title, tag, evr, branch, patches, rpmRows, at, q, mark, markCls,
+              branchChanged) {
   var out = '<div class="side"><div class="bl">' + esc(title) + ' · <b>'
           + esc(tag) + '</b></div>';
   out += kv('версия', evr ? '<span class="mono">' + hl(evr, q) + '</span>'
@@ -864,8 +897,9 @@ function side(title, tag, evr, branch, patches, rpms, q, mark, markCls,
     : '<span class="none">—</span>');
   out += '<div class="bl" style="margin-top:.7rem">патчи · ' + patches.length
       + '</div>' + patchesHtml(patches, q, mark, markCls);
-  out += '<div class="bl" style="margin-top:.7rem">RPM · ' + rpms.length
-      + '</div>' + rpmsHtml(rpms, q, rpmMark, markCls);
+  out += '<div class="bl" style="margin-top:.7rem">RPM · '
+      + rpmSideCount(rpmRows, at)
+      + '</div>' + rpmSideHtml(rpmRows, at, q, markCls);
   return out + '</div>';
 }
 
@@ -875,11 +909,11 @@ function diffDetail(row, q) {
   var changed = row.tags.indexOf('branch-changed') !== -1;
   return '<div class="sides">'
     + side('было', oldTag, row.old_evr, row.old_branch, row.old_patches,
-           row.old_rpms, q, setFrom(row.patches_removed), 'is-removed',
-           setFrom(row.rpms_removed), changed)
+           row.rpm_rows, 0, q, setFrom(row.patches_removed), 'is-removed',
+           changed)
     + side('стало', newTag, row.new_evr, row.new_branch, row.new_patches,
-           row.new_rpms, q, setFrom(row.patches_added), 'is-added',
-           setFrom(row.rpms_added), changed)
+           row.rpm_rows, 1, q, setFrom(row.patches_added), 'is-added',
+           changed)
     + '</div>';
 }
 

@@ -131,6 +131,21 @@ class PageDataTest(unittest.TestCase):
         self.assertEqual(rows["gone"]["status"], "removed")
         self.assertEqual(pair["counts"]["added"], 1)
 
+    def test_pair_rows_carry_aligned_rpm_rows(self):
+        # фронтенду отдаются готовые строки «было/стало», а не два списка:
+        # выравнивание считается один раз здесь и покрыто тестами diff
+        old = snap("os-9.1", [build("nginx", "1.0",
+                                    rpms=["nginx-1.0-1.el9.x86_64",
+                                          "nginx-mod-1.0-1.el9.x86_64"])])
+        new = snap("os-9.2", [build("nginx", "1.1",
+                                    rpms=["nginx-1.1-1.el9.x86_64"])])
+        row = self.data([old, new], diff_chain([old, new]))["pairs"][0]["rows"][0]
+        self.assertEqual(row["rpm_rows"],
+                         [["nginx-1.0-1.el9.x86_64", "nginx-1.1-1.el9.x86_64"],
+                          ["nginx-mod-1.0-1.el9.x86_64", None]])
+        self.assertNotIn("old_rpms", row)
+        self.assertNotIn("new_rpms", row)
+
     def test_summary_pair_is_marked(self):
         snaps = [snap("a", []), snap("b", []), snap("c", [])]
         data = self.data(snaps, diff_chain(snaps))

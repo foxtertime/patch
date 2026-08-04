@@ -1,6 +1,6 @@
 import unittest
 
-from kojipatch.diff import diff_chain, diff_snapshots
+from kojipatch.diff import align_rpms, diff_chain, diff_snapshots
 from kojipatch.model import Build, Patch, Snapshot, Source
 
 
@@ -146,6 +146,78 @@ class DetailsTest(unittest.TestCase):
         got = self.diff_of([], [build("nginx", patches=["a.patch"])])
         self.assertEqual(got["nginx"].patches_added, [])
         self.assertFalse(got["nginx"].repackaged)
+
+
+class AlignRpmsTest(unittest.TestCase):
+    """Строки «было/стало» для подпакетов: один подпакет — одна строка."""
+
+    def test_same_subpackage_stands_opposite_itself(self):
+        # версия билда поехала, NVRA слева и справа разные — но это один и
+        # тот же подпакет, и он обязан стоять на одной высоте
+        rows = align_rpms(build("nginx", "1.24.0", subpackages=["nginx"]),
+                          build("nginx", "1.25.0", subpackages=["nginx"]))
+        self.assertEqual(rows, [["nginx-1.24.0-1.el9.x86_64",
+                                 "nginx-1.25.0-1.el9.x86_64"]])
+
+    def test_disappeared_subpackage_keeps_its_place(self):
+        rows = align_rpms(
+            build("nginx", subpackages=["nginx", "nginx-mod"]),
+            build("nginx", subpackages=["nginx"]))
+        self.assertEqual(rows, [["nginx-1.0-1.el9.x86_64",
+                                 "nginx-1.0-1.el9.x86_64"],
+                                ["nginx-mod-1.0-1.el9.x86_64", None]])
+
+    def test_new_subpackage_goes_to_the_bottom(self):
+        # «aaa» встал бы первым по алфавиту, но пришедшее место
+        # существующих строк не сдвигает — иначе поедет выравнивание
+        rows = align_rpms(
+            build("nginx", subpackages=["nginx"]),
+            build("nginx", subpackages=["aaa-tool", "nginx"]))
+        self.assertEqual(rows, [["nginx-1.0-1.el9.x86_64",
+                                 "nginx-1.0-1.el9.x86_64"],
+                                [None, "aaa-tool-1.0-1.el9.x86_64"]])
+
+    def test_left_column_is_sorted(self):
+        rows = align_rpms(build("nginx", subpackages=["zzz", "aaa", "mmm"]),
+                          build("nginx", subpackages=["zzz", "aaa", "mmm"]))
+        self.assertEqual([row[0].split("-1.0-")[0] for row in rows],
+                         ["aaa", "mmm", "zzz"])
+
+    def test_component_without_an_old_build(self):
+        rows = align_rpms(None, build("nginx", subpackages=["nginx"]))
+        self.assertEqual(rows, [[None, "nginx-1.0-1.el9.x86_64"]])
+
+    def test_component_without_a_new_build(self):
+        rows = align_rpms(build("nginx", subpackages=["nginx"]), None)
+        self.assertEqual(rows, [["nginx-1.0-1.el9.x86_64", None]])
+
+    def test_no_builds_at_all(self):
+        self.assertEqual(align_rpms(None, None), [])
+
+    def test_arch_split_is_two_rows(self):
+        # один и тот же name в двух архитектурах — разные ключи, разные
+        # строки: иначе aarch64 «превратился бы» в x86_64
+        rows = align_rpms(
+            build("nginx", rpms=[nvra("nginx", "1.0", "1.el9", "aarch64"),
+                                 nvra("nginx", "1.0", "1.el9", "x86_64")]),
+            build("nginx", rpms=[nvra("nginx", "1.0", "1.el9", "x86_64")]))
+        self.assertEqual(rows, [["nginx-1.0-1.el9.aarch64", None],
+                                ["nginx-1.0-1.el9.x86_64",
+                                 "nginx-1.0-1.el9.x86_64"]])
+
+    def test_rows_agree_with_the_deltas(self):
+        # выравнивание и rpms_added/rpms_removed считают одно и то же:
+        # пустая ячейка справа — это ровно «ушедший» подпакет
+        old = build("nginx", subpackages=["nginx", "nginx-mod"])
+        new = build("nginx", subpackages=["nginx", "nginx-core"])
+        component = {c.name: c for c in
+                     diff_snapshots(snap("a", [old]), snap("b", [new]))
+                     .components}["nginx"]
+        rows = align_rpms(old, new)
+        self.assertEqual([r[0] for r in rows if r[1] is None],
+                         component.rpms_removed)
+        self.assertEqual([r[1] for r in rows if r[0] is None],
+                         component.rpms_added)
 
 
 class CountsTest(unittest.TestCase):

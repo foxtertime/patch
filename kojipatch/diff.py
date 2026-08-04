@@ -85,6 +85,35 @@ def _rpm_delta(source: Dict[str, List[str]],
     return sorted(out)
 
 
+def _rpm_row_pairs(left: List[str], right: List[str]) -> List[List[Optional[str]]]:
+    left, right = sorted(left), sorted(right)
+    return [[left[i] if i < len(left) else None,
+             right[i] if i < len(right) else None]
+            for i in range(max(len(left), len(right)))]
+
+
+def align_rpms(old: Optional[Build],
+               new: Optional[Build]) -> List[List[Optional[str]]]:
+    """Строки «было/стало» по подпакетам: одна строка — один подпакет.
+
+    Один и тот же подпакет должен стоять слева и справа на одной высоте,
+    иначе версии не сравнить глазами. Строки собираются по ключу
+    (name.arch), а не по NVRA: NVRA несёт версию билда и с обновлением
+    меняется целиком. Пропавший подпакет остаётся на своём месте с пустой
+    правой ячейкой; пришедший уходит вниз списка, чтобы не сдвигать всё,
+    что стоит выше.
+    """
+    old_keys = _rpm_keys(old) if old else {}
+    new_keys = _rpm_keys(new) if new else {}
+    rows = []
+    for key in sorted(old_keys, key=lambda k: min(old_keys[k])):
+        rows.extend(_rpm_row_pairs(old_keys[key], new_keys.get(key, [])))
+    fresh = set(new_keys) - set(old_keys)
+    for key in sorted(fresh, key=lambda k: min(new_keys[k])):
+        rows.extend(_rpm_row_pairs([], new_keys[key]))
+    return rows
+
+
 def diff_snapshots(old: Snapshot, new: Snapshot,
                    is_summary: bool = False) -> PairDiff:
     """Сравнивает два снапшота по именам компонентов."""

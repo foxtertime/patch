@@ -6,6 +6,8 @@ import re
 from typing import Dict, List, Optional
 from urllib.parse import quote
 
+from .diff import align_rpms
+
 logger = logging.getLogger(__name__)
 
 PLACEHOLDER = "/*__DATA__*/"
@@ -134,8 +136,10 @@ def _diff_row(component, koji_web) -> Dict[str, object]:
         "rpms_removed": list(component.rpms_removed),
         "old_patches": [_patch_dict(p) for p in (old.patches if old else [])],
         "new_patches": [_patch_dict(p) for p in (new.patches if new else [])],
-        "old_rpms": list(old.rpms) if old else [],
-        "new_rpms": list(new.rpms) if new else [],
+        # выровненные строки «было/стало» вместо двух отдельных списков:
+        # так один и тот же подпакет стоит в обеих колонках на одной высоте,
+        # и NVRA не дублируются в данных страницы
+        "rpm_rows": align_rpms(old, new),
         "koji_url": _koji_url(koji_web, shown.nvr) if shown else None,
         "source_url": (shown.source.web_url
                        if shown and shown.source else None),
