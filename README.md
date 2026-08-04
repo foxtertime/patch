@@ -3,8 +3,8 @@
 Дашборд патчей: для одного или нескольких koji-тегов собирает последние билды
 (с учётом наследования тегов), по `extra.source.original_url` определяет
 ветку GitLab, с которой собран каждый билд, читает в этой ветке каталог
-`PATCH`, классифицирует найденные файлы (CVE / SAST / DAST / SPEC /
-CHANGELOG / other) и строит самодостаточный HTML-дашборд с вкладкой
+`PATCH`, классифицирует найденные файлы (CVE / SAST / DAST / COVERAGE /
+SPEC / CHANGELOG / other) и строит самодостаточный HTML-дашборд с вкладкой
 «Состояние» по каждому тегу и вкладкой «Изменения», сравнивающей теги
 между собой.
 
@@ -123,17 +123,18 @@ python3 -m kojipatch --config kojipatch.yaml run --tag os-9.1 --tag os-9.2 \
 | `gitlab.hosts.<host>.api` | да для каждого описанного хоста | — | база REST v4, например `https://gitlab.example.com/api/v4` |
 | `gitlab.hosts.<host>.web` | нет | `api` до `/api/...` | база для веб-ссылок на дерево и файлы репозитория |
 | `patch_dir` | нет | `PATCH` | имя каталога патчей в корне репозитория; можно перекрыть `--patch-dir` |
-| `patch_classes` | нет | правила для CVE, SAST, DAST, SPEC, CHANGELOG + `other: '.*'` | список правил `{name, pattern}` — регулярка по имени файла патча → класс |
+| `patch_classes` | нет | правила для CVE, SAST, DAST, COVERAGE, SPEC, CHANGELOG + `other: '.*'` | список правил `{name, pattern}` — регулярка по имени файла патча → класс |
 
 Правила `patch_classes` применяются по порядку, побеждает первое совпадение
 (`re.search`, без привязки к началу строки). По умолчанию CVE опознаётся по
 идентификатору в любом месте имени (`httpd-2.4.62-cve-2024-42516.patch.new`),
-SAST и DAST — по вхождению маркера, тоже в любом месте
+SAST, DAST и COVERAGE — по вхождению маркера, тоже в любом месте
 (`SAST-src.core.ngx_file.c.patch.new` и `httpd-2.4.62-sast-src.core.c.patch.new`
-оба попадут в SAST). В DAST кроме `dast` попадает и `fuzz`
-(`FUZZ-parser.patch.new`, `httpd-2.4.62-fuzz-parser.patch.new`): фаззинг — то
-же динамическое тестирование, и отдельной категорией он бы только дробил
-отчёт. SPEC опознаётся по `.spec.` с точками
+оба попадут в SAST, `COVERAGE-parser.patch.new` — в COVERAGE). В DAST кроме
+`dast` попадает и `fuzz` (`FUZZ-parser.patch.new`,
+`httpd-2.4.62-fuzz-parser.patch.new`): фаззинг — то же динамическое
+тестирование, и отдельной категорией он бы только дробил отчёт.
+SPEC опознаётся по `.spec.` с точками
 (`nginx.spec.patch`, `httpd-2.4.62.spec.patch.new`), а CHANGELOG — по
 `changelog.yaml` (короткое `.yml` тоже ловится). Точки в правиле SPEC
 обязательны: без них в класс попали бы `specialcase.patch` и `respec-fix.patch`.
@@ -217,9 +218,9 @@ export GITLAB_TOKEN=glpat-...
 
 Вычисляемые метки поверх строки, к koji-тегам отношения не имеют.
 
-На вкладке «Состояние»: `cve`, `sast`, `dast`, `spec`, `changelog`, `other`
-(класс патча, присутствует в билде хотя бы один патч этого класса),
-`inherited` (билд
+На вкладке «Состояние»: `cve`, `sast`, `dast`, `coverage`, `spec`,
+`changelog`, `other` (класс патча, присутствует в билде хотя бы один патч
+этого класса), `inherited` (билд
 висит не в выбранном теге, а в одном из его родителей), `no-patch` (у ветки
 нет каталога `PATCH`, т.е. `patch_dir_present == false`), `no-source`
 (в билде нет `extra.source.original_url`), `from-commit` (билд собран не с

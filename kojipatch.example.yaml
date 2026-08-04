@@ -25,6 +25,7 @@ patch_classes:
   # Фаззинг — то же динамическое тестирование, поэтому FUZZ/fuzz идёт в DAST,
   # а не отдельной категорией: иначе отчёт дробился бы без пользы.
   - { name: DAST, pattern: '(?i)(?:dast|fuzz)' }
+  - { name: COVERAGE, pattern: '(?i)coverage' }
   # Патч на спек: nginx.spec.patch, httpd-2.4.62.spec.patch.new. Точки в
   # шаблоне обязательны, иначе сюда уедут specialcase.patch и respec-fix.patch.
   # Правило стоит после CVE/SAST/DAST: спек-патч, закрывающий CVE, — прежде

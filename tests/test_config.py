@@ -166,6 +166,20 @@ class DefaultRulesOnRealNamesTest(unittest.TestCase):
         self.assertEqual(
             self.classifier.classify("fuzz-cve-2024-42516.patch.new"), "CVE")
 
+    def test_coverage(self):
+        self.assertEqual(self.classifier.classify("COVERAGE-parser.patch.new"),
+                         "COVERAGE")
+
+    def test_coverage_lowercase_and_in_the_middle(self):
+        self.assertEqual(
+            self.classifier.classify("httpd-2.4.62-coverage-src.c.patch.new"),
+            "COVERAGE")
+
+    def test_cve_still_wins_over_coverage(self):
+        self.assertEqual(
+            self.classifier.classify("coverage-cve-2024-42516.patch.new"),
+            "CVE")
+
     def test_sast_after_an_underscore(self):
         self.assertEqual(self.classifier.classify("httpd_sast_fix.patch.new"),
                          "SAST")
