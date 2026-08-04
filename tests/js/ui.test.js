@@ -864,3 +864,45 @@ test('крестик, нажатый до срабатывания поиска,
     assert.doesNotMatch(dom.location.hash, /q=/);
     assert.doesNotMatch(dom.id('state-rows').innerHTML, /class="empty"/);
   });
+
+/* Сообщения о загрузке — события, а не состояние: файл отвергнут, состав
+   не изменился, читать это второй раз незачем. Раньше они висели до конца
+   сеанса. */
+function sameFileTwice(dom, t) {
+  var text = JSON.stringify([snap('os-9.2', '2026-08-01T00:00:00+03:00')]);
+  var drop = dom.id('drop');
+  dom.fire(drop, 'drop',
+           { dataTransfer: { files: [domstub.file('a.json', text)] } });
+  t.mock.timers.tick(1);
+  dom.fire(drop, 'drop',
+           { dataTransfer: { files: [domstub.file('a.json', text)] } });
+  t.mock.timers.tick(1);
+}
+
+test('повторно поднесённый снапшот объясняется и сообщение гаснет само',
+  function (t) {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    var dom = load();
+    sameFileTwice(dom, t);
+    assert.match(dom.id('load-errors').innerHTML, /os-9\.2/,
+                 'человеку должны сказать, что именно отвергнуто');
+    assert.strictEqual(store.list().length, 1, 'цепочка не удвоилась');
+
+    t.mock.timers.tick(30000);
+    assert.strictEqual(dom.id('load-errors').innerHTML, '',
+                       'сообщение обязано уйти само');
+  });
+
+test('новое сообщение продлевает срок, а не наследует остаток чужого',
+  function (t) {
+    t.mock.timers.enable({ apis: ['setTimeout'] });
+    var dom = load();
+    sameFileTwice(dom, t);
+    t.mock.timers.tick(9000);                 /* почти догорело */
+    dom.fire(dom.id('drop'), 'drop',
+             { dataTransfer: { files: [domstub.file('b.json', '{ сломано')] } });
+    t.mock.timers.tick(1);
+    t.mock.timers.tick(9000);                 /* прежний срок уже истёк бы */
+    assert.match(dom.id('load-errors').innerHTML, /b\.json/,
+                 'свежее сообщение не должно гаснуть по чужому таймеру');
+  });

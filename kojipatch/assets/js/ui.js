@@ -1667,10 +1667,43 @@
     syncEmpty();
   });
 
+  /* Сообщение о загрузке — событие, а не состояние страницы: файл
+     отвергнут, состав снапшотов прежний, и через минуту эта строка
+     сообщает только о том, что человек и так уже понял. Поэтому гаснет
+     сама. Десяти секунд хватает прочитать две строки, а не хватит —
+     сообщение повторится, стоит поднести файл снова.
+
+     Предупреждение о разных хабах в соседнем блоке так не гасят, и это
+     не забывчивость: оно описывает не событие, а то, что на экране
+     сейчас, и правдиво ровно до смены состава. */
+  var ERRORS_LIFE = 10000;
+  var ERRORS_FADE = 400;
+  var errorsTimers = [];
+
+  function stopErrorsTimers() {
+    for (var i = 0; i < errorsTimers.length; i++) clearTimeout(errorsTimers[i]);
+    errorsTimers = [];
+  }
+
   function showErrors(errors) {
     var out = '', i;
     for (i = 0; i < errors.length; i++) out += '<li>' + esc(errors[i]) + '</li>';
+    /* Свежее сообщение начинает свой срок с нуля: догорающий чужой таймер
+       погасил бы его раньше, чем человек успел прочитать. */
+    stopErrorsTimers();
+    loadErrors.className = 'problems loaderrors';
     loadErrors.innerHTML = out;
+    if (!out) return;
+    /* Два независимых таймера, а не вложенных: гашение и уборка — разные
+       события, и заводить второе изнутри первого значит связать их
+       порядком выполнения там, где связи нет. */
+    errorsTimers.push(setTimeout(function () {
+      loadErrors.className = 'problems loaderrors fading';
+    }, ERRORS_LIFE));
+    errorsTimers.push(setTimeout(function () {
+      loadErrors.innerHTML = '';
+      loadErrors.className = 'problems loaderrors';
+    }, ERRORS_LIFE + ERRORS_FADE));
   }
 
   function loadFiles(files) {
