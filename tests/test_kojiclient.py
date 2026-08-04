@@ -1,3 +1,4 @@
+import logging
 import unittest
 
 from kojipatch.kojiclient import KojiClient, KojiError
@@ -102,6 +103,47 @@ class KojiClientTest(unittest.TestCase):
         client = KojiClient(session, batch=10)
         with self.assertRaises(KojiError):
             client.build_details([1, 2])
+
+
+class LoggingTest(unittest.TestCase):
+    def setUp(self):
+        self.session = FakeKojiSession(tagged=TAGGED, builds=BUILDS, rpms=RPMS)
+        self.client = KojiClient(self.session, batch=10)
+
+    def test_tagged_builds_is_logged_at_debug(self):
+        with self.assertLogs("kojipatch.kojiclient", level="DEBUG") as caught:
+            self.client.tagged_builds("os-9.2")
+        line = "\n".join(caught.output)
+        self.assertIn("listTagged", line)
+        self.assertIn("os-9.2", line)
+
+    def test_batch_call_is_logged_with_its_size(self):
+        with self.assertLogs("kojipatch.kojiclient", level="DEBUG") as caught:
+            self.client.build_details([1, 2])
+        line = "\n".join(caught.output)
+        self.assertIn("getBuild", line)
+        self.assertIn("2", line)
+
+    def test_sequential_fallback_is_logged_as_warning(self):
+        session = FakeKojiSession(tagged=TAGGED, builds=BUILDS, rpms=RPMS,
+                                  supports_multicall=False)
+        client = KojiClient(session, batch=10)
+        with self.assertLogs("kojipatch.kojiclient", level="WARNING") as caught:
+            client.build_details([1, 2])
+        self.assertIn("multicall", "\n".join(caught.output))
+
+    def test_multicall_fallback_is_warned_about_once_per_client(self):
+        # факт статичный: на 800 билдах пачками по 100 одно и то же
+        # предупреждение вышло бы шестнадцать раз подряд
+        session = FakeKojiSession(tagged=TAGGED, builds=BUILDS, rpms=RPMS,
+                                  supports_multicall=False)
+        client = KojiClient(session, batch=1)
+        with self.assertLogs("kojipatch.kojiclient", level="DEBUG") as caught:
+            client.build_details([1, 2])
+            client.rpms_for([1, 2])
+        warnings = [r for r in caught.records if r.levelno == logging.WARNING]
+        self.assertEqual(len(warnings), 1,
+                         [r.getMessage() for r in warnings])
 
 
 if __name__ == "__main__":

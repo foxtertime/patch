@@ -1,6 +1,8 @@
 """Сбор снапшота одного тега из koji и GitLab."""
+import logging
 import os
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from typing import Dict, Optional
@@ -8,6 +10,8 @@ from typing import Dict, Optional
 from .classify import Classifier, find_cves
 from .model import Build, Patch, Snapshot, Source
 from .sourceurl import SourceUrlError, parse_source_url
+
+logger = logging.getLogger(__name__)
 
 
 def _now_iso() -> str:
@@ -31,33 +35,55 @@ def _original_url(info: dict) -> Optional[str]:
 
 
 def collect_tag(tag: str, cfg, koji_client, gitlab_client, jobs: int = 8,
-                now: Optional[str] = None, progress=None) -> Snapshot:
+                now: Optional[str] = None) -> Snapshot:
     """Собирает билды тега, их патчи и RPM в один снапшот."""
     classifier = Classifier.from_config(cfg)
+    started = time.monotonic()
     tagged = koji_client.tagged_builds(tag)
     build_ids = [item["build_id"] for item in tagged]
+    workers = max(1, int(jobs))
+    # на 800 билдах это шестнадцать мультиколлов подряд: без строки прогон
+    # выглядит зависшим между размером тега и первой строкой прогресса
+    logger.info("%s: %d билдов в теге, спрашиваю у koji детали и RPM", tag,
+                len(build_ids))
     details = koji_client.build_details(build_ids)
     rpms = koji_client.rpms_for(build_ids)
 
     infos = [details[bid] for bid in build_ids if bid in details]
+    # оба числа в одной строке: прогресс считает полученные детали, а размер
+    # тега — то, что перечислил listTagged. Когда они расходятся, «4 билдов в
+    # теге» и остановившийся на «3/3» прогресс читаются как выброшенный билд;
+    # на деле такой билд обработан и о нём предупреждено отдельно.
+    logger.info("%s: %d билдов в теге, деталей получено %d, сбор в %d "
+                "поток(ов)", tag, len(build_ids), len(infos), workers)
     # getBuild мог не вернуть билд, который listTagged только что перечислил.
     # Молча выбросить строку нельзя: для дашборда патчей пропавший компонент —
     # худший из возможных исходов. Показываем его по данным listTagged.
     tagged_by_id = {item.get("build_id"): item for item in tagged}
     missing = [tagged_by_id[bid] for bid in build_ids if bid not in details]
     total = len(infos)
+    step = max(1, total // 20)   # ~20 строк прогресса на прогон любого размера
     done = [0]
+    problem_builds = [0]
     progress_lock = threading.Lock()
 
-    def report_progress() -> None:
+    def report_progress(build) -> None:
         # increment/read под одним lock'ом, чтобы разные потоки пула не
-        # теряли инкременты; сам callback зовём уже вне лока, чтобы
-        # медленный progress не сериализовал пул.
+        # теряли инкременты; строку пишем уже вне лока, чтобы медленный
+        # обработчик лога не сериализовал пул.
         with progress_lock:
             done[0] += 1
-            current = done[0]
-        if progress:
-            progress(current, total)
+            if build.problems:
+                problem_builds[0] += 1
+            current, problems = done[0], problem_builds[0]
+        if current % step and current != total:
+            return
+        elapsed = time.monotonic() - started
+        rate = current / elapsed if elapsed > 0 else 0.0
+        left = (total - current) / rate if rate > 0 else 0.0
+        logger.info("%s: %d/%d (%d%%), %d проблемных, %.1f билда/с, "
+                    "~%d с осталось", tag, current, total,
+                    100 * current // max(1, total), problems, rate, left)
 
     def handle(info) -> Build:
         build = _build_from_info(info, rpms.get(info.get("build_id"), []))
@@ -67,21 +93,30 @@ def collect_tag(tag: str, cfg, koji_client, gitlab_client, jobs: int = 8,
             # ни одна ошибка билда (в т.ч. неожиданная, не только
             # SourceUrlError/проблема GitLab) не должна валить весь сбор.
             build.problems.append("internal error: %s" % exc)
-        report_progress()
+        for problem in build.problems:
+            logger.warning("%s: %s", build.name, problem)
+        report_progress(build)
         return build
 
-    workers = max(1, int(jobs))
     if workers == 1 or total <= 1:
         builds = [handle(info) for info in infos]
     else:
-        with ThreadPoolExecutor(max_workers=workers) as pool:
+        # имя потока попадает в дебажный лог, длинное сделало бы его нечитаемым
+        with ThreadPoolExecutor(max_workers=workers,
+                                thread_name_prefix="w") as pool:
             builds = list(pool.map(handle, infos))
 
-    builds.extend(_placeholder_build(item, rpms.get(item.get("build_id"), []))
-                  for item in missing)
+    for item in missing:
+        build = _placeholder_build(item, rpms.get(item.get("build_id"), []))
+        logger.warning("%s: %s", build.name, build.problems[0])
+        builds.append(build)
     builds.sort(key=lambda b: b.name or "")
-    return Snapshot(tag=tag, generated=now or _now_iso(),
-                    koji_hub=cfg.koji_hub, koji_web=cfg.koji_web, builds=builds)
+
+    snapshot = Snapshot(tag=tag, generated=now or _now_iso(),
+                        koji_hub=cfg.koji_hub, koji_web=cfg.koji_web,
+                        builds=builds)
+    _log_summary(snapshot, time.monotonic() - started)
+    return snapshot
 
 
 def _build_from_info(info: dict, rpms) -> Build:
@@ -146,6 +181,16 @@ def _attach_patches(build: Build, info: dict, cfg, gitlab_client,
 # Проблемы, у которых после двоеточия стоит произвольный текст: в сводке их
 # группируем по префиксу, иначе одна строка stderr растёт до числа билдов.
 _GROUPED_PROBLEMS = ("gitlab:", "internal error:", "bad source url:")
+
+
+def _log_summary(snapshot: Snapshot, elapsed: float) -> None:
+    """Итог по тегу — то, что раньше печатал CLI своим sys.stderr.write."""
+    summary = problem_summary(snapshot)
+    problems = sum(1 for b in snapshot.builds if b.problems)
+    details = ", ".join("%s: %d" % item for item in sorted(summary.items()))
+    logger.info("%s: готово, %d билдов, %d проблемных%s, за %.1f с",
+                snapshot.tag, len(snapshot.builds), problems,
+                (" (%s)" % details) if details else "", elapsed)
 
 
 def problem_summary(snapshot: Snapshot) -> Dict[str, int]:

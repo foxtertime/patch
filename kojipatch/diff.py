@@ -1,9 +1,12 @@
 """Сравнение снапшотов тегов."""
+import logging
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 from .model import Build, Snapshot
 from .rpmvercmp import compare_evr
+
+logger = logging.getLogger(__name__)
 
 STATUSES = ("added", "removed", "unchanged", "upgraded", "downgraded")
 
@@ -147,4 +150,5 @@ def diff_chain(snapshots: List[Snapshot]) -> List[PairDiff]:
     if len(snapshots) > 2:
         pairs.append(diff_snapshots(snapshots[0], snapshots[-1],
                                     is_summary=True))
+    logger.debug("цепочка из %d снапшотов → %d пар", len(snapshots), len(pairs))
     return pairs

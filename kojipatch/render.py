@@ -1,9 +1,12 @@
 """Подготовка данных страницы и подстановка их в HTML-шаблон."""
 import json
+import logging
 import os
 import re
 from typing import Dict, List, Optional
 from urllib.parse import quote
+
+logger = logging.getLogger(__name__)
 
 PLACEHOLDER = "/*__DATA__*/"
 # то же правило, что и slug() в дашборде: ключ фильтра из имени класса
@@ -163,6 +166,10 @@ def build_page_data(snapshots, pairs, classifier) -> Dict[str, object]:
         "rows": [_diff_row(c, koji_web) for c in pair.components],
     } for pair in pairs]
 
+    logger.debug("страница: %d снапшотов, %d строк, %d пар",
+                 len(snapshot_blocks),
+                 sum(len(block["builds"]) for block in snapshot_blocks),
+                 len(pair_blocks))
     return {"generated": snapshots[0].generated if snapshots else "",
             "patch_classes": class_names, "snapshots": snapshot_blocks,
             "pairs": pair_blocks}

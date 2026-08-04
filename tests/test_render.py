@@ -232,5 +232,18 @@ class TemplateContractTest(unittest.TestCase):
             self.assertNotIn(marker, self.html, marker)
 
 
+class LoggingTest(unittest.TestCase):
+    def test_page_size_is_logged_at_debug(self):
+        classifier = Classifier(RULES)
+        old = snap("os-9.1", [build("nginx", "1.0")])
+        new = snap("os-9.2", [build("nginx", "1.1")])
+        from kojipatch.diff import diff_chain as chain
+        with self.assertLogs("kojipatch", level="DEBUG") as caught:
+            render_html([old, new], chain([old, new]), classifier)
+        line = "\n".join(caught.output)
+        self.assertIn("kojipatch.render", line)
+        self.assertIn("kojipatch.diff", line)
+
+
 if __name__ == "__main__":
     unittest.main()

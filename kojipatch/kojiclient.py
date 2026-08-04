@@ -1,5 +1,9 @@
 """Тонкая обёртка над koji.ClientSession с пакетными вызовами."""
+import logging
+import time
 from typing import Dict, List
+
+logger = logging.getLogger(__name__)
 
 
 class KojiError(Exception):
@@ -10,13 +14,18 @@ class KojiClient:
     def __init__(self, session, batch: int = 100):
         self._session = session
         self._batch = max(1, int(batch))
+        self._multicall_warned = False
 
     def tagged_builds(self, tag: str) -> List[dict]:
         """Последние билды тега с учётом наследования."""
+        started = time.monotonic()
         try:
-            return self._session.listTagged(tag, latest=True, inherit=True)
+            builds = self._session.listTagged(tag, latest=True, inherit=True)
         except Exception as exc:
             raise KojiError("не получить билды тега %s: %s" % (tag, exc))
+        logger.debug("listTagged %s → %d билдов за %.2f с", tag, len(builds),
+                     time.monotonic() - started)
+        return builds
 
     def build_details(self, build_ids: List[int]) -> Dict[int, dict]:
         results = self._call_batched("getBuild", build_ids)
@@ -47,21 +56,35 @@ class KojiClient:
                     keyword: str) -> Dict[int, object]:
         """Один пакет: сперва multicall, при его отсутствии — последовательные
         вызовы; любая иная ошибка хаба оборачивается в KojiError с контекстом."""
+        started = time.monotonic()
         try:
             try:
-                return self._multicall_chunk(method, chunk, keyword)
+                result = self._multicall_chunk(method, chunk, keyword)
             except (AttributeError, NotImplementedError, TypeError):
                 # AttributeError/NotImplementedError — на хабе нет multicall
                 # (старый клиент) или он не вернул VirtualCall; TypeError —
                 # multicall на хабе до koji 1.18 был обычным булевым
                 # атрибутом, а не вызываемым методом. Во всех случаях —
                 # фолбэк на последовательные вызовы.
-                return self._sequential_chunk(method, chunk, keyword)
+                if self._multicall_warned:
+                    # свойство хаба, а не пачки: на 800 билдах пачками по 100
+                    # одно и то же предупреждение вышло бы шестнадцать раз
+                    logger.debug("%s ×%d — последовательными вызовами",
+                                 method, len(chunk))
+                else:
+                    self._multicall_warned = True
+                    logger.warning("хаб не поддерживает multicall, %s ×%d "
+                                   "и остальные вызовы пойдут "
+                                   "последовательными", method, len(chunk))
+                result = self._sequential_chunk(method, chunk, keyword)
         except KojiError:
             raise
         except Exception as exc:
-            raise KojiError("%s: ошибка хаба на %d билд(ах): %s" %
-                            (method, len(chunk), exc))
+            raise KojiError("%s: ошибка хаба на %d билд(ах): %s"
+                            % (method, len(chunk), exc))
+        logger.debug("%s ×%d за %.2f с", method, len(chunk),
+                     time.monotonic() - started)
+        return result
 
     def _invoke(self, target, method: str, build_id: int, keyword: str):
         call = getattr(target, method)

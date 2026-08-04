@@ -168,5 +168,46 @@ class DefaultRulesOnRealNamesTest(unittest.TestCase):
             "other")
 
 
+class TokenTest(unittest.TestCase):
+    """Токен из окружения. Пробелы по краям — не косметика: requests
+    отказывается отправлять такой заголовок и кладёт ЗНАЧЕНИЕ заголовка в
+    текст исключения, а тот уходит в лог, в проблемы билда, в снапшот и в
+    HTML."""
+
+    ENV = "KOJIPATCH_TEST_TOKEN"
+
+    def setUp(self):
+        os.environ.pop(self.ENV, None)
+        self.addCleanup(os.environ.pop, self.ENV, None)
+        self.cfg = Config(koji_hub="https://hub/kojihub",
+                          gitlab_token_env=self.ENV)
+
+    def test_token_is_read_from_the_environment(self):
+        os.environ[self.ENV] = "glpat-t0ken"
+        self.assertEqual(self.cfg.token(), "glpat-t0ken")
+
+    def test_trailing_newline_is_stripped(self):
+        # классическое GITLAB_TOKEN=$(cat token.txt)
+        os.environ[self.ENV] = "glpat-t0ken\n"
+        self.assertEqual(self.cfg.token(), "glpat-t0ken")
+
+    def test_surrounding_whitespace_is_stripped(self):
+        # копипаста из вебморды приносит пробелы и с той, и с другой стороны
+        os.environ[self.ENV] = "  glpat-t0ken \r\n"
+        self.assertEqual(self.cfg.token(), "glpat-t0ken")
+
+    def test_whitespace_only_value_is_none(self):
+        # пустого токена в заголовке быть не должно: это тот же «токена нет»
+        os.environ[self.ENV] = " \n\t "
+        self.assertIsNone(self.cfg.token())
+
+    def test_empty_value_is_none(self):
+        os.environ[self.ENV] = ""
+        self.assertIsNone(self.cfg.token())
+
+    def test_unset_variable_is_none(self):
+        self.assertIsNone(self.cfg.token())
+
+
 if __name__ == "__main__":
     unittest.main()

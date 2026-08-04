@@ -12,6 +12,7 @@ HOST = "gitlab.example.com"
 HOSTS = {HOST: GitlabHost(api="https://gitlab.example.com/api/v4",
                           web="https://gitlab.example.com")}
 TREE = "https://gitlab.example.com/api/v4/projects/%s/repository/tree"
+COMMITS = "https://gitlab.example.com/api/v4/projects/%s/repository/commits/%s"
 
 TAGGED = {"os-9.2": [
     {"build_id": 1, "name": "nginx"},
@@ -144,13 +145,6 @@ class CollectTagTest(unittest.TestCase):
         snap, _ = self.collect()
         self.assertEqual(snap.by_name()["vim"].epoch, 2)
 
-    def test_progress_callback_is_called(self):
-        koji_client, gitlab, _ = make_clients(self.routes)
-        seen = []
-        collect_tag("os-9.2", config(), koji_client, gitlab, jobs=1,
-                    now="n", progress=lambda done, total: seen.append((done, total)))
-        self.assertEqual(seen[-1], (3, 3))
-
     def test_problem_summary_counts_by_message(self):
         snap, _ = self.collect()
         summary = problem_summary(snap)
@@ -267,12 +261,99 @@ class CollectTagTest(unittest.TestCase):
         self.assertIn("old.example.com", build.problems[0])
         self.assertIn(HOST, build.problems[0])
 
-    def test_progress_reaches_total_under_concurrency(self):
+class LoggingTest(unittest.TestCase):
+    def setUp(self):
+        self.routes = {
+            TREE % "g%2Fnginx": Response(200, [
+                {"name": "CVE-2024-7347.patch", "type": "blob",
+                 "path": "PATCH/CVE-2024-7347.patch"}], {}),
+            TREE % "g%2Fvim": Response(404, {"message": "404 Tree Not Found"}, {}),
+            COMMITS % ("g%2Fvim", "br"): Response(200, {"id": "abc"}, {}),
+        }
+
+    def collect(self, jobs=1):
         koji_client, gitlab, _ = make_clients(self.routes)
-        seen = []
-        collect_tag("os-9.2", config(), koji_client, gitlab, jobs=4, now="n",
-                    progress=lambda done, total: seen.append((done, total)))
-        self.assertEqual(seen[-1], (3, 3))
+        return collect_tag("os-9.2", config(), koji_client, gitlab, jobs=jobs,
+                           now="2026-08-03T13:20:00+03:00")
+
+    def test_progress_reaches_the_total(self):
+        with self.assertLogs("kojipatch.collect", level="INFO") as caught:
+            self.collect()
+        self.assertTrue(any("3/3" in line for line in caught.output),
+                        caught.output)
+
+    def test_progress_reaches_the_total_under_concurrency(self):
+        with self.assertLogs("kojipatch.collect", level="INFO") as caught:
+            self.collect(jobs=4)
+        self.assertTrue(any("3/3" in line for line in caught.output),
+                        caught.output)
+
+    def test_tag_size_is_logged(self):
+        with self.assertLogs("kojipatch.collect", level="INFO") as caught:
+            self.collect()
+        self.assertTrue(any("os-9.2" in line and "3" in line
+                            for line in caught.output), caught.output)
+
+    def test_tag_size_and_detail_count_are_both_logged(self):
+        # listTagged перечислил два билда, getBuild вернул один: прогресс
+        # дойдёт до 1/1, а в теге билдов два. Если в логе только одно из этих
+        # чисел, расхождение читается как молча выброшенный компонент —
+        # худшее, что может померещиться в дашборде патчей.
+        tagged = {"os-9.2": [{"build_id": 1, "name": "nginx"},
+                             {"build_id": 7, "name": "ghost"}]}
+        session = FakeKojiSession(tagged=tagged, builds={1: BUILDS[1]},
+                                  rpms={1: [], 7: []})
+        gitlab = GitlabClient(HOSTS, token=None,
+                              transport=FakeTransport(self.routes),
+                              sleeper=lambda _s: None)
+        with self.assertLogs("kojipatch.collect", level="INFO") as caught:
+            collect_tag("os-9.2", config(), KojiClient(session), gitlab,
+                        jobs=1, now="n")
+        opening = [line for line in caught.output
+                   if "в теге" in line and "деталей получено" in line]
+        self.assertTrue(opening, caught.output)
+        self.assertIn("2 билдов в теге", opening[0])
+        self.assertIn("деталей получено 1", opening[0])
+
+    def test_koji_batch_phase_is_announced_at_info(self):
+        # на 800 билдах между размером тега и первой строкой прогресса
+        # шестнадцать мультиколлов: без этой строки прогон выглядит зависшим
+        with self.assertLogs("kojipatch.collect", level="INFO") as caught:
+            self.collect()
+        # сверяемся с текстом записи, а не со строкой вывода: имя логгера
+        # kojipatch.collect само содержит «koji» и делало бы проверку слепой
+        self.assertTrue(any("спрашиваю у koji" in record.getMessage()
+                            for record in caught.records), caught.output)
+
+    def test_build_problem_is_logged_as_warning_with_the_component(self):
+        with self.assertLogs("kojipatch.collect", level="WARNING") as caught:
+            self.collect()
+        line = "\n".join(caught.output)
+        self.assertIn("curl", line)
+        self.assertIn("no source url", line)
+
+    def test_clean_build_is_not_warned_about(self):
+        with self.assertLogs("kojipatch.collect", level="WARNING") as caught:
+            self.collect()
+        self.assertNotIn("nginx", "\n".join(caught.output))
+
+    def test_progress_step_scales_with_the_tag(self):
+        # шаг = total // 20, поэтому число строк прогресса не зависит от
+        # размера тега: на 40 билдах их столько же, сколько на 800
+        tagged = [{"build_id": i, "name": "pkg%03d" % i} for i in range(40)]
+        builds = {i: {"build_id": i, "name": "pkg%03d" % i, "version": "1.0",
+                      "release": "1.el9", "nvr": "pkg%03d-1.0-1.el9" % i,
+                      "extra": {}}
+                  for i in range(40)}
+        session = FakeKojiSession(tagged={"os-big": tagged}, builds=builds,
+                                  rpms={i: [] for i in range(40)})
+        gitlab = GitlabClient(HOSTS, token=None, transport=FakeTransport({}),
+                              sleeper=lambda _s: None)
+        with self.assertLogs("kojipatch.collect", level="INFO") as caught:
+            collect_tag("os-big", config(), KojiClient(session), gitlab,
+                        jobs=1, now="n")
+        progress_lines = [line for line in caught.output if "/40" in line]
+        self.assertEqual(len(progress_lines), 20, caught.output)
 
 
 def _build_with(problems):

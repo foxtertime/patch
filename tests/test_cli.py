@@ -1,4 +1,5 @@
 import io
+import logging
 import os
 import shutil
 import tempfile
@@ -42,10 +43,38 @@ def build(name, version, patches=(), subpackages=None, ref="main"):
                  problems=[])
 
 
-class TempDirTest(unittest.TestCase):
+class LoggerStateMixin:
+    """Возврат логгера пакета в исходное состояние после прогона CLI.
+
+    main() зовёт logs.configure(): на логгере kojipatch остаётся хендлер с
+    уже никому не нужным потоком и propagate=False. Само по себе это
+    безвредно, но следующий тест, который пишет в лог мимо assertLogs,
+    молча потерял бы свои строки. Восстановление вешаем через addCleanup,
+    а не через tearDown: наследники его переопределяют, не вызывая super.
+    """
+
+    def setUp(self):
+        super().setUp()
+        logger = logging.getLogger("kojipatch")
+        state = (list(logger.handlers), logger.level, logger.propagate)
+        self.addCleanup(self._restore_logger, logger, state)
+
+    @staticmethod
+    def _restore_logger(logger, state):
+        handlers, level, propagate = state
+        for handler in list(logger.handlers):
+            logger.removeHandler(handler)
+        for handler in handlers:
+            logger.addHandler(handler)
+        logger.setLevel(level)
+        logger.propagate = propagate
+
+
+class TempDirTest(LoggerStateMixin, unittest.TestCase):
     """Общий временный каталог: ничего не пишем в дерево исходников."""
 
     def setUp(self):
+        super().setUp()
         self.tmp = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, self.tmp, True)
 
@@ -107,6 +136,74 @@ class CliRenderTest(TempDirTest):
         text = out.getvalue()
         for word in ("collect", "render", "run"):
             self.assertIn(word, text)
+
+
+class LogLevelTest(LoggerStateMixin, unittest.TestCase):
+    def out_path(self):
+        fd, path = tempfile.mkstemp(suffix=".html")
+        os.close(fd)
+        return path
+
+    def snapshots(self):
+        return [os.path.join(FIXTURES, "snapshot-os-9.1.json"),
+                os.path.join(FIXTURES, "snapshot-os-9.2.json")]
+
+    def test_written_file_is_logged_at_info(self):
+        out = self.out_path()
+        with self.assertLogs("kojipatch.cli", level="INFO") as caught:
+            code = main(["render"] + self.snapshots() + ["-o", out])
+        self.assertEqual(code, 0)
+        self.assertIn(out, "\n".join(caught.output))
+
+    def test_fatal_error_is_logged_at_error(self):
+        with self.assertLogs("kojipatch.cli", level="ERROR") as caught:
+            code = main(["render", "/nonexistent.json", "-o", self.out_path()])
+        self.assertEqual(code, 2)
+        self.assertIn("снапшот", "\n".join(caught.output).lower())
+
+    def test_error_carries_a_traceback_record_at_debug(self):
+        # пользователю — одна строка, разработчику — трейсбек, но только
+        # когда он его попросил уровнем
+        with self.assertLogs("kojipatch.cli", level="DEBUG") as caught:
+            main(["--config", "/nonexistent.yaml", "collect", "--tag", "t"])
+        self.assertIn(logging.ERROR, [r.levelno for r in caught.records])
+        with_traceback = [r for r in caught.records
+                          if r.levelno == logging.DEBUG and r.exc_info]
+        self.assertTrue(with_traceback, caught.output)
+
+    def test_error_alone_has_no_traceback_record(self):
+        with self.assertLogs("kojipatch.cli", level="ERROR") as caught:
+            main(["--config", "/nonexistent.yaml", "collect", "--tag", "t"])
+        for record in caught.records:
+            self.assertIsNone(record.exc_info)
+
+    def test_snapshot_error_is_named_in_the_error_line(self):
+        # «cli: ошибка: ...» не говорит ничего, в отличие от соседних
+        # «ошибка конфига» и «ошибка ввода-вывода»
+        with self.assertLogs("kojipatch.cli", level="ERROR") as caught:
+            main(["render", "/nonexistent.json", "-o", self.out_path()])
+        self.assertIn("ошибка снапшота", "\n".join(caught.output))
+
+    def test_unknown_level_is_rejected_by_argparse(self):
+        err = io.StringIO()
+        with redirect_stderr(err):
+            with self.assertRaises(SystemExit):
+                main(["--log-level", "loud", "render", "x.json"])
+        self.assertIn("--log-level", err.getvalue())
+
+    def test_verbose_flag_is_gone(self):
+        err = io.StringIO()
+        with redirect_stderr(err):
+            with self.assertRaises(SystemExit):
+                main(["-v", "render", "x.json"])
+        self.assertIn("unrecognized", err.getvalue())
+
+    def test_help_mentions_log_level(self):
+        out = io.StringIO()
+        with redirect_stdout(out):
+            with self.assertRaises(SystemExit):
+                main(["--help"])
+        self.assertIn("--log-level", out.getvalue())
 
 
 class SnapshotFixtureTest(unittest.TestCase):
@@ -229,7 +326,8 @@ class RunCommandTest(TempDirTest):
         self.assertIn("nginx-1.25.0-1.el9", html)
         self.assertIn("CVE-2024-7347.patch", html)
         self.assertNotIn("/*__DATA__*/", html)
-        self.assertIn("os-9.2: 2 билдов, 1 проблемных", err)
+        self.assertIn("os-9.2", err)
+        self.assertIn("2 билдов, 1 проблемных", err)
 
     def test_run_returns_one_when_problems_exceed_the_limit(self):
         code, err = self.run_cli(self.argv("run", "--tag", "os-9.2",
@@ -274,6 +372,21 @@ class RunCommandTest(TempDirTest):
                                            "-o", self.out_path()))
         self.assertEqual(code, 2)
         self.assertIn("нет-такого", err)
+
+
+class LoggerIsolationTest(unittest.TestCase):
+    def test_a_cli_test_leaves_the_package_logger_as_it_found_it(self):
+        # прогоняем настоящий тест целиком, вместе с его setUp и уборкой,
+        # и смотрим на глобальное состояние после: если восстановление
+        # пропадёт, этот тест упадёт
+        logger = logging.getLogger("kojipatch")
+        before = (list(logger.handlers), logger.level, logger.propagate)
+        case = CliRenderTest("test_render_two_snapshots")
+        result = unittest.TestResult()
+        case.run(result)
+        self.assertEqual(result.errors + result.failures, [])
+        self.assertEqual((list(logger.handlers), logger.level,
+                          logger.propagate), before)
 
 
 if __name__ == "__main__":
