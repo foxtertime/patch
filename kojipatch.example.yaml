@@ -28,3 +28,6 @@ patch_classes:
   # Правило стоит после CVE/SAST/DAST: спек-патч, закрывающий CVE, — прежде
   # всего CVE.
   - { name: SPEC, pattern: '(?i)\.spec\.' }
+  # changelog.yaml — не исправление, а бухгалтерия каталога: своим классом он
+  # перестаёт разбавлять other. Короткое написание .yml тоже ловится.
+  - { name: CHANGELOG, pattern: '(?i)changelog\.ya?ml' }

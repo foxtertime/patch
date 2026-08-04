@@ -177,6 +177,21 @@ class DefaultRulesOnRealNamesTest(unittest.TestCase):
         self.assertEqual(self.classifier.classify("specialcase.patch"),
                          "other")
 
+    def test_changelog(self):
+        self.assertEqual(self.classifier.classify("changelog.yaml"),
+                         "CHANGELOG")
+
+    def test_changelog_with_a_component_prefix(self):
+        self.assertEqual(self.classifier.classify("nginx-changelog.yaml"),
+                         "CHANGELOG")
+
+    def test_changelog_in_the_short_yaml_spelling(self):
+        self.assertEqual(self.classifier.classify("changelog.yml"), "CHANGELOG")
+
+    def test_changelog_needs_the_yaml_extension(self):
+        # просто «changelog» без расширения — не тот файл, о котором речь
+        self.assertEqual(self.classifier.classify("changelog.patch"), "other")
+
     def test_cve_wins_over_spec(self):
         # спек-патч, закрывающий CVE, — прежде всего CVE: класс отвечает на
         # вопрос «зачем патч», а не «какой файл он правит»
