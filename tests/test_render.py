@@ -66,6 +66,38 @@ class PageDataTest(unittest.TestCase):
         self.assertEqual(counts["by_class"]["CVE"], {"builds": 1, "files": 1})
         self.assertEqual(counts["by_class"]["DAST"], {"builds": 0, "files": 0})
 
+    def test_tags_keep_one_order_whatever_the_file_order(self):
+        # порядок файлов в каталоге PATCH задаёт GitLab, и он разный от
+        # репозитория к репозиторию. Колонка «теги» читается по месту:
+        # если у одной строки cve первый, а у соседней второй, читать её
+        # глазами невозможно
+        forward = build("a", patches=[patch("CVE-2024-7347.patch", "CVE"),
+                                      patch("sast-x.patch", "SAST")])
+        backward = build("b", patches=[patch("SAST-x.patch", "SAST"),
+                                       patch("cve-2024-7347.patch", "CVE")])
+        rows = {r["name"]: r for r in
+                self.data([snap("t", [forward, backward])])["snapshots"][0]["builds"]}
+        self.assertEqual(rows["a"]["tags"], ["cve", "sast"])
+        self.assertEqual(rows["b"]["tags"], ["cve", "sast"])
+
+    def test_classes_go_in_classifier_order_not_alphabetically(self):
+        # тот же порядок, что у карточек классов: конфиг перечислил
+        # CVE, SAST, DAST — значит и в метках он такой
+        row = self.data([snap("t", [build("a", patches=[
+            patch("dast-x.patch", "DAST"),
+            patch("sast-x.patch", "SAST"),
+            patch("CVE-2024-7347.patch", "CVE")])])])["snapshots"][0]["builds"][0]
+        self.assertEqual(row["tags"], ["cve", "sast", "dast"])
+
+    def test_state_tags_follow_a_fixed_order(self):
+        row = self.data([snap("t", [build(
+            "a", tag_name="parent", present=False,
+            problems=["gitlab: 404", "internal error: boom"],
+            patches=[patch("CVE-2024-7347.patch", "CVE")])])]
+        )["snapshots"][0]["builds"][0]
+        self.assertEqual(row["tags"], ["cve", "inherited", "no-patch",
+                                       "gitlab-error", "internal-error"])
+
     def test_direct_and_inherited_builds_are_told_apart(self):
         rows = self.data([snap("os-9.2", [
             build("nginx", tag_name="os-9.2"),
@@ -90,6 +122,22 @@ class PageDataTest(unittest.TestCase):
             build("vim", tag_name="os-9-base")])])["snapshots"][0]["counts"]
         self.assertEqual(counts["inherited"], 2)
         self.assertEqual(counts["direct"], 1)
+
+    def test_diff_tags_follow_a_fixed_order(self):
+        # та же причина, что и в «Состоянии»: колонку читают по месту.
+        # Статус всегда первый, дальше — что именно поехало
+        old = snap("os-9.1", [build("nginx", "1.0", ref="a",
+                                    tag_name="os-9-base",
+                                    patches=[patch("old.patch", "other")],
+                                    rpms=["nginx-1.0-1.el9.x86_64"])])
+        new = snap("os-9.2", [build("nginx", "1.0", ref="b",
+                                    tag_name="os-9.2",
+                                    patches=[patch("new.patch", "other")],
+                                    rpms=["nginx-1.0-1.el9.aarch64"])])
+        row = self.data([old, new], diff_chain([old, new]))["pairs"][0]["rows"][0]
+        self.assertEqual(row["tags"],
+                         ["unchanged", "repackaged", "patches+", "patches-",
+                          "branch-changed", "tag-changed"])
 
     def test_pair_rows_carry_both_tags(self):
         old = snap("os-9.1", [build("nginx", tag_name="os-9-base")])

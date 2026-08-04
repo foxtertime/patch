@@ -53,7 +53,30 @@ def _inherited(build, tag: Optional[str]) -> Optional[bool]:
     return build.tag_name != tag
 
 
-def _build_tags(build, tag: Optional[str]) -> List[str]:
+# Порядок меток состояния после классов патчей. Он же порядок в колонке
+# «теги»: сперва откуда билд, потом что не так с патчами, потом ошибки.
+_STATE_TAG_ORDER = ("inherited", "no-source", "from-commit", "no-patch",
+                    "gitlab-error", "internal-error")
+
+
+def _tag_sort_key(tag: str, class_order: List[str]):
+    """Позиция метки в строке. Классы патчей идут первыми, в порядке
+    классификатора — том же, в каком стоят карточки классов."""
+    if tag in class_order:
+        return (0, class_order.index(tag), "")
+    if tag in _STATE_TAG_ORDER:
+        return (1, _STATE_TAG_ORDER.index(tag), "")
+    return (2, 0, tag)
+
+
+def _build_tags(build, tag: Optional[str], class_order=()) -> List[str]:
+    """Метки строки, всегда в одном и том же порядке.
+
+    Порядок здесь позиционный: колонку «теги» читают по месту, а порядок
+    файлов в каталоге PATCH задаёт GitLab и он разный от репозитория к
+    репозиторию. Без сортировки у одной строки первым стоял бы cve, у
+    соседней sast, и колонка перестала бы читаться.
+    """
     tags = []
     for patch in build.patches:
         tag_key = slug(patch.cls)
@@ -72,7 +95,7 @@ def _build_tags(build, tag: Optional[str]) -> List[str]:
         tags.append("gitlab-error")
     if any(p.startswith("internal error") for p in build.problems):
         tags.append("internal-error")
-    return tags
+    return sorted(tags, key=lambda t: _tag_sort_key(t, list(class_order)))
 
 
 def _patch_dict(patch) -> Dict[str, object]:
@@ -80,7 +103,8 @@ def _patch_dict(patch) -> Dict[str, object]:
             "cves": list(patch.cves), "url": patch.web_url}
 
 
-def _build_row(build, koji_web, tag: Optional[str] = None) -> Dict[str, object]:
+def _build_row(build, koji_web, tag: Optional[str] = None,
+               class_order=()) -> Dict[str, object]:
     counts = {}
     for patch in build.patches:
         counts[patch.cls] = counts.get(patch.cls, 0) + 1
@@ -101,7 +125,8 @@ def _build_row(build, koji_web, tag: Optional[str] = None) -> Dict[str, object]:
         # архитектуры и сам ничего не пересортировывает
         "patch_counts": counts, "rpms": sort_rpms(build.rpms),
         "patch_dir_present": build.patch_dir_present,
-        "problems": list(build.problems), "tags": _build_tags(build, tag),
+        "problems": list(build.problems),
+        "tags": _build_tags(build, tag, class_order),
     }
 
 
@@ -180,10 +205,13 @@ def _diff_row(component, koji_web, old_tag=None, new_tag=None) -> Dict[str, obje
 def build_page_data(snapshots, pairs, classifier) -> Dict[str, object]:
     """Собирает всё, что нужно фронтенду, в один сериализуемый словарь."""
     class_names = classifier.class_names()
+    # метки классов в строке — те же slug'и, что и ключи карточек классов
+    class_order = [slug(name) for name in class_names]
     snapshot_blocks = []
     for snapshot in snapshots:
         # порядок билдов в снапшоте не гарантирован — сортируем здесь
-        rows = sorted((_build_row(b, snapshot.koji_web, snapshot.tag)
+        rows = sorted((_build_row(b, snapshot.koji_web, snapshot.tag,
+                                  class_order)
                        for b in snapshot.builds),
                       key=lambda row: row["name"])
         snapshot_blocks.append({
