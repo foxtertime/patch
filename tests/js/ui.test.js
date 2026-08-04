@@ -468,6 +468,45 @@ test('подписи классов не переживают выгрузку �
                      'фильтр класса из выгруженного снапшота остался живым');
 });
 
+/* Карточки класса скрипт рисует через innerHTML, а заглушка разметку из
+   строк не разбирает. Ставим такую же карточку настоящим узлом: проверяется
+   делегированный обработчик, а не то, как браузер её отрисует. */
+function pressCard(dom, host, key) {
+  var node = dom.document.createElement('div');
+  node.setAttribute('class', 'card');
+  node.setAttribute('data-filter', key);
+  dom.id(host).appendChild(node);
+  dom.fire(node, 'click', {});
+}
+
+/* Тот же отсев, но на пути applyData: снапшоты человек выгружает и
+   догружает, и класс патчей уходит вместе со своим снапшотом. Через
+   hashchange это ловится, а через applyData — нет: адрес там свой,
+   перечитывать его нельзя, и отсев без него не случался вовсе. */
+test('фильтр по классу не переживает смену состава снапшотов',
+     async function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL,
+                  { classes: ['SAST'],
+                    builds: [build('nginx', { patches: [patch('s.patch', 'SAST')] })] })],
+            'a.json');
+  await dom.tick();
+  pressCard(dom, 'tab-state', 'sast');            /* человек включил фильтр */
+  assert.ok(dom.id('chips').innerHTML.indexOf('sast') !== -1,
+            dom.id('chips').innerHTML);
+  store.remove(0);
+  store.add([snap('os-9.2', AUG,
+                  { classes: ['CVE'],
+                    builds: [build('nginx', { patches: [patch('c.patch', 'CVE')] })] })],
+            'b.json');
+  await dom.tick();
+  assert.strictEqual(dom.id('chips').innerHTML, '',
+                     'фильтр класса из выгруженного снапшота остался живым');
+  assert.ok(dom.id('state-rows').innerHTML.indexOf('nginx') !== -1,
+            'таблица пуста под фильтр, которого нет ни на одной карточке: '
+            + dom.id('state-rows').innerHTML);
+});
+
 /* Файлы роняют на страницу по одному, и каждый — отдельный store.add, то
    есть отдельный applyData. Обещание README «открывается на последнем
    снапшоте цепочки и на самом широком переходе» обязано выполняться и
@@ -484,6 +523,21 @@ test('снапшоты приехали по одному — открыт са�
   assert.strictEqual(pressedTag(dom.id('tag-select').innerHTML), 'os-9.3',
                      dom.id('tag-select').innerHTML);
   /* Пар три: os-9.1→os-9.2, os-9.2→os-9.3 и сводная os-9.1→os-9.3. */
+  assert.strictEqual(pressedPair(dom.id('pair-select').innerHTML), '2',
+                     dom.id('pair-select').innerHTML);
+});
+
+/* Тот же вид обязан открываться и с одного файла на три снапшота: applyData
+   здесь один, а не три, и умолчание не должно зависеть от числа вызовов. */
+test('три снапшота одним файлом — тот же свежий снапшот и тот же широкий переход',
+     async function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { builds: [build('nginx')] }),
+             snap('os-9.2', AUG, { builds: [build('nginx')] }),
+             snap('os-9.3', SEP, { builds: [build('nginx')] })], 'all.json');
+  await dom.tick();
+  assert.strictEqual(pressedTag(dom.id('tag-select').innerHTML), 'os-9.3',
+                     dom.id('tag-select').innerHTML);
   assert.strictEqual(pressedPair(dom.id('pair-select').innerHTML), '2',
                      dom.id('pair-select').innerHTML);
 });

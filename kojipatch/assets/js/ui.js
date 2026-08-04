@@ -72,6 +72,13 @@
        выбор в обход picked, снова похоронив умолчание. Ссылку, присланную
        позже, приносит hashchange. */
     if (!hashIsOurs) readHash();
+    /* Фильтр переживает смену состава снапшотов, а его предмет — нет: класс
+       патчей уходит вместе со своим снапшотом, тег строки — вместе с
+       последней такой строкой. Зовём отдельно от readHash(), который выше
+       зовут уже не всегда: иначе страница показывала бы пустую таблицу под
+       фильтр, которого не поставить и не снять — карточки с ним не осталось
+       ни одной, а в чипе вместо подписи стоял бы сам ключ. */
+    dropDeadFilters();
     showTab(st.tab);
     rebuild();
     renderMeta();
@@ -1197,10 +1204,11 @@
     try { return decodeURIComponent(s); } catch (e) { return null; }
   }
 
-  /* Токен фильтра из хеша мог устареть (тег пересобрали, класс переименовали).
-     Свой мы узнаём по подписи, по классу патчей или по тегу живой строки;
-     чужой молча выбрасываем, чтобы страница не показывала пустую таблицу под
-     фильтр, которого не поставить и не снять — его нет ни на одной карточке. */
+  /* Токен фильтра мог устареть — приехать из чужого хеша или пережить свой
+     снапшот. Свой мы узнаём по подписи, по классу патчей или по тегу живой
+     строки; чужой молча выбрасываем, чтобы страница не показывала пустую
+     таблицу под фильтр, которого не поставить и не снять — его нет ни на
+     одной карточке. */
   function knownFilter(key) {
     var i;
     if (!key || key === 'all') return false;
@@ -1214,6 +1222,24 @@
       if (rows[i].tags.indexOf(key) !== -1) return true;
     }
     return false;
+  }
+
+  /* Единственное место, где обещание knownFilter выполняется: и для фильтров
+     из хеша, и для тех, что человек поставил кликом, а данные под ними
+     сменились. Обе вкладки сразу — фильтры у них свои, а knownFilter судит
+     по данным текущей, поэтому на время отсева текущей побывает каждая. */
+  function dropDeadFilters() {
+    var was = st.tab, tabs = ['state', 'diff'], t, i, from, live;
+    for (t = 0; t < tabs.length; t++) {
+      st.tab = tabs[t];
+      from = keys(activeFilters());
+      live = [];
+      for (i = 0; i < from.length; i++) {
+        if (knownFilter(from[i])) live.push(from[i]);
+      }
+      st.filters[st.tab] = setFrom(live);
+    }
+    st.tab = was;
   }
 
   function readHash() {
@@ -1263,13 +1289,9 @@
        из неё — диффовые; на вкладке состояния они дали бы пустую таблицу без
        единого намёка почему. */
     if (dropped) filters = null;
-    if (filters) {
-      var live = [];
-      for (i = 0; i < filters.length; i++) {
-        if (knownFilter(filters[i])) live.push(filters[i]);
-      }
-      st.filters[st.tab] = setFrom(live);
-    }
+    /* Что из этого живое, решает dropDeadFilters() — его зовут оба, кто
+       читает хеш, и оба по той же причине, что и после смены данных. */
+    if (filters) st.filters[st.tab] = setFrom(filters);
     if (sort && sort[0]) {
       st.sort[st.tab] = { key: sort[0], asc: sort[1] !== 'desc' };
     }
@@ -1462,7 +1484,7 @@
 
   window.addEventListener('hashchange', function () {
     if (hashLock) return;
-    if (readHash()) { showTab(st.tab); rebuild(); }
+    if (readHash()) { dropDeadFilters(); showTab(st.tab); rebuild(); }
   });
 
   /* ---------- подсказки ---------- */
