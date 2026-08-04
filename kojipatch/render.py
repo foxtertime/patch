@@ -7,6 +7,7 @@ from typing import Dict, List, Optional
 from urllib.parse import quote
 
 from .diff import align_rpms
+from .rpms import sort_rpms
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +82,9 @@ def _build_row(build, koji_web) -> Dict[str, object]:
         "completed": build.completed, "owner": build.owner,
         "build_id": build.build_id, "task_id": build.task_id,
         "patches": [_patch_dict(p) for p in build.patches],
-        "patch_counts": counts, "rpms": list(build.rpms),
+        # порядок задаём здесь: дашборд режет список на блоки по смене
+        # архитектуры и сам ничего не пересортировывает
+        "patch_counts": counts, "rpms": sort_rpms(build.rpms),
         "patch_dir_present": build.patch_dir_present,
         "problems": list(build.problems), "tags": _build_tags(build),
     }

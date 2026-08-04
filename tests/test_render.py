@@ -65,6 +65,16 @@ class PageDataTest(unittest.TestCase):
         self.assertEqual(counts["by_class"]["CVE"], {"builds": 1, "files": 1})
         self.assertEqual(counts["by_class"]["DAST"], {"builds": 0, "files": 0})
 
+    def test_build_rpms_come_grouped_by_arch(self):
+        # дашборд режет список на блоки по смене архитектуры, поэтому
+        # порядок задаётся здесь, а не в браузере
+        rows = self.data([snap("t", [build("nginx", rpms=[
+            "nginx-1.0-1.el9.x86_64", "nginx-1.0-1.el9.src",
+            "nginx-doc-1.0-1.el9.noarch", "nginx-core-1.0-1.el9.x86_64"])])])
+        self.assertEqual(rows["snapshots"][0]["builds"][0]["rpms"], [
+            "nginx-1.0-1.el9.src", "nginx-doc-1.0-1.el9.noarch",
+            "nginx-1.0-1.el9.x86_64", "nginx-core-1.0-1.el9.x86_64"])
+
     def test_builds_are_sorted_by_name(self):
         rows = self.data()["snapshots"][0]["builds"]
         self.assertEqual([r["name"] for r in rows], ["curl", "nginx", "vim"])

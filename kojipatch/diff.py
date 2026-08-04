@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 from .model import Build, Snapshot
+from .rpms import arch_key, arch_of
 from .rpmvercmp import compare_evr
 
 logger = logging.getLogger(__name__)
@@ -100,17 +101,25 @@ def align_rpms(old: Optional[Build],
     иначе версии не сравнить глазами. Строки собираются по ключу
     (name.arch), а не по NVRA: NVRA несёт версию билда и с обновлением
     меняется целиком. Пропавший подпакет остаётся на своём месте с пустой
-    правой ячейкой; пришедший уходит вниз списка, чтобы не сдвигать всё,
-    что стоит выше.
+    правой ячейкой; пришедший уходит вниз своей группы, чтобы не сдвигать
+    всё, что стоит выше.
+
+    Строки идут группами по архитектуре, в порядке sort_key. Дашборд
+    рисует блоки, просто разрезая список по смене архитектуры, — поэтому
+    порядок задаётся здесь, один раз и сразу для обеих колонок.
     """
     old_keys = _rpm_keys(old) if old else {}
     new_keys = _rpm_keys(new) if new else {}
+    arches = sorted({arch_of(k) for k in set(old_keys) | set(new_keys)},
+                    key=arch_key)
     rows = []
-    for key in sorted(old_keys, key=lambda k: min(old_keys[k])):
-        rows.extend(_rpm_row_pairs(old_keys[key], new_keys.get(key, [])))
-    fresh = set(new_keys) - set(old_keys)
-    for key in sorted(fresh, key=lambda k: min(new_keys[k])):
-        rows.extend(_rpm_row_pairs([], new_keys[key]))
+    for arch in arches:
+        kept = [k for k in old_keys if arch_of(k) == arch]
+        for key in sorted(kept, key=lambda k: min(old_keys[k])):
+            rows.extend(_rpm_row_pairs(old_keys[key], new_keys.get(key, [])))
+        fresh = [k for k in new_keys if k not in old_keys and arch_of(k) == arch]
+        for key in sorted(fresh, key=lambda k: min(new_keys[k])):
+            rows.extend(_rpm_row_pairs([], new_keys[key]))
     return rows
 
 

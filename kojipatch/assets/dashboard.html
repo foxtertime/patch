@@ -228,6 +228,10 @@ tr.detail-row > td { background: var(--card); padding: .85rem .7rem 1.1rem 2.2re
 .pgroup .pclass { font-size: .7rem; font-weight: 700; letter-spacing: .05em;
   text-transform: uppercase; }
 .pgroup .pclass .n { color: var(--muted); font-weight: 600; }
+/* Блок архитектуры набран так же, как блок класса патчей, но без цвета:
+   цвет в этом дашборде означает класс патча, и раскрасить им ещё и
+   архитектуры значило бы завести вторую, ложную легенду. */
+.pgroup.arch .pclass { color: var(--fg); }
 .plist { list-style: none; margin: .2rem 0 0; padding: .1rem 0 .1rem .6rem;
   border-left: 2px solid currentColor; }
 .plist li { color: var(--fg); font-size: .82rem; padding: .1rem 0;
@@ -767,35 +771,68 @@ function patchesHtml(patches, q, mark, markCls) {
   return out;
 }
 
-/* Пакеты одного билда: просто список, без выравнивания. */
+/* Архитектура — хвост после последней точки: точки внутри версии и
+   релиза не мешают, архитектура в имени всегда последняя. */
+function archOf(nvra) {
+  var at = nvra.lastIndexOf('.');
+  return at === -1 ? '?' : nvra.slice(at + 1);
+}
+
+function rowArch(row) {
+  return archOf(row[0] === null ? row[1] : row[0]);
+}
+
+function archGroupHtml(arch, count, body) {
+  return '<div class="pgroup arch"><div class="pclass">' + esc(arch)
+       + ' <span class="n">' + count + '</span></div><ul class="rlist">'
+       + body + '</ul></div>';
+}
+
+/* Пакеты приходят из Python уже разложенными: сначала src, потом noarch,
+   дальше остальные архитектуры. Здесь список только режется на блоки по
+   смене архитектуры — своего порядка фронтенд не заводит, иначе колонки
+   «было» и «стало» разъехались бы. */
 function rpmsHtml(list, q) {
   if (!list.length) return '<div class="none">пакетов нет</div>';
-  var out = '<ul class="rlist">';
-  for (var i = 0; i < list.length; i++) {
-    out += '<li>' + hl(list[i], q) + '</li>';
+  var out = '', i = 0;
+  while (i < list.length) {
+    var arch = archOf(list[i]), body = '', n = 0;
+    while (i < list.length && archOf(list[i]) === arch) {
+      body += '<li>' + hl(list[i], q) + '</li>';
+      i++; n++;
+    }
+    out += archGroupHtml(arch, n, body);
   }
-  return out + '</ul>';
+  return out;
 }
 
 /* Одна колонка выровненной таблицы пакетов. rows приходят из diff.py уже
    спаренными: [было, стало], где null означает «на этой стороне пакета
-   нет». Обе стороны печатают одинаковое число строк, поэтому один и тот
-   же подпакет стоит слева и справа на одной высоте, а пустая ячейка
-   напротив соседа читается как «пропал» или «пришёл». */
+   нет». Обе стороны печатают одинаковое число строк и одинаковые блоки,
+   поэтому один и тот же подпакет стоит слева и справа на одной высоте, а
+   пустая ячейка напротив соседа читается как «пропал» или «пришёл».
+   В заголовке блока — счётчик своей стороны, поэтому у исчезнувшей
+   целиком архитектуры он честно показывает 0. */
 function rpmSideHtml(rows, at, q, markCls) {
   if (!rows.length) return '<div class="none">пакетов нет</div>';
-  var out = '<ul class="rlist">';
-  for (var i = 0; i < rows.length; i++) {
-    var mine = rows[i][at], other = rows[i][1 - at];
-    if (mine === null) {
-      out += '<li class="rgap">·</li>';
-      continue;
+  var out = '', i = 0;
+  while (i < rows.length) {
+    var arch = rowArch(rows[i]), body = '', n = 0;
+    while (i < rows.length && rowArch(rows[i]) === arch) {
+      var mine = rows[i][at], other = rows[i][1 - at];
+      if (mine === null) {
+        body += '<li class="rgap">·</li>';
+      } else {
+        var hot = other === null;
+        body += '<li' + (hot ? ' class="' + markCls + '"' : '') + '>'
+             + (hot ? signHtml(markCls) : '') + hl(mine, q) + '</li>';
+        n++;
+      }
+      i++;
     }
-    var hot = other === null;
-    out += '<li' + (hot ? ' class="' + markCls + '"' : '') + '>'
-        + (hot ? signHtml(markCls) : '') + hl(mine, q) + '</li>';
+    out += archGroupHtml(arch, n, body);
   }
-  return out + '</ul>';
+  return out;
 }
 
 function rpmSideCount(rows, at) {

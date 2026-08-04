@@ -2,6 +2,7 @@ import unittest
 
 from kojipatch.diff import align_rpms, diff_chain, diff_snapshots
 from kojipatch.model import Build, Patch, Snapshot, Source
+from kojipatch.rpms import arch_of
 
 
 def nvra(sub, version, release, arch="x86_64"):
@@ -204,6 +205,37 @@ class AlignRpmsTest(unittest.TestCase):
         self.assertEqual(rows, [["nginx-1.0-1.el9.aarch64", None],
                                 ["nginx-1.0-1.el9.x86_64",
                                  "nginx-1.0-1.el9.x86_64"]])
+
+    def test_rows_come_grouped_by_arch(self):
+        # дашборд рисует группы, просто разрезая строки по смене
+        # архитектуры, — значит порядок обязан задавать этот код
+        both = [nvra("nginx", "1.0", "1.el9", "x86_64"),
+                nvra("nginx", "1.0", "1.el9", "src"),
+                nvra("nginx-doc", "1.0", "1.el9", "noarch")]
+        rows = align_rpms(build("nginx", rpms=both), build("nginx", rpms=both))
+        self.assertEqual([arch_of(row[0]) for row in rows],
+                         ["src", "noarch", "x86_64"])
+
+    def test_new_subpackage_goes_to_the_bottom_of_its_own_arch(self):
+        # «вниз списка» — вниз своей группы, иначе пакет уедет под чужой
+        # заголовок архитектуры
+        rows = align_rpms(
+            build("nginx", rpms=[nvra("nginx", "1.0", "1.el9", "noarch"),
+                                 nvra("nginx", "1.0", "1.el9", "x86_64")]),
+            build("nginx", rpms=[nvra("nginx", "1.0", "1.el9", "noarch"),
+                                 nvra("aaa", "1.0", "1.el9", "noarch"),
+                                 nvra("nginx", "1.0", "1.el9", "x86_64")]))
+        self.assertEqual(rows, [
+            ["nginx-1.0-1.el9.noarch", "nginx-1.0-1.el9.noarch"],
+            [None, "aaa-1.0-1.el9.noarch"],
+            ["nginx-1.0-1.el9.x86_64", "nginx-1.0-1.el9.x86_64"]])
+
+    def test_arch_present_on_one_side_only_still_keeps_its_group(self):
+        rows = align_rpms(
+            build("nginx", rpms=[nvra("nginx", "1.0", "1.el9", "aarch64")]),
+            build("nginx", rpms=[nvra("nginx", "1.0", "1.el9", "x86_64")]))
+        self.assertEqual(rows, [["nginx-1.0-1.el9.aarch64", None],
+                                [None, "nginx-1.0-1.el9.x86_64"]])
 
     def test_rows_agree_with_the_deltas(self):
         # выравнивание и rpms_added/rpms_removed считают одно и то же:
