@@ -115,8 +115,17 @@ class TemplateContractTest(unittest.TestCase):
                      "--accent", "--added", "--removed", "--hit"):
             self.assertIn(name, self.html, name)
 
-    def test_supports_dark_theme(self):
-        self.assertIn("prefers-color-scheme: dark", self.html)
+    def test_page_is_dark_only(self):
+        """Тема одна, и это выбор, а не умолчание.
+
+        color-scheme говорит о нём браузеру: без него полосы прокрутки и
+        внутренности поля поиска остаются светлыми. Заодно сторожим, что
+        светлая ветка не вернётся половинчато: перекрытие по
+        prefers-color-scheme на странице с одной темой означало бы, что
+        часть цветов живёт по одним правилам, а часть по другим.
+        """
+        self.assertIn("color-scheme: dark", self.html)
+        self.assertNotIn("prefers-color-scheme", self.html)
 
     def test_diff_tab_starts_filtered_to_changed_rows(self):
         # обещание спеки и README: «Изменения» открываются на изменившихся

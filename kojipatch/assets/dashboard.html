@@ -6,22 +6,29 @@
 <title>Koji patch dashboard</title>
 <style>
 :root {
-  /* Ground / surface, а не «белое на белом»: карточки и шапка таблицы
-     всплывают над мягким фоном, и границы почти не нужны. Акцент —
-     приглушённый сине-серый: девять цветов классов патчей уже значат
-     что-то, и десятый яркий цвет спорил бы с ними за внимание. */
-  --bg: #f4f5f7; --fg: #15181c; --muted: #6b727b; --line: #e2e5e9;
-  --card: #ffffff; --accent: #2f5d8a; --up: #15803d; --down: #b91c1c;
-  --major: #b45309; --added: #15803d; --removed: #b91c1c; --repack: #7c3aed;
-  --hit: #fde68a; --hitfg: #1a1a1a;
-  --shadow: 0 1px 2px rgba(21, 24, 28, .05);
-  --lift: 0 3px 10px rgba(21, 24, 28, .08);
+  /* Тема одна — тёмная, и это выбор, а не умолчание. color-scheme говорит
+     о нём браузеру: полосы прокрутки, внутренности поля поиска и системные
+     рамки фокуса рисуются тёмными, иначе они светили бы белым посреди
+     страницы, к которой их никто не приглашал. */
+  color-scheme: dark;
+  /* Глубина берётся не тенью, а светлотой: карточка светлее фона, и она
+     читается поднятой сама по себе. Акцент — приглушённый сине-серый:
+     девять цветов классов патчей уже значат что-то, и десятый яркий цвет
+     спорил бы с ними за внимание. */
+  --bg: #0f1216; --fg: #e8eaed; --muted: #99a1ab; --line: #252a31;
+  --card: #171b21; --accent: #8fb6da; --up: #4ade80; --down: #f87171;
+  --major: #fbbf24; --added: #4ade80; --removed: #f87171; --repack: #c4b5fd;
+  --hit: #78350f; --hitfg: #fef3c7;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .35);
+  --lift: 0 4px 14px rgba(0, 0, 0, .5);
   /* Цвета классов патчей. Они же красят «полоску состава» в колонке
      патчей, теги строк и полосы групп в развёрнутой строке: один и тот же
-     класс всюду одного цвета, иначе полоска ничего не сообщает. */
-  --autogen: #4338ca; --cve: #be123c; --sast: #6d28d9; --dast: #0e7490;
-  --coverage: #4d7c0f; --spec: #a16207; --changelog: #a21caf;
-  --files: #0f766e; --other: #6b7280;
+     класс всюду одного цвета, иначе полоска ничего не сообщает. Взяты
+     светлее и чище, чем берут для белого фона: на тёмном тёмный оттенок
+     сливается с ним и перестаёт быть меткой. */
+  --autogen: #818cf8; --cve: #fb7185; --sast: #a78bfa; --dast: #22d3ee;
+  --coverage: #a3e635; --spec: #fbbf24; --changelog: #e879f9;
+  --files: #5eead4; --other: #9ca3af;
   /* высоту панели фильтров проставляет JS — от неё зависит смещение
      «липкой» шапки таблицы. Значение здесь — запасное, до первого замера. */
   --controls-h: 3.4rem;
@@ -43,19 +50,6 @@
      а не как акцент. Движение снимается общим правилом в самом низу. */
   --dur: .16s;
   --ease: cubic-bezier(.2, .6, .3, 1);
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #101317; --fg: #e7e9ec; --muted: #98a0aa; --line: #262b32;
-    --card: #191d23; --accent: #8fb6da; --up: #4ade80; --down: #f87171;
-    --major: #fbbf24; --added: #4ade80; --removed: #f87171; --repack: #c4b5fd;
-    --hit: #78350f; --hitfg: #fef3c7;
-    --shadow: 0 1px 2px rgba(0, 0, 0, .3);
-    --lift: 0 3px 12px rgba(0, 0, 0, .45);
-    --autogen: #818cf8; --cve: #fb7185; --sast: #a78bfa; --dast: #22d3ee;
-    --coverage: #a3e635; --spec: #fbbf24; --changelog: #e879f9;
-    --files: #5eead4; --other: #9ca3af;
-  }
 }
 * { box-sizing: border-box; }
 body {
@@ -131,7 +125,9 @@ h1 .dot { color: var(--muted); font-weight: 400; }
   padding: 5rem 1.5rem; text-align: center; background: var(--card);
   transition: border-color var(--dur) var(--ease),
               background var(--dur) var(--ease); }
-.drop.over { border-color: var(--fg); background: var(--bg); }
+/* Пока файл над страницей, зона поднимается, а не темнеет: на тёмной теме
+   «активно» читается как «светлее», и обратное движение сбивало бы. */
+.drop.over { border-color: var(--fg); background: var(--line); }
 .dropmain { font-size: 1.05rem; font-weight: 500; letter-spacing: -.01em;
   margin: 0 0 .5rem; }
 .dropsub { color: var(--muted); font-size: .82rem; margin: 0; }
@@ -492,10 +488,14 @@ tr.detail-row > td { background: var(--card); padding: .85rem .7rem 1.1rem 2.2re
   box-shadow: 0 4px 14px rgba(0, 0, 0, .18); }
 #totop:hover { border-color: var(--accent); color: var(--accent); }
 #totop[hidden] { display: none; }
+/* Подсказка — приподнятая поверхность, а не вспышка. Инверсия «светлое на
+   тёмном» работала, пока страница была светлой; на тёмной такой всплывающий
+   прямоугольник бьёт по глазам сильнее, чем помогает. */
 #tip { position: fixed; display: none; z-index: 100; max-width: 320px;
-  background: var(--fg); color: var(--bg); font-size: .78rem; line-height: 1.45;
-  padding: .5rem .65rem; border-radius: 6px; pointer-events: none;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, .28); }
+  background: var(--card); color: var(--fg); border: 1px solid var(--line);
+  font-size: .78rem; line-height: 1.45;
+  padding: .5rem .65rem; border-radius: var(--r-1); pointer-events: none;
+  box-shadow: var(--lift); }
 /* Движения ровно столько, сколько его переживёт устройство отрисовки:
    таблица и карточки перестраиваются через innerHTML, поэтому появление
    анимировать нельзя — оно повторялось бы на каждое нажатие клавиши в
