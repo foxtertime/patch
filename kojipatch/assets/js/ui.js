@@ -15,8 +15,9 @@
   var DATA = { generated: '', patch_classes: [], snapshots: [], pairs: [] };
   var SNAPS = [], PAIRS = [], CLASSES = [];
 
-  /* Единственная дверь для данных: всё, что зависит от их состава, ниже
-     пересчитывается отсюда. */
+  /* Единственная дверь для данных: сюда приходит то, что посчитал
+     viewmodel.js, отсюда перерисовывается страница. Перерисовка — не
+     полный сброс: LABELS подписи прежних классов не забывает. */
   function applyData(pageData) {
     DATA = pageData;
     SNAPS = pageData.snapshots || [];

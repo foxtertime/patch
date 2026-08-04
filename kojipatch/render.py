@@ -277,6 +277,11 @@ def _encode(data: Dict[str, object]) -> str:
                 .replace("\u2029", "\\u2029"))
 
 
+# СЛОМАНА и не чинится: шаблон уехал в kojipatch/build.py, плейсхолдера
+# /*__DATA__*/ в dashboard.html больше нет, и любой вызов кончается
+# RenderError. Никто её не зовёт — страницу собирает build_html. Чинить
+# нечего: модуль целиком уходит следующей задачей, а до неё render.py жив
+# ради build_page_data, на котором держится сверка с эталоном.
 def render_html(snapshots, pairs, classifier,
                 template_path: Optional[str] = None) -> str:
     path = template_path or TEMPLATE_PATH

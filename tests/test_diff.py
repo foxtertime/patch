@@ -355,6 +355,13 @@ class ChainTest(unittest.TestCase):
                          [("a", "b", False), ("b", "c", False),
                           ("a", "c", True)])
 
+    def test_chain_length_is_logged_at_debug(self):
+        # цепочка — единственное место, где видно, сколько пар получилось
+        # из скольких снапшотов; на debug это первое, что спрашивают
+        with self.assertLogs("kojipatch.diff", level="DEBUG") as caught:
+            diff_chain([snap("a", []), snap("b", []), snap("c", [])])
+        self.assertIn("цепочка из 3 снапшотов", "\n".join(caught.output))
+
     def test_summary_compares_endpoints_not_steps(self):
         # компонент удалён на шаге 2 и вернулся на шаге 3 — в итоге он неизменен
         pairs = diff_chain([snap("a", [build("nginx")]), snap("b", []),
