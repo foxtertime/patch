@@ -8,7 +8,7 @@
     root.KP = root.KP || {};
     root.KP.text = factory();
   }
-}(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+}(typeof globalThis !== 'undefined' ? globalThis : this, () => {
   'use strict';
 
   function esc(s) {
@@ -22,7 +22,7 @@
   function hl(s, q) {
     s = String(s === null || s === undefined ? '' : s);
     if (!q) return esc(s);
-    var low = s.toLowerCase(), out = '', from = 0, at;
+    let low = s.toLowerCase(), out = '', from = 0, at;
     while ((at = low.indexOf(q, from)) !== -1) {
       out += esc(s.slice(from, at)) + '<span class="hit">'
           + esc(s.slice(at, at + q.length)) + '</span>';
@@ -50,7 +50,7 @@
   }
 
   function plural(n, one, few, many) {
-    var a = Math.abs(n) % 100, b = a % 10;
+    const a = Math.abs(n) % 100, b = a % 10;
     if (a > 10 && a < 20) return many;
     if (b > 1 && b < 5) return few;
     if (b === 1) return one;
@@ -62,11 +62,11 @@
      dashboard, а разбор увёл бы подпись в часовой пояс читателя — снапшот
      же собран там, где стоит хаб. */
   function stampOf(value) {
-    var text = String(value === null || value === undefined ? '' : value);
+    let text = String(value === null || value === undefined ? '' : value);
     return text.slice(0, 16).replace('T', ' ');
   }
 
-  var MINUTE = 60000, HOUR = 60 * MINUTE, DAY = 24 * HOUR;
+  const MINUTE = 60000, HOUR = 60 * MINUTE, DAY = 24 * HOUR;
 
   /* Расстояние между соседними снапшотами — над отрезком рельса. Единица
      берётся крупная: под узлами и так стоят полные даты, а от подписи нужен
@@ -76,7 +76,7 @@
      Порядок концов не важен, берётся модуль: цепочку переставляют руками, и
      у переставленной пары расстояние то же самое. */
   function gapLabel(from, to) {
-    var a = Date.parse(from), b = Date.parse(to), ms;
+    let a = Date.parse(from), b = Date.parse(to), ms;
     if (isNaN(a) || isNaN(b)) return '';
     ms = Math.abs(b - a);
     if (ms < MINUTE) return '';
@@ -87,14 +87,14 @@
   }
 
   function keys(obj) {
-    var out = [];
-    for (var k in obj) { if (obj.hasOwnProperty(k)) out.push(k); }
+    let out = [];
+    for (const k in obj) { if (obj.hasOwnProperty(k)) out.push(k); }
     return out;
   }
 
   function setFrom(list) {
-    var out = {};
-    for (var i = 0; i < (list || []).length; i++) out[list[i]] = 1;
+    let out = {};
+    for (const key of list || []) out[key] = 1;
     return out;
   }
 

@@ -8,15 +8,15 @@
     root.KP = root.KP || {};
     root.KP.tips = factory();
   }
-}(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+}(typeof globalThis !== 'undefined' ? globalThis : this, () => {
   'use strict';
 
-  var DELAY = 450;
+  const DELAY = 450;
 
   function create(deps) {
-    var tip = deps.node;
-    var timer = null;
-    var current = null;
+    const tip = deps.node;
+    let timer = null;
+    let current = null;
 
     function anchorOf(node) {
       while (node && node.getAttribute) {
@@ -30,11 +30,11 @@
       tip.textContent = el.getAttribute('data-tip');
       tip.style.visibility = 'hidden';
       tip.style.display = 'block';
-      var host = el.getBoundingClientRect();
-      var box = tip.getBoundingClientRect();
-      var left = Math.min(Math.max(8, host.left + (host.width - box.width) / 2),
+      const host = el.getBoundingClientRect();
+      const box = tip.getBoundingClientRect();
+      let left = Math.min(Math.max(8, host.left + (host.width - box.width) / 2),
                           window.innerWidth - box.width - 8);
-      var top = host.bottom + 8;
+      let top = host.bottom + 8;
       if (top + box.height > window.innerHeight - 8) {
         top = host.top - box.height - 8;
       }
@@ -51,29 +51,29 @@
 
     /* Делегирование, а не обход всех [data-tip]: строки таблицы и карточки
        перерисовываются, и навешенные обработчики умирали бы вместе с ними. */
-    document.addEventListener('mouseover', function (e) {
-      var el = anchorOf(e.target);
+    document.addEventListener('mouseover', (e) => {
+      const el = anchorOf(e.target);
       if (el === current) return;
       hide();
       current = el;
       if (el) {
-        timer = setTimeout(function () {
+        timer = setTimeout(() => {
           if (current === el) place(el);
         }, DELAY);
       }
     });
     document.addEventListener('mouseleave', hide);
     /* С клавиатуры ждать незачем — показываем сразу. */
-    document.addEventListener('focusin', function (e) {
-      var el = anchorOf(e.target);
+    document.addEventListener('focusin', (e) => {
+      const el = anchorOf(e.target);
       hide();
       if (el) { current = el; place(el); }
     });
     document.addEventListener('focusout', hide);
     window.addEventListener('scroll', hide, true);
 
-    return { hide: hide };
+    return { hide };
   }
 
-  return { create: create };
+  return { create };
 }));
