@@ -1806,7 +1806,7 @@
       + '<button type="button" class="ghost pick" data-add="1"'
       + ' data-tip="Добавить снапшоты из файлов">'
       + '<span class="sign">+</span><span class="nm">добавить</span>'
-      + '<span class="when">из файлов</span></button>';
+      + '<span class="when">снапшот</span></button>';
   }
 
   /* Рельс перерисовывается целиком, и нажатая кнопка исчезает вместе с

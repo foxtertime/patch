@@ -125,7 +125,10 @@ h1 .dot { color: var(--muted); font-weight: 400; }
    Сетка у чипа из двух колонок: точка стоит слева от тега, а время сбора
    уходит во вторую строку под тег — оно уточняет снапшот, а не называет
    его, и в один ряд с тегом спорило бы с ним за первый взгляд. */
-.pick { display: grid; grid-template-columns: auto minmax(0, 1fr);
+/* Первая колонка задана числом, а не auto: в ней стоит либо точка узла,
+   либо знак призрака, и от auto колонка мерилась бы по знаку — призрак
+   выходил бы на пару точек шире соседей. Девять — это и есть точка. */
+.pick { display: grid; grid-template-columns: 9px minmax(0, 1fr);
   column-gap: .5rem; row-gap: .05rem; align-items: center; text-align: left;
   color: var(--muted); padding: .5rem .6rem; background: none;
   box-shadow: none; border-radius: var(--r-1); font: inherit;
@@ -141,9 +144,15 @@ button.pick { border-color: var(--line); }
 .pick .nm { grid-row: 1; font-size: .95rem; line-height: 1.2rem;
   font-weight: 600; letter-spacing: -.01em; }
 /* Время сбора приглушено при любом состоянии узла: оно уточняет тег и
-   тогда, когда сам тег горит белым. */
+   тогда, когда сам тег горит белым.
+
+   Ширину узла задаёт эта строка: шестнадцать знаков «ГГГГ-ММ-ДД ЧЧ:ММ»,
+   выраженные в ch — в моноширинном это ровно их и есть. Отсюда все узлы
+   рельса одной ширины, и призрак в его конце тоже: ряд разношироких чипов
+   читался бы как список, а не как рельс. */
 .pick .when { grid-column: 2; color: var(--muted); font-size: .72rem;
-  line-height: 1.05rem; font-variant-numeric: tabular-nums; }
+  line-height: 1.05rem; font-variant-numeric: tabular-nums;
+  min-width: 16ch; }
 /* Выбранный узел — белая рамка и залитая точка: и на «Состоянии», где так
    помечен открытый снапшот, и на «Изменениях», где так помечены концы
    диапазона. */
@@ -190,8 +199,10 @@ button.pick:hover { background: var(--card); color: var(--fg);
 .ghost { border-style: dashed; }
 /* Не .plus: этим классом на странице покрашены прибавившиеся RPM, и знак
    на призраке позеленел бы вместе с ними. */
-.ghost .sign { grid-row: 1; font-size: .95rem; line-height: 1.2rem;
-  font-weight: 600; width: 9px; text-align: center; }
+/* Знак стоит в клетке точки и в неё же вписан: крупнее — и он вылез бы
+   за её края. */
+.ghost .sign { grid-row: 1; font-size: .8rem; line-height: 1.2rem;
+  font-weight: 700; text-align: center; }
 .rl.dash::after { background: none;
   border-top: 1px dashed var(--line); height: 0; }
 /* Метка сводного диапазона стоит в конце рельса — там, где кончается
