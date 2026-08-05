@@ -78,7 +78,7 @@
     }
 
     function snapIndexByKey(key) {
-      for (var i = 0; i < SNAPS.length; i++) {
+      for (let i = 0; i < SNAPS.length; i++) {
         if (snapKey(SNAPS[i]) === key) return i;
       }
       return -1;
@@ -356,34 +356,33 @@
 
     /* ---------- какие строки видны ---------- */
 
-    function visibleRows() {
-      let q = st.q, out = [], i, row, scan;
-      if (st.tab === 'diff') {
-        let pair = curPair();
-        const rows = pair ? pair.rows : [];
-        for (i = 0; i < rows.length; i++) {
-          row = rows[i];
-          if (!diffMatches(row)) continue;
-          scan = scanDiff(row, q);
-          if (!scan.show) continue;
-          out.push({ row: row, open: scan.deep });
-        }
-        return out;
-      }
-      const snap = curSnap();
-      const builds = snap ? snap.builds : [];
-      for (i = 0; i < builds.length; i++) {
-        row = builds[i];
-        if (!stateMatches(row)) continue;
-        scan = scanState(row, q);
-        if (!scan.show) continue;
-        out.push({ row: row, open: scan.deep });
+    /* Строки одной вкладки: сперва фильтры, потом поиск. Правило одно на
+       обе, разные у них только источник строк и пара считалок. */
+    function pick(rows, matches, scan) {
+      const out = [];
+      for (const row of rows) {
+        if (!matches(row)) continue;
+        const found = scan(row, st.q);
+        if (!found.show) continue;
+        out.push({ row, open: found.deep });
       }
       return out;
     }
 
+    function visibleRows() {
+      if (st.tab === 'diff') {
+        const pair = curPair();
+        return pick(pair ? pair.rows : [], diffMatches, scanDiff);
+      }
+      const snap = curSnap();
+      return pick(snap ? snap.builds : [], stateMatches, scanState);
+    }
+
     function totalRows() {
-      if (st.tab === 'diff') { var p = curPair(); return p ? p.rows.length : 0; }
+      if (st.tab === 'diff') {
+        const pair = curPair();
+        return pair ? pair.rows.length : 0;
+      }
       const s = curSnap();
       return s ? s.builds.length : 0;
     }
@@ -551,22 +550,22 @@
     function data() { return DATA; }
 
     return {
-      st: st, picked: picked,
-      applyData: applyData, snapshots: snapshots, data: data,
-      curSnap: curSnap, curPair: curPair,
-      snapKey: snapKey, snapIndexByKey: snapIndexByKey, snapNamed: snapNamed,
-      currentEnds: currentEnds, pairKey: pairKey, pairFor: pairFor,
-      lastEndsNamed: lastEndsNamed, endsFromName: endsFromName,
-      setPairEnds: setPairEnds, selectSnapshot: selectSnapshot,
-      anchor: anchorAt, setAnchor: setAnchor,
-      activeFilters: activeFilters, toggleFilter: toggleFilter,
-      knownFilter: knownFilter, dropDeadFilters: dropDeadFilters,
-      visibleRows: visibleRows, totalRows: totalRows,
-      sortRows: sortRows, sortBy: sortBy,
-      rowKey: rowKey, openOf: openOf, setOpen: setOpen,
-      restore: restore, hashParts: hashParts
+      st, picked,
+      applyData, snapshots, data,
+      curSnap, curPair,
+      snapKey, snapIndexByKey, snapNamed,
+      currentEnds, pairKey, pairFor,
+      lastEndsNamed, endsFromName,
+      setPairEnds, selectSnapshot,
+      anchor: anchorAt, setAnchor,
+      activeFilters, toggleFilter,
+      knownFilter, dropDeadFilters,
+      visibleRows, totalRows,
+      sortRows, sortBy,
+      rowKey, openOf, setOpen,
+      restore, hashParts
     };
   }
 
-  return { create: create };
+  return { create };
 }));
