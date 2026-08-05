@@ -1,4 +1,4 @@
-# kojipatch
+# dashboard
 
 Дашборд патчей: для одного или нескольких koji-тегов собирает последние билды
 (с учётом наследования тегов), по `extra.source.original_url` определяет
@@ -10,7 +10,7 @@ HTML-дашборде с вкладкой «Состояние» по каждо
 
 Данные и представление в проекте разделены, и делают их разные команды.
 `collect` ходит в koji и GitLab и кладёт снапшот тега в JSON — это данные, и
-только они. `dashboard` кладёт на диск страницу, внутри которой нет ни одного
+только они. `page` кладёт на диск страницу, внутри которой нет ни одного
 снапшота, — это представление, и только оно. Снапшоты в страницу подгружает
 человек, уже открыв её в браузере.
 
@@ -36,11 +36,11 @@ HTML-дашборде с вкладкой «Состояние» по каждо
   импортируется лениво внутри транспорта, который дёргает сеть только
   при сборе
 
-`dashboard` не требует ни koji, ни `requests`, ни даже конфига: страница
+`page` не требует ни koji, ни `requests`, ни даже конфига: страница
 пуста, пока в неё не подгрузят снапшоты, и ходить ей некуда.
 
 Все модули должны быть доступны в интерпретаторе, которым запускается
-`python3 -m kojipatch`; отдельного `requirements.txt` в проекте нет. Поставить
+`python3 -m dashboard`; отдельного `requirements.txt` в проекте нет. Поставить
 недостающее можно, например, через `pip install koji requests pyyaml` —
 пакет `koji` на PyPI и есть официальный клиент проекта Koji.
 
@@ -48,10 +48,10 @@ HTML-дашборде с вкладкой «Состояние» по каждо
 
 ```bash
 export GITLAB_TOKEN=glpat-...                 # опц., см. «Токен GitLab»
-cp kojipatch.example.yaml kojipatch.yaml      # поправить адреса под себя
-python3 -m kojipatch --config kojipatch.yaml collect \
+cp dashboard.example.yaml dashboard.yaml      # поправить адреса под себя
+python3 -m dashboard --config dashboard.yaml collect \
     --tag os-9.2 -o os-9.2.json
-python3 -m kojipatch dashboard -o dashboard.html
+python3 -m dashboard page -o dashboard.html
 ```
 
 Дальше `dashboard.html` открывают в браузере и перетаскивают в него
@@ -60,7 +60,7 @@ python3 -m kojipatch dashboard -o dashboard.html
 Сравнить два тега — собрать оба снапшота:
 
 ```bash
-python3 -m kojipatch --config kojipatch.yaml collect \
+python3 -m dashboard --config dashboard.yaml collect \
     --tag os-9.1 --tag os-9.2 -o snapshots.json
 ```
 
@@ -72,10 +72,10 @@ python3 -m kojipatch --config kojipatch.yaml collect \
 разное время:
 
 ```bash
-python3 -m kojipatch --config kojipatch.yaml collect --tag os-9.2 \
+python3 -m dashboard --config dashboard.yaml collect --tag os-9.2 \
     -o os-9.2-07-01.json
 # ... через месяц ...
-python3 -m kojipatch --config kojipatch.yaml collect --tag os-9.2 \
+python3 -m dashboard --config dashboard.yaml collect --tag os-9.2 \
     -o os-9.2-08-01.json
 ```
 
@@ -121,21 +121,21 @@ os-9.4 честно говорит «не изменилось», пока св�
 первых трёх его нет — их `patch_classes` оставлен прежним нарочно, из них
 порождён эталон `page-data.golden.json`, пересобрать который уже нечем.
 Так же выглядела бы страница, на которую положили снапшоты, собранные
-разными версиями kojipatch: класс, известный не всем, дописывается в конец.
+разными версиями dashboard: класс, известный не всем, дописывается в конец.
 
 Рядом лежат `snapshot-os-9.1.json` и `snapshot-os-9.2.json`: они старого
 формата, без `patch_classes` и тегов билдов, и годятся разве что затем,
 чтобы посмотреть, как страница читает снапшот прежней версии.
 
 `--config` можно не передавать флагом, а задать переменной окружения
-`KOJIPATCH_CONFIG`.
+`DASHBOARD_CONFIG`.
 
 ## Подкоманды
 
 ### `collect` — собрать снапшоты в JSON
 
 ```bash
-python3 -m kojipatch --config kojipatch.yaml collect \
+python3 -m dashboard --config dashboard.yaml collect \
     --tag os-9.1 --tag os-9.2 -o snapshots.json
 ```
 
@@ -143,24 +143,24 @@ python3 -m kojipatch --config kojipatch.yaml collect \
 список снапшотов, по одному на тег. Требует `koji.hub` (в конфиге или через
 `--koji-hub`). Без `-o` пишет `snapshot.json`.
 
-### `dashboard` — положить страницу на диск
+### `page` — положить страницу на диск
 
 ```bash
-python3 -m kojipatch dashboard -o dashboard.html
+python3 -m dashboard page -o dashboard.html
 ```
 
 Собирает шаблон и скрипты в один самодостаточный файл и записывает его.
 Данных внутри нет, поэтому ни koji, ни GitLab, ни конфиг команде не нужны:
 пример выше отработал без `--config`. Без `-o` пишет `dashboard.html`.
 
-Пересобирать страницу нужно только после обновления самого kojipatch — новые
+Пересобирать страницу нужно только после обновления самого dashboard — новые
 снапшоты в неё просто подгружают.
 
 ### Общие флаги (перед именем подкоманды)
 
 | Флаг | Что делает |
 |---|---|
-| `--config PATH` | путь к YAML-конфигу (или `KOJIPATCH_CONFIG` в окружении) |
+| `--config PATH` | путь к YAML-конфигу (или `DASHBOARD_CONFIG` в окружении) |
 | `--koji-hub URL` | перекрыть `koji.hub` из конфига |
 | `--gitlab-api URL` | перекрыть адрес GitLab API (пишется как хост `default_host` или `*`, если `default_host` не задан) |
 | `--patch-dir NAME` | перекрыть имя каталога патчей (по умолчанию `PATCH`) |
@@ -170,19 +170,19 @@ python3 -m kojipatch dashboard -o dashboard.html
 | `--version` | напечатать версию и выйти; подкоманда при этом не нужна |
 
 Эти флаги общие для всего CLI и должны идти **до** имени подкоманды
-(`kojipatch --log-level debug collect --tag ...`, а не
-`kojipatch collect --log-level debug --tag ...`) — таковы правила
+(`dashboard --log-level debug collect --tag ...`, а не
+`dashboard collect --log-level debug --tag ...`) — таковы правила
 `argparse`-подпарсеров, используемых в проекте.
 
 ## Конфигурация
 
-Конфиг — YAML-файл, пример в `kojipatch.example.yaml`. Все ключи, кроме
+Конфиг — YAML-файл, пример в `dashboard.example.yaml`. Все ключи, кроме
 `koji.hub` (для `collect`) и `gitlab.hosts.<host>.api` (для каждого
 описанного хоста), необязательны.
 
 | Ключ | Обязателен | По умолчанию | Что делает |
 |---|---|---|---|
-| `koji.hub` | да для `collect`, не нужен для `dashboard` | — | XML-RPC адрес хаба; можно перекрыть `--koji-hub` |
+| `koji.hub` | да для `collect`, не нужен для `page` | — | XML-RPC адрес хаба; можно перекрыть `--koji-hub` |
 | `koji.web` | нет | нет ссылок на koji в дашборде | база для ссылок вида `/search?match=exact&type=build&terms=NVR` |
 | `gitlab.default_host` | нет | — | хост, на который будет отправлен запрос, если хост из `original_url` не описан в `gitlab.hosts` |
 | `gitlab.token_env` | нет | `GITLAB_TOKEN` | имя переменной окружения, из которой читается токен GitLab |
@@ -304,7 +304,7 @@ export GITLAB_TOKEN=glpat-...
 Отказы называются по имени файла и стоят списком рядом с зоной загрузки —
 списком, который остаётся на виду и после того, как данные появились, а
 сама зона спряталась: не разбирается как JSON, чужая версия схемы, «это не
-снапшот kojipatch», файл не читается. Отдельный случай — данные, на
+снапшот dashboard», файл не читается. Отдельный случай — данные, на
 которых страница не рисуется: загрузка тогда откатывается целиком, состав
 возвращается к прежнему, а причина встаёт рядом с именем файла. Перестановка
 и удаление откатываются по тому же правилу, только причина уезжает в
@@ -507,7 +507,7 @@ export GITLAB_TOKEN=glpat-...
 страницы) и `2>run.log` (файл журнала) друг другу не мешают:
 
 ```bash
-python3 -m kojipatch --config kojipatch.yaml --log-level debug collect \
+python3 -m dashboard --config dashboard.yaml --log-level debug collect \
     --tag os-9.2 -o os-9.2.json 2>run.log
 ```
 
@@ -530,7 +530,7 @@ python3 -m kojipatch --config kojipatch.yaml --log-level debug collect \
 
 `--max-problems` без значения (флаг не передан) отключает проверку и код 1
 не возвращается никогда. Считаются проблемные билды только что собранных
-снапшотов, поэтому проверка возможна лишь у `collect`; `dashboard`
+снапшотов, поэтому проверка возможна лишь у `collect`; `page`
 возвращает 0 сразу после успешной записи файла — снапшотов он не видел и
 считать ему нечего.
 
@@ -554,7 +554,7 @@ python3 -m kojipatch --config kojipatch.yaml --log-level debug collect \
 [
  {
   "schema": 1,
-  "kojipatch": "1.0.0",
+  "dashboard": "1.0.0",
   "tag": "os-9.1",
   "generated": "2026-07-01T00:00:00+03:00",
   "koji_hub": "https://hub/kojihub",
@@ -602,10 +602,10 @@ python3 -m kojipatch --config kojipatch.yaml --log-level debug collect \
 
 `schema` — версия формата (сейчас `1`); файл с другим значением страница
 не примет и скажет об этом прямо, назвав чужую версию, а не «это не
-снапшот»: такой файл сделан другой версией kojipatch, и человеку полезнее
+снапшот»: такой файл сделан другой версией dashboard, и человеку полезнее
 знать какой.
 
-`kojipatch` — версия инструмента, записавшего файл. Поле необязательное:
+`dashboard` — версия инструмента, записавшего файл. Поле необязательное:
 снапшоты, собранные до его появления, читаются как прежде, и схему оно не
 меняет — версия формата и версия инструмента растут порознь. Отвечает оно
 на вопрос «чем это собрано», который возникает, когда файл прислали со
@@ -636,7 +636,7 @@ name="generator">` и рядом с заголовком, — и печатае�
 получит. Но в списке классов страницы его не будет, а фильтр по нему из
 присланной ссылки опознается только там, где такие строки видны:
 единственной опорой остаются теги строк выбранного снапшота.
-Собрать оба снапшота одной версией kojipatch дешевле, чем разбираться в
+Собрать оба снапшота одной версией dashboard дешевле, чем разбираться в
 такой странице.
 
 `completed` — время окончания сборки в виде `YYYY-MM-DD HH:MM:SS`, **в
@@ -699,7 +699,7 @@ found"]` и `patch_dir_present = null`, а не молчаливое «патч�
 
 | Что | Где |
 |---|---|
-| разбор командной строки | `kojipatch/cli.py` |
+| разбор командной строки | `dashboard/cli.py` |
 | конфиг, классификатор, модель снапшота, логи | `config.py`, `classify.py`, `model.py`, `logs.py` |
 | сбор данных | `collect.py`, `kojiclient.py`, `gitlabclient.py`, `sourceurl.py` |
 | сборка страницы | `build.py` + `assets/dashboard.html` + `assets/js/*.js` |
@@ -741,14 +741,14 @@ found"]` и `patch_dir_present = null`, а не молчаливое «патч�
 задачи, а перемотка её потеряла бы.
 
 Релиз — слияние `develop` в `master` и тег `vX.Y.Z` на нём. Номер к этому
-моменту уже стоит в `kojipatch/__init__.py`: его поднимают вместе с самим
+моменту уже стоит в `dashboard/__init__.py`: его поднимают вместе с самим
 изменением (см. ниже), а тег лишь отмечает, что именно этот номер вышел.
 `hotfix/*` идёт от `master`, поднимает младший номер и вливается в обе
 ветки — иначе починка потеряется в следующем релизе.
 
 ### Версия и запись о ней
 
-Номер живёт в `kojipatch/__init__.py` и поднимается тем же коммитом, что и
+Номер живёт в `dashboard/__init__.py` и поднимается тем же коммитом, что и
 само изменение, — не отдельным «релизным». Сломали флаг CLI или формат
 снапшота — старший номер, появилась возможность — средний, починили или
 поправили вид — младший; правки только в тестах, документации или

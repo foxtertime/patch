@@ -11,7 +11,7 @@ PLACEHOLDER = "<!--__SCRIPTS__-->"
 # Один токен на две подстановки: он стоит и в meta generator, и в заголовке
 # страницы. Версия нужна в собранном файле именно потому, что файл этот
 # пересылают: у того, кто его открыл, исходников под рукой нет.
-VERSION_TOKEN = "__KOJIPATCH_VERSION__"
+VERSION_TOKEN = "__DASHBOARD_VERSION__"
 ASSETS = os.path.join(os.path.dirname(__file__), "assets")
 TEMPLATE_PATH = os.path.join(ASSETS, "dashboard.html")
 # Порядок по зависимостям, а не по алфавиту: каждый следующий скрипт

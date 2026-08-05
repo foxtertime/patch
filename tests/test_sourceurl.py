@@ -1,6 +1,6 @@
 import unittest
 
-from kojipatch.sourceurl import SourceUrlError, parse_source_url
+from dashboard.sourceurl import SourceUrlError, parse_source_url
 
 SHA = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0"
 

@@ -1,5 +1,5 @@
 'use strict';
-/* Мини-DOM поверх настоящего kojipatch/assets/dashboard.html.
+/* Мини-DOM поверх настоящего dashboard/assets/dashboard.html.
    Нужен, чтобы прогонять ui.js в node: браузера в сборке нет, а
    расхождение разметки и скрипта ничем себя не выдаёт — страница просто
    перестаёт рисоваться. Дерево строится из самого шаблона, поэтому
@@ -11,7 +11,7 @@
 var fs = require('node:fs');
 var path = require('node:path');
 
-var TEMPLATE = path.join(__dirname, '..', '..', 'kojipatch', 'assets',
+var TEMPLATE = path.join(__dirname, '..', '..', 'dashboard', 'assets',
                          'dashboard.html');
 var VOID = { meta: 1, input: 1, br: 1, hr: 1, img: 1, link: 1, source: 1 };
 

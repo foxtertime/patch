@@ -3,8 +3,8 @@ import os
 import tempfile
 import unittest
 
-from kojipatch import __version__
-from kojipatch.model import (SCHEMA, Build, Patch, Snapshot, SnapshotError,
+from dashboard import __version__
+from dashboard.model import (SCHEMA, Build, Patch, Snapshot, SnapshotError,
                              Source, dump_snapshots, load_snapshots,
                              snapshot_from_dict, snapshot_to_dict)
 
@@ -34,7 +34,7 @@ def sample_snapshot(tag="os-9.2"):
 class SerialisationTest(unittest.TestCase):
     def test_written_snapshot_names_the_version_that_wrote_it(self):
         data = snapshot_to_dict(sample_snapshot())
-        self.assertEqual(data["kojipatch"], __version__)
+        self.assertEqual(data["dashboard"], __version__)
         # Схема от появления поля не поехала: поле добавлено, а не заменило
         # собой что-то, и старый читатель его просто не заметит.
         self.assertEqual(data["schema"], SCHEMA)
@@ -43,7 +43,7 @@ class SerialisationTest(unittest.TestCase):
         # Снапшоты, собранные до появления поля, — законный вход: версия
         # инструмента необязательна, обязательна только схема.
         data = snapshot_to_dict(sample_snapshot())
-        del data["kojipatch"]
+        del data["dashboard"]
         self.assertEqual(snapshot_from_dict(data), sample_snapshot())
 
     def test_roundtrip_preserves_everything(self):

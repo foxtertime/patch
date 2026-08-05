@@ -133,10 +133,10 @@ class Snapshot:
 
 def snapshot_to_dict(snapshot: Snapshot) -> Dict[str, Any]:
     # Версия инструмента стоит рядом со схемой, но значит другое: schema —
-    # формат файла, kojipatch — та версия, которая файл записала. Поле
+    # формат файла, dashboard — та версия, которая файл записала. Поле
     # необязательное и добавленное, поэтому схема остаётся прежней: снапшот
     # с ним читают и старые версии, снапшот без него — новые.
-    return {"schema": SCHEMA, "kojipatch": __version__, "tag": snapshot.tag,
+    return {"schema": SCHEMA, "dashboard": __version__, "tag": snapshot.tag,
             "generated": snapshot.generated, "koji_hub": snapshot.koji_hub,
             "koji_web": snapshot.koji_web,
             "patch_classes": list(snapshot.patch_classes),

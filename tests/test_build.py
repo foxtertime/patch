@@ -2,9 +2,9 @@
 import re
 import unittest
 
-from kojipatch import __version__
-from kojipatch.build import SCRIPTS, BuildError, build_html
-from kojipatch.config import DEFAULT_PATCH_CLASSES
+from dashboard import __version__
+from dashboard.build import SCRIPTS, BuildError, build_html
+from dashboard.config import DEFAULT_PATCH_CLASSES
 
 RICH = "tests/fixtures/rich-old.json"
 
@@ -13,13 +13,13 @@ class BuildHtml(unittest.TestCase):
     def test_no_placeholder_remains(self):
         html = build_html()
         self.assertNotIn("<!--__SCRIPTS__-->", html)
-        self.assertNotIn("__KOJIPATCH_VERSION__", html)
+        self.assertNotIn("__DASHBOARD_VERSION__", html)
 
     def test_version_is_stamped_into_the_page(self):
         # Страницу пересылают файлом, и у того, кто её открыл, исходников
         # под рукой нет: чем собрана, должно быть видно в ней самой.
         html = build_html()
-        self.assertIn('<meta name="generator" content="kojipatch %s">'
+        self.assertIn('<meta name="generator" content="dashboard %s">'
                       % __version__, html)
         self.assertIn('<span class="ver">%s</span>' % __version__, html)
 
@@ -175,9 +175,9 @@ class TemplateContractTest(unittest.TestCase):
 
 class LoggingTest(unittest.TestCase):
     def test_page_size_is_logged_at_debug(self):
-        with self.assertLogs("kojipatch", level="DEBUG") as caught:
+        with self.assertLogs("dashboard", level="DEBUG") as caught:
             build_html()
-        self.assertIn("kojipatch.build", "\n".join(caught.output))
+        self.assertIn("dashboard.build", "\n".join(caught.output))
 
 
 if __name__ == "__main__":

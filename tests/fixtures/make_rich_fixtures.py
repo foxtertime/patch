@@ -10,7 +10,7 @@ import sys
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from kojipatch.model import (Build, Patch, Snapshot, Source,  # noqa: E402
+from dashboard.model import (Build, Patch, Snapshot, Source,  # noqa: E402
                              dump_snapshots)
 
 CLASSES = ["AUTOGEN", "CVE", "SAST", "DAST", "COVERAGE", "SPEC",

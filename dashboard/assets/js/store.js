@@ -133,7 +133,7 @@
     for (i = 0; i < list.length; i++) {
       snapshot = list[i];
       /* Чужую версию схемы называем прямо: «это не снапшот» сбило бы с
-         толку человека, у которого файл сделан другой версией kojipatch. */
+         толку человека, у которого файл сделан другой версией dashboard. */
       if (snapshot && typeof snapshot === 'object' && !isArray(snapshot)
           && snapshot.schema !== undefined && snapshot.schema !== 1) {
         return { ok: false,
@@ -142,7 +142,7 @@
       }
       if (!isSnapshot(snapshot)) {
         return { ok: false,
-                 error: fileName + ': это не снапшот kojipatch — нужны tag, '
+                 error: fileName + ': это не снапшот dashboard — нужны tag, '
                       + 'generated и builds' };
       }
     }
@@ -160,7 +160,7 @@
            parseText: полагаться на то, что снапшот уже проверен снаружи,
            значило бы держать вход в хранилище открытым для чужого кода. */
         if (!isSnapshot(snapshot)) {
-          rejected.push(fileName + ': это не снапшот kojipatch — нужны tag, '
+          rejected.push(fileName + ': это не снапшот dashboard — нужны tag, '
                       + 'generated и builds');
           continue;
         }

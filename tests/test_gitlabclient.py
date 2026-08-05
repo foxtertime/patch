@@ -1,8 +1,8 @@
 import logging
 import unittest
 
-from kojipatch.config import GitlabHost
-from kojipatch.gitlabclient import GitlabClient, HttpTransport
+from dashboard.config import GitlabHost
+from dashboard.gitlabclient import GitlabClient, HttpTransport
 from tests.fakes import FakeTransport, Response
 
 try:  # requests нужен только collect/run, весь остальной набор без него живёт
@@ -322,7 +322,7 @@ class UrlTest(unittest.TestCase):
 class LoggingTest(unittest.TestCase):
     def test_request_is_logged_at_debug(self):
         cli, _ = client({TREE_URL: TWO_FILES})
-        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
+        with self.assertLogs("dashboard.gitlabclient", level="DEBUG") as caught:
             cli.patch_files("gitlab.example.com", "g/r", "br")
         line = "\n".join(caught.output)
         self.assertIn("GET", line)
@@ -335,7 +335,7 @@ class LoggingTest(unittest.TestCase):
         transport = FakeTransport({TREE_URL: TWO_FILES})
         cli = GitlabClient(HOSTS, token=SECRET, transport=transport,
                            sleeper=lambda _s: None)
-        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
+        with self.assertLogs("dashboard.gitlabclient", level="DEBUG") as caught:
             cli.patch_files("gitlab.example.com", "g/r", "br")
         line = "\n".join(caught.output)
         self.assertNotIn(SECRET, line)
@@ -349,7 +349,7 @@ class LoggingTest(unittest.TestCase):
         transport = _TokenLeakingTransport(SECRET)
         cli = GitlabClient(HOSTS, token=SECRET, transport=transport,
                            sleeper=lambda _s: None, retries=3)
-        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
+        with self.assertLogs("dashboard.gitlabclient", level="DEBUG") as caught:
             result = cli.patch_files("gitlab.example.com", "g/r", "br")
         self.assertNotIn(SECRET, "\n".join(caught.output))
         self.assertNotIn(SECRET, result.problem)
@@ -372,7 +372,7 @@ class LoggingTest(unittest.TestCase):
         cli = GitlabClient(HOSTS, token=SECRET, transport=transport,
                            sleeper=lambda _s: None, retries=3,
                            default_host="gitlab.example.com")
-        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
+        with self.assertLogs("dashboard.gitlabclient", level="DEBUG") as caught:
             result = cli.patch_files("other.example.com", "g/r", "br")
         self.assertIn("не описан в конфиге", result.problem)
         self.assertNotIn(SECRET, result.problem)
@@ -380,14 +380,14 @@ class LoggingTest(unittest.TestCase):
 
     def test_error_body_is_logged_at_debug(self):
         cli, _ = client({TREE_URL: Response(403, {"message": "403 Forbidden"}, {})})
-        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
+        with self.assertLogs("dashboard.gitlabclient", level="DEBUG") as caught:
             cli.patch_files("gitlab.example.com", "g/r", "br")
         self.assertIn("403 Forbidden", "\n".join(caught.output))
 
     def test_retry_is_logged_as_warning(self):
         cli, _ = client({TREE_URL: [Response(429, {}, {"Retry-After": "0"}),
                                     TWO_FILES]})
-        with self.assertLogs("kojipatch.gitlabclient", level="WARNING") as caught:
+        with self.assertLogs("dashboard.gitlabclient", level="WARNING") as caught:
             cli.patch_files("gitlab.example.com", "g/r", "br")
         line = "\n".join(caught.output)
         self.assertIn("429", line)
@@ -400,7 +400,7 @@ class LoggingTest(unittest.TestCase):
         transport = FakeTransport({TREE_URL: [Response(429, {}, {"Retry-After": "0"}),
                                               TWO_FILES]})
         seen = []
-        with self.assertLogs("kojipatch.gitlabclient", level="WARNING") as caught:
+        with self.assertLogs("dashboard.gitlabclient", level="WARNING") as caught:
             cli = GitlabClient(HOSTS, token=TOKEN, transport=transport,
                                sleeper=lambda _s: seen.append(list(caught.output)))
             cli.patch_files("gitlab.example.com", "g/r", "br")
@@ -412,7 +412,7 @@ class LoggingTest(unittest.TestCase):
         # без ref и path непонятно, какую именно ветку он не отдаёт
         cli, _ = client({TREE_URL: [Response(429, {}, {"Retry-After": "0"}),
                                     TWO_FILES]})
-        with self.assertLogs("kojipatch.gitlabclient", level="WARNING") as caught:
+        with self.assertLogs("dashboard.gitlabclient", level="WARNING") as caught:
             cli.patch_files("gitlab.example.com", "g/r", "br")
         line = "\n".join(caught.output)
         self.assertIn("ref=br", line)
@@ -423,14 +423,14 @@ class LoggingTest(unittest.TestCase):
         # collect; здесь предупреждение только пообещало бы новую попытку
         cli = GitlabClient(HOSTS, token=TOKEN, transport=_BrokenTransport(),
                            sleeper=lambda _s: None, retries=1)
-        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
+        with self.assertLogs("dashboard.gitlabclient", level="DEBUG") as caught:
             cli.patch_files("gitlab.example.com", "g/r", "br")
         self.assertEqual([r.levelname for r in caught.records], ["DEBUG"])
 
     def test_transport_failures_warn_only_while_attempts_remain(self):
         cli = GitlabClient(HOSTS, token=TOKEN, transport=_BrokenTransport(),
                            sleeper=lambda _s: None, retries=3)
-        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
+        with self.assertLogs("dashboard.gitlabclient", level="DEBUG") as caught:
             cli.patch_files("gitlab.example.com", "g/r", "br")
         warnings = [r for r in caught.records if r.levelno == logging.WARNING]
         self.assertEqual(len(warnings), 2)
@@ -442,7 +442,7 @@ class LoggingTest(unittest.TestCase):
             TREE_URL: Response(404, {"message": "404 Tree Not Found"}, {}),
             COMMITS_URL: Response(200, {"id": "abc123"}, {}),
         })
-        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
+        with self.assertLogs("dashboard.gitlabclient", level="DEBUG") as caught:
             cli.patch_files("gitlab.example.com", "g/r", "br")
         for line in caught.output:
             self.assertNotIn("  ", line)
@@ -454,7 +454,7 @@ class LoggingTest(unittest.TestCase):
             TREE_URL: Response(404, {"message": "404 Tree Not Found"}, {}),
             COMMITS_URL: Response(200, {"id": "abc123"}, {}),
         })
-        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
+        with self.assertLogs("dashboard.gitlabclient", level="DEBUG") as caught:
             cli.patch_files("gitlab.example.com", "g/r", "br")
         line = "\n".join(caught.output)
         self.assertIn("ветка br есть", line)
@@ -466,7 +466,7 @@ class LoggingTest(unittest.TestCase):
             TREE_URL: Response(404, {"message": "404 Tree Not Found"}, {}),
             COMMITS_URL: Response(404, {"message": "404 Commit Not Found"}, {}),
         })
-        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
+        with self.assertLogs("dashboard.gitlabclient", level="DEBUG") as caught:
             cli.patch_files("gitlab.example.com", "g/r", "br")
         self.assertIn("ветки br нет", "\n".join(caught.output))
 
@@ -475,14 +475,14 @@ class LoggingTest(unittest.TestCase):
             TREE_URL: Response(404, {"message": "404 Tree Not Found"}, {}),
             COMMITS_URL: Response(403, {"message": "403 Forbidden"}, {}),
         })
-        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
+        with self.assertLogs("dashboard.gitlabclient", level="DEBUG") as caught:
             cli.patch_files("gitlab.example.com", "g/r", "br")
         self.assertIn("не удалось выяснить", "\n".join(caught.output))
 
     def test_cache_hit_is_logged_at_debug(self):
         cli, _ = client({TREE_URL: TWO_FILES})
         cli.patch_files("gitlab.example.com", "g/r", "br")
-        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
+        with self.assertLogs("dashboard.gitlabclient", level="DEBUG") as caught:
             cli.patch_files("gitlab.example.com", "g/r", "br")
         self.assertIn("кэш", "\n".join(caught.output))
 
@@ -490,7 +490,7 @@ class LoggingTest(unittest.TestCase):
         # обычный успешный запрос не должен шуметь на уровне по умолчанию:
         # ни одной записи выше DEBUG он порождать не вправе
         cli, _ = client({TREE_URL: TWO_FILES})
-        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
+        with self.assertLogs("dashboard.gitlabclient", level="DEBUG") as caught:
             cli.patch_files("gitlab.example.com", "g/r", "br")
         self.assertTrue(caught.records)
         for record in caught.records:
@@ -571,7 +571,7 @@ class RealRequestsTest(unittest.TestCase):
         cli = GitlabClient(self.HOSTS, token=SECRET + "\n",
                            transport=HttpTransport(timeout=1),
                            sleeper=lambda _s: None, retries=1)
-        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
+        with self.assertLogs("dashboard.gitlabclient", level="DEBUG") as caught:
             result = cli.patch_files("h", "g/r", "br")
         # «***» подтверждает, что чистить было что: requests действительно
         # вложил значение заголовка в текст. Если однажды перестанет — тест

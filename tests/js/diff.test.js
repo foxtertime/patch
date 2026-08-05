@@ -1,7 +1,7 @@
 'use strict';
 var test = require('node:test');
 var assert = require('node:assert');
-var diff = require('../../kojipatch/assets/js/diff.js');
+var diff = require('../../dashboard/assets/js/diff.js');
 
 function build(over) {
   var b = { nvr: 'nginx-1.0-1.el9', name: 'nginx', version: '1.0',
@@ -359,7 +359,7 @@ test('test_rows_come_grouped_by_arch', function () {
               nvra2('nginx', '1.0', '1.el9', 'src'),
               nvra2('nginx-doc', '1.0', '1.el9', 'noarch')];
   var rows = diff.alignRpms(build2('nginx', { rpms: both }), build2('nginx', { rpms: both }));
-  var rpms = require('../../kojipatch/assets/js/rpms.js');
+  var rpms = require('../../dashboard/assets/js/rpms.js');
   assert.deepStrictEqual(rows.map(function (row) { return rpms.archOf(row[0]); }),
                           ['src', 'noarch', 'x86_64']);
 });

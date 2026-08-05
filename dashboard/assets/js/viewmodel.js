@@ -1,5 +1,5 @@
 /* Данные страницы: снапшоты и пары, готовые к отрисовке.
-   Порт kojipatch/render.py (всё, кроме сборки самого HTML). */
+   Порт dashboard/render.py (всё, кроме сборки самого HTML). */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
     module.exports = factory(require('./diff.js'), require('./rpms.js'));
