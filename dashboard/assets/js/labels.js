@@ -8,12 +8,12 @@
     root.KP = root.KP || {};
     root.KP.labels = factory(root.KP.text);
   }
-}(typeof globalThis !== 'undefined' ? globalThis : this, function (text) {
+}(typeof globalThis !== 'undefined' ? globalThis : this, (text) => {
   'use strict';
 
   /* Подписи фильтров: ключ приходит из данных (метки строк, статусы диффа),
      а по-русски он должен читаться и в чипе, и в подсказке. */
-  var LABELS = {
+  const LABELS = {
     "all": "все",
     "has-patch": "с патчами", "problem": "с проблемами",
     "no-patch": "нет каталога PATCH", "no-source": "нет источника",
@@ -29,18 +29,18 @@
   };
   /* Подписи классов патчей живут отдельно от постоянных: классы приходят с
      данными и уходят вместе с ними, а LABELS — словарь самой страницы. */
-  var CLASS_LABELS = {};
-  var CLASSES = [];
-  var ARROW = { added: "+", removed: "−", upgraded: "↑",
-                downgraded: "↓", unchanged: "=" };
-  var KNOWN_CLASS = { "autogen": 1, "cve": 1, "sast": 1, "dast": 1,
-                      "coverage": 1, "distsuffix": 1, "spec": 1,
-                      "changelog": 1, "files": 1, "other": 1 };
-  var CALM_MARKS = { "from-commit": "warn", "no-patch": "calm",
-                    "no-source": "bad", "gitlab-error": "bad",
-                    "internal-error": "bad", "inherited": "calm" };
-  var STATUS_MARKS = { "added": 1, "removed": 1, "unchanged": 1, "upgraded": 1,
-                      "downgraded": 1, "repackaged": 1 };
+  let CLASS_LABELS = {};
+  let CLASSES = [];
+  const ARROW = { added: "+", removed: "−", upgraded: "↑",
+                  downgraded: "↓", unchanged: "=" };
+  const KNOWN_CLASS = { "autogen": 1, "cve": 1, "sast": 1, "dast": 1,
+                        "coverage": 1, "distsuffix": 1, "spec": 1,
+                        "changelog": 1, "files": 1, "other": 1 };
+  const CALM_MARKS = { "from-commit": "warn", "no-patch": "calm",
+                       "no-source": "bad", "gitlab-error": "bad",
+                       "internal-error": "bad", "inherited": "calm" };
+  const STATUS_MARKS = { "added": 1, "removed": 1, "unchanged": 1,
+                         "upgraded": 1, "downgraded": 1, "repackaged": 1 };
 
   /* Классы патчей задаются конфигом, поэтому подписи для них берём из
      данных. Ключ — тот же slug(), что стоит в метке строки и в карточке
@@ -61,7 +61,7 @@
   /* Класс патчей задаётся конфигом, а цвета в CSS перечислены поимённо.
      Незнакомый класс не должен остаться бесцветным — уводим его в c-x. */
   function classCls(name) {
-    var key = text.slug(name);
+    const key = text.slug(name);
     return text.own(KNOWN_CLASS, key) ? 'c-' + key : 'c-x';
   }
 
@@ -72,11 +72,11 @@
   /* Порядок классов: сначала как их перечислил классификатор, потом всё,
      что встретилось в данных, но в списке классов отсутствует. */
   function classOrder(counts) {
-    var out = [], i;
+    let out = [], i;
     for (i = 0; i < CLASSES.length; i++) {
       if (text.own(counts, CLASSES[i])) out.push(CLASSES[i]);
     }
-    var extra = text.keys(counts).sort();
+    const extra = text.keys(counts).sort();
     for (i = 0; i < extra.length; i++) {
       if (out.indexOf(extra[i]) === -1) out.push(extra[i]);
     }

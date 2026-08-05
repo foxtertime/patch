@@ -12,7 +12,7 @@
     root.KP = root.KP || {};
     root.KP.hash = factory();
   }
-}(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+}(typeof globalThis !== 'undefined' ? globalThis : this, () => {
   'use strict';
 
   /* decodeURIComponent на битом куске бросает URIError; без этой обёртки он
@@ -28,12 +28,12 @@
      Ничего не проверяется по данным: годится ли эта вкладка, есть ли такой
      снапшот и жив ли такой фильтр, решает тот, у кого данные есть. */
   function parse(raw) {
-    var out = { tab: null, tag: null, pair: null, filters: null,
+    let out = { tab: null, tag: null, pair: null, filters: null,
                 q: null, sort: null };
-    var body = String(raw === null || raw === undefined ? '' : raw)
+    const body = String(raw === null || raw === undefined ? '' : raw)
       .replace(/^#/, '');
     if (!body) return out;
-    var parts = body.split('&'), i, kvp, key, val, bits;
+    let parts = body.split('&'), i, kvp, key, val, bits;
     for (i = 0; i < parts.length; i++) {
       kvp = parts[i].split('=');
       key = kvp[0];
@@ -55,7 +55,7 @@
   /* Сборка строки обратно. Имена снапшота и диапазона приходят готовыми:
      как они устроены, знает page.js. */
   function format(parts) {
-    var out = ['tab=' + parts.tab];
+    const out = ['tab=' + parts.tab];
     /* Снапшот храним именем, а не номером: набор снапшотов на странице
        меняется, и присланная ссылка «tag=1» показала бы другой снапшот,
        ничем не выдав подмены. Имя полное, с временем сбора, — иначе два
