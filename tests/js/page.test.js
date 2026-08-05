@@ -312,6 +312,50 @@ test('на единственном снапшоте диапазона в сс�
   assert.strictEqual(make([snap('os-9.1', JUL)]).hashParts().pair, null);
 });
 
+/* Сводность диапазона: правило «вся цепочка, и только когда снапшотов
+   больше двух». На двух снапшотах единственный переход и есть вся цепочка,
+   и звать его итогом значит сообщать очевидное.
+
+   На рельсе это больше не подписано, но в данных страницы поле остаётся:
+   pairFor кладёт его в блок перехода, а сам блок сверяется с золотой
+   фикстурой. Так что правило проверяется здесь — там, где оно и живёт. */
+test('диапазон во всю цепочку сводный, а соседний — нет', function () {
+  var p = make([snap('os-9.1', JUL), snap('os-9.2', AUG), snap('os-9.3', SEP)]);
+  assert.strictEqual(p.pairFor([0, 2]).summary, true);
+  assert.strictEqual(p.pairFor([0, 1]).summary, false);
+});
+
+test('на двух снапшотах сводного диапазона нет вовсе', function () {
+  var p = make([snap('os-9.1', JUL), snap('os-9.2', AUG)]);
+  assert.strictEqual(p.pairFor([0, 1]).summary, false);
+});
+
+/* Два прогона одного тега в кэш предпосчитанных пар не попадают: по имени
+   тега такую пару не опознать. Значит, переход считается на месте, и
+   сводность решает уже pairFor — то самое правило, которое на разных тегах
+   сторожит diff.js. */
+test('сводность считается на месте и когда тег в цепочке двоится',
+  function () {
+    var p = make([snap('os-9.2', JUL), snap('os-9.3', AUG),
+                  snap('os-9.2', SEP)]);
+    assert.strictEqual(p.pairFor([0, 2]).summary, true);
+    assert.strictEqual(p.pairFor([1, 2]).summary, false);
+  });
+
+/* Снапшот с тем же именем — тот же файл, но набор вокруг него другой:
+   диапазон 9.1→9.3 был всей цепочкой, а с приходом четвёртого файла быть
+   ею перестал. Кэш, переживший смену состава, отдал бы прежний блок — со
+   сводностью, которой у этого диапазона уже нет. */
+test('смена состава снапшотов заводит кэш переходов заново', function () {
+  var p = make([snap('os-9.1', JUL), snap('os-9.2', AUG), snap('os-9.3', SEP)]);
+  assert.strictEqual(p.pairFor([0, 2]).summary, true,
+                     'диапазон во всю цепочку не сводный, сценарий '
+                     + 'проверяет не то');
+  storemod.add([snap('os-9.4', '2026-10-01T00:00:00+03:00')], 'd.json');
+  p.applyData(viewmodel.buildPageData(storemod.snapshots()));
+  assert.strictEqual(p.pairFor([0, 2]).summary, false);
+});
+
 test('две страницы не делят состояния', function () {
   var a = make([snap('os-9.1', JUL), snap('os-9.2', AUG)]);
   var b = pagemod.create({ viewmodel: viewmodel, diffmod: diffmod,
