@@ -1025,23 +1025,6 @@
       + (filter ? '</button>' : '</div>');
   }
 
-  function renderTagSelect() {
-    var box = document.getElementById('tag-select'), out = '', i;
-    /* У двух прогонов одного тега кнопки различает дата: без неё в селекторе
-       стояли бы две одинаковые. */
-    var when = whenLabels(SNAPS);
-    for (i = 0; i < SNAPS.length; i++) {
-      var s = SNAPS[i];
-      out += '<button type="button" class="pick" data-tag="' + i + '" aria-pressed="'
-          + (i === st.tag ? 'true' : 'false') + '" data-tip="Снимок тега '
-          + esc(s.tag) + ' от ' + esc(s.generated) + '">' + esc(s.tag)
-          + '<span class="sub">' + (when[i] ? esc(when[i]) + ' · ' : '')
-          + s.counts.builds + ' '
-          + plural(s.counts.builds, 'сборка', 'сборки', 'сборок') + '</span></button>';
-    }
-    box.innerHTML = out || '<span class="none">снимков нет</span>';
-  }
-
   function renderStateCards() {
     var snap = curSnap();
     var big = document.getElementById('state-cards');
@@ -1197,11 +1180,9 @@
     writeHash();
   }
 
-  /* Карточки и селектор тегов перерисовываются только при смене вкладки,
-     тега или пары: иначе клик по карточке уничтожал бы её же вместе с
-     фокусом. */
+  /* Карточки перерисовываются только при смене вкладки, тега или пары:
+     иначе клик по карточке уничтожал бы её же вместе с фокусом. */
   function rebuild() {
-    renderTagSelect();
     renderStateCards();
     renderDiffCards();
     render();
@@ -1220,10 +1201,11 @@
 
   function showTab(name) {
     /* Единственное место, где снимается отметка: начатый выбор со сменой
-       вкладки теряет смысл — на «Состоянии» узлы не нажимаются, и отметка
-       ждала бы второго клика, которого там некому сделать. Смена состава
-       снапшотов проходит здесь же: applyData заканчивается showTab, а
-       номер узла после прихода файла стоит уже у другого снапшота. */
+       вкладки теряет смысл — на «Состоянии» клик по узлу открывает
+       снапшот, и отметка ждала бы второго клика, которого там никто не
+       сделает. Смена состава снапшотов проходит здесь же: applyData
+       заканчивается showTab, а номер узла после прихода файла стоит уже
+       у другого снапшота. */
     anchor = null;
     if (name === 'diff' && SNAPS.length < 2) name = 'state';
     st.tab = name;
@@ -1525,14 +1507,6 @@
           var f = node.getAttribute('data-filter');
           if (f) { toggleFilter(f); return; }
         }
-        var tag = node.getAttribute('data-tag');
-        if (tag !== null && tag !== undefined && node.className
-            && String(node.className).indexOf('pick') !== -1) {
-          st.tag = parseInt(tag, 10);
-          picked.tag = true;
-          renderTagSelect(); renderStateCards(); render();
-          return;
-        }
         var stop = node.getAttribute('data-node');
         if (stop !== null && stop !== undefined) {
           pickNode(parseInt(stop, 10));
@@ -1755,8 +1729,11 @@
      В подписи у тегов-двойников стоит дата: «os-9.2 → os-9.2» не сказало
      бы человеку, что с чем сравнивается.
 
-     На «Изменениях» рельс ещё и выбирает: узлы там нажимаются, и два клика
-     задают любой диапазон цепочки. */
+     Рельс ещё и выбирает — он на странице единственный, кто это делает:
+     на «Состоянии» один клик открывает снапшот, на «Изменениях» два
+     задают любой диапазон цепочки. Число сборок и полное время сбора
+     стоят в списке источников, а не на узлах: рельс отвечает на вопрос
+     «где я», а не пересказывает каждый снапшот. */
   function renderChain() {
     var items = store.list(), when = whenLabels(items), out = '', i, here;
     var live = st.tab === 'diff';
@@ -1768,7 +1745,7 @@
             + (ends && i > ends[0] && i <= ends[1] ? ' on' : '') + '"></span>';
       }
       here = ends ? (i === ends[0] || i === ends[1]) : i === st.tag;
-      out += stopHtml(i, items[i].tag, when[i], here, live);
+      out += stopHtml(i, items[i].tag, when[i], here, live, items.length > 1);
     }
     /* Сводность спрашиваем у самого перехода, а не считаем заново: правило
        «вся цепочка, и только когда снапшотов больше двух» уже сказано —
@@ -1780,18 +1757,28 @@
     chainBox.innerHTML = '<span class="l">снапшоты</span>' + out + sum;
   }
 
-  /* Узел рельса. На «Состоянии» он только подпись, на «Изменениях» — кнопка:
-     нажимается лишь то, что и правда что-то делает. */
-  function stopHtml(at, tag, when, here, live) {
+  /* Узел рельса. Кнопка, пока снапшот на странице не один: на единственном
+     переключать нечего и сравнивать не с чем, а кнопка, которая ничего не
+     делает, обещает лишнее.
+
+     На «Состоянии» узел — выбор из ряда, и aria-pressed говорит, какой
+     снапшот открыт. На «Изменениях» нажатого узла нет: там выбирают не
+     узел, а отрезок, и концы диапазона показаны заливкой. */
+  function stopHtml(at, tag, when, here, live, hot) {
     var cls = 'stop' + (here ? ' on' : '') + (anchor === at ? ' anchor' : '');
     var body = '<span class="node"></span><span class="nm">' + esc(tag)
       + (when ? ' <span class="when">' + esc(when) + '</span>' : '')
       + '</span>';
-    if (!live) return '<span class="' + cls + '">' + body + '</span>';
+    if (!hot) return '<span class="' + cls + '">' + body + '</span>';
+    var open = '<button type="button" class="' + cls + '" data-node="' + at + '"';
+    if (!live) {
+      return open + ' aria-pressed="' + (here ? 'true' : 'false')
+        + '" data-tip="' + (here ? 'Открыт сейчас' : 'Открыть этот снапшот')
+        + '">' + body + '</button>';
+    }
     var tip = anchor === null ? 'Отметить началом сравнения'
       : (anchor === at ? 'Снять отметку' : 'Сравнить с отмеченным');
-    return '<button type="button" class="' + cls + '" data-node="' + at
-      + '" data-tip="' + esc(tip) + '">' + body + '</button>';
+    return open + ' data-tip="' + esc(tip) + '">' + body + '</button>';
   }
 
   /* Рельс перерисовывается целиком, и нажатая кнопка исчезает вместе с
@@ -1807,15 +1794,28 @@
     }
   }
 
-  /* Диапазон выбирается двумя кликами: первый отмечает конец, второй
-     задаёт пару. Клик по отмеченному узлу снимает отметку — иначе из
-     начатого выбора нельзя было бы выйти, не выбрав чего-нибудь. */
+  /* Клик по узлу значит на вкладках разное: на «Состоянии» открывает
+     снапшот одним кликом, на «Изменениях» выбирает диапазон двумя. Первый
+     клик отмечает конец, второй задаёт пару; клик по отмеченному узлу
+     снимает отметку — иначе из начатого выбора нельзя было бы выйти, не
+     выбрав чего-нибудь. */
   function pickNode(at) {
     /* Подсказка привязана к узлу, которого через строку не станет. Обычно
        её обновит focusin — фокус уезжает на новый узел тут же, ниже. Но
        если узла с таким номером в рельсе не нашлось, focusin не случится,
        и снимать её будет некому. */
     hideTip();
+    if (st.tab !== 'diff') {
+      st.tag = at;
+      /* Выбор стал явным, и дальше страница держит его именем: приход или
+         уход соседнего снапшота не должен молча переселить таблицу на
+         другой прогон. */
+      picked.tag = true;
+      renderStateCards();
+      render();
+      focusNode(at);
+      return;
+    }
     if (anchor === null) { anchor = at; renderChain(); }
     else if (anchor === at) { anchor = null; renderChain(); }
     else {

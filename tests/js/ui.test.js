@@ -155,37 +155,27 @@ test('последний снапшот убрали — страница сно
   assert.strictEqual(dom.id('meta').innerHTML, '');
 });
 
-function pressedTag(html) {
-  var m = /aria-pressed="true" data-tip="Снимок тега ([^ ]+) /.exec(html);
+/* Какой снапшот открыт, страница говорит нажатым узлом рельса — тем же
+   aria-pressed, которым раньше говорил селектор тегов. Подпись узла стоит
+   в разметке следом за атрибутом, оттуда и читаем тег. */
+function openTag(html) {
+  var m = /aria-pressed="true"[\s\S]*?class="nm">([^ <]+)/.exec(html);
   return m ? m[1] : null;
 }
+
+function chain(dom) { return dom.id('chain').innerHTML; }
 
 test('выбранный тег держится именем, а не номером', async function () {
   var dom = load();
   store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
   store.add([snap('os-9.2', '2026-08-01T00:00:00+03:00')], 'b.json');
-  /* Селектор тегов скрипт тоже рисует строкой — кнопку ставим узлом. */
-  var pick = dom.document.createElement('button');
-  pick.setAttribute('class', 'pick');
-  pick.setAttribute('data-tag', '1');
-  dom.id('tag-select').appendChild(pick);
-  dom.fire(pick, 'click', {});
-  assert.strictEqual(pressedTag(dom.id('tag-select').innerHTML), 'os-9.2');
+  clickNode(dom, 1);
+  assert.strictEqual(openTag(chain(dom)), 'os-9.2', chain(dom));
   await dom.tick();
   dom.location.hash = '';        /* выбор должен держаться и без адреса */
   store.move(1, -1);             /* теперь последний в списке — os-9.1 */
-  assert.strictEqual(pressedTag(dom.id('tag-select').innerHTML), 'os-9.2');
+  assert.strictEqual(openTag(chain(dom)), 'os-9.2', chain(dom));
 });
-
-/* Кнопки селекторов скрипт тоже рисует строкой — ставим такую же узлом.
-   Проверяется делегированный обработчик, а не отрисовка кнопки. */
-function pressPick(dom, host, name, value) {
-  var node = dom.document.createElement('button');
-  node.setAttribute('class', 'pick');
-  node.setAttribute(name, value);
-  dom.id(host).appendChild(node);
-  dom.fire(node, 'click', {});
-}
 
 /* Два прогона одного тега — самый частый способ сравнения: «тот же тег
    месяц назад против сегодняшнего». Различать их дашборд обязан не глазами
@@ -210,7 +200,7 @@ test('выбор снапшота держится тегом и времене�
                   { builds: [build('nginx')] })], 'a.json');
   store.add([snap('os-9.2', JUL, { builds: [build('apache')] })], 'b.json');
   store.add([snap('os-9.2', AUG, { builds: [build('httpd')] })], 'c.json');
-  pressPick(dom, 'tag-select', 'data-tag', '1');   /* os-9.2 от 1 июля */
+  clickNode(dom, 1);                                /* os-9.2 от 1 июля */
   assert.ok(dom.id('state-rows').innerHTML.indexOf('apache') !== -1,
             dom.id('state-rows').innerHTML);
   store.remove(0);                                  /* цепочка сдвинулась */
@@ -223,7 +213,7 @@ test('в адресе у снапшота стоит и тег, и время с
   var dom = load();
   store.add([snap('os-9.2', JUL, { builds: [build('apache')] })], 'b.json');
   store.add([snap('os-9.2', AUG, { builds: [build('httpd')] })], 'c.json');
-  pressPick(dom, 'tag-select', 'data-tag', '0');
+  clickNode(dom, 0);
   assert.ok(dom.location.hash.indexOf(encodeURIComponent('os-9.2@' + JUL)) !== -1,
             dom.location.hash);
 });
@@ -232,7 +222,7 @@ test('ссылка со временем сбора открывает тот ж
   var dom = load();
   store.add([snap('os-9.2', JUL, { builds: [build('apache')] })], 'b.json');
   store.add([snap('os-9.2', AUG, { builds: [build('httpd')] })], 'c.json');
-  pressPick(dom, 'tag-select', 'data-tag', '1');   /* открыт августовский */
+  clickNode(dom, 1);                                /* открыт августовский */
   assert.ok(dom.id('state-rows').innerHTML.indexOf('httpd') !== -1);
   /* Свою же запись в адрес страница пропускает, и ждать её приходится
      тику: иначе присланная ссылка была бы прочитана как эхо. */
@@ -244,27 +234,60 @@ test('ссылка со временем сбора открывает тот ж
             dom.id('state-rows').innerHTML);
 });
 
-test('одинаковые теги видно по датам в цепочке и в селекторе', function () {
+test('одинаковые теги видно по датам в цепочке', function () {
   var dom = load();
   store.add([snap('os-9.2', JUL)], 'b.json');
   store.add([snap('os-9.2', AUG)], 'c.json');
-  var chain = dom.id('chain').innerHTML;
-  assert.ok(/class="when">2026-07-01</.test(chain), chain);
-  assert.ok(/class="when">2026-08-01</.test(chain), chain);
-  var picks = dom.id('tag-select').innerHTML;
-  assert.ok(/class="sub">2026-07-01/.test(picks), picks);
-  assert.ok(/class="sub">2026-08-01/.test(picks), picks);
+  assert.ok(/class="when">2026-07-01</.test(chain(dom)), chain(dom));
+  assert.ok(/class="when">2026-08-01</.test(chain(dom)), chain(dom));
 });
 
 test('у разных тегов даты в подписи нет — она там шум', function () {
   var dom = load();
   store.add([snap('os-9.1', JUL)], 'a.json');
   store.add([snap('os-9.2', AUG)], 'b.json');
-  assert.strictEqual(dom.id('chain').innerHTML.indexOf('class="when"'), -1,
-                     dom.id('chain').innerHTML);
-  /* В селекторе дата остаётся только в подсказке, а не в подписи кнопки. */
-  assert.ok(!/class="sub">2026-/.test(dom.id('tag-select').innerHTML),
-            dom.id('tag-select').innerHTML);
+  assert.strictEqual(chain(dom).indexOf('class="when"'), -1, chain(dom));
+});
+
+/* Рельс — единственный способ переключить снапшот: селектор-пилюли, стоявший
+   раньше над карточками, ушёл. Клик по узлу на «Состоянии» открывает снапшот
+   сразу, а не отмечает конец диапазона: диапазон живёт на «Изменениях». */
+test('на «Состоянии» клик по узлу открывает снапшот', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { builds: [build('nginx')] })], 'a.json');
+  store.add([snap('os-9.2', AUG, { builds: [build('apache')] })], 'b.json');
+  clickNode(dom, 0);
+  assert.strictEqual(openTag(chain(dom)), 'os-9.1', chain(dom));
+  assert.ok(dom.id('state-rows').innerHTML.indexOf('nginx') !== -1,
+            dom.id('state-rows').innerHTML);
+  assert.strictEqual(chain(dom).indexOf('anchor'), -1, chain(dom));
+});
+
+/* Отметка принадлежит «Изменениям», и клик на «Состоянии» не должен ей
+   ничего оставлять: следующий клик там же — это выбор другого снапшота,
+   а не второй конец начатого где-то диапазона. */
+test('выбор снапшота не мешает следующему выбору диапазона', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { builds: [build('nginx')] })], 'a.json');
+  store.add([snap('os-9.2', AUG, { builds: [build('nginx')] })], 'b.json');
+  store.add([snap('os-9.3', SEP, { builds: [build('nginx')] })], 'c.json');
+  clickNode(dom, 0);
+  clickNode(dom, 1);
+  assert.strictEqual(openTag(chain(dom)), 'os-9.2', chain(dom));
+  pressTab(dom, 'diff');
+  clickNode(dom, 1);
+  clickNode(dom, 2);
+  assert.match(dom.location.hash, /pair=os-9\.2%40[^.]*\.\.os-9\.3/,
+               dom.location.hash);
+});
+
+/* Единственный снапшот переключать не на что, и узел там не кнопка:
+   нажимается лишь то, что и правда что-то делает. */
+test('на одном снапшоте узел рельса не нажимается', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL)], 'a.json');
+  assert.strictEqual(chain(dom).indexOf('data-node'), -1, chain(dom));
+  assert.ok(chain(dom).indexOf('os-9.1') !== -1, chain(dom));
 });
 
 test('пары одинаковых тегов различимы в адресе', function () {
@@ -550,12 +573,18 @@ test('после клика фокус остаётся на том же узл�
    focus() событий не поднимает, так что такой тест был бы зелён только
    в ней: уверенность без покрытия хуже, чем её отсутствие. */
 
-test('на вкладке «Состояние» узлы рельса не нажимаются', function () {
+/* Узел нажимается на обеих вкладках, но обещает разное: на «Изменениях» он
+   конец диапазона, на «Состоянии» — выбор из ряда. Подсказка про отметку,
+   уехавшая на «Состояние», звала бы делать то, чего там не делают. */
+test('подсказка узла говорит то, что клик и сделает', function () {
   var dom = load();
   threeChain(dom);
+  assert.match(chain(dom), /data-tip="Отметить началом сравнения"/, chain(dom));
   pressTab(dom, 'state');
-  assert.strictEqual(dom.id('chain').innerHTML.indexOf('data-node'), -1,
-                     dom.id('chain').innerHTML);
+  assert.strictEqual(chain(dom).indexOf('Отметить началом'), -1, chain(dom));
+  assert.match(chain(dom), /data-tip="Открыть этот снапшот"/, chain(dom));
+  assert.match(chain(dom), /aria-pressed="true" data-tip="Открыт сейчас"/,
+               chain(dom));
 });
 
 test('файл роняют на страницу — снапшот загружается', async function () {
@@ -825,8 +854,7 @@ test('снапшоты приехали по одному — открыт са�
   await dom.tick();
   store.add([snap('os-9.3', SEP, { builds: [build('nginx')] })], 'c.json');
   await dom.tick();
-  assert.strictEqual(pressedTag(dom.id('tag-select').innerHTML), 'os-9.3',
-                     dom.id('tag-select').innerHTML);
+  assert.strictEqual(openTag(chain(dom)), 'os-9.3', chain(dom));
   /* Самый широкий переход — вся цепочка, от os-9.1 до os-9.3. */
   assert.match(dom.location.hash, /pair=os-9\.1%40[^.]*\.\.os-9\.3/,
                dom.location.hash);
@@ -841,8 +869,7 @@ test('три снапшота одним файлом — тот же свежи
              snap('os-9.2', AUG, { builds: [build('nginx')] }),
              snap('os-9.3', SEP, { builds: [build('nginx')] })], 'all.json');
   await dom.tick();
-  assert.strictEqual(pressedTag(dom.id('tag-select').innerHTML), 'os-9.3',
-                     dom.id('tag-select').innerHTML);
+  assert.strictEqual(openTag(chain(dom)), 'os-9.3', chain(dom));
   assert.match(dom.location.hash, /pair=os-9\.1%40[^.]*\.\.os-9\.3/,
                dom.location.hash);
 });
@@ -853,8 +880,7 @@ test('свежий снапшот выбирается и когда файл п
   var dom = load();
   store.add([snap('os-9.2', AUG, { builds: [build('nginx')] })], 'b.json');
   store.add([snap('os-9.1', JUL, { builds: [build('nginx')] })], 'a.json');
-  assert.strictEqual(pressedTag(dom.id('tag-select').innerHTML), 'os-9.2',
-                     dom.id('tag-select').innerHTML);
+  assert.strictEqual(openTag(chain(dom)), 'os-9.2', chain(dom));
 });
 
 test('выбранный человеком снапшот переживает приход нового файла',
@@ -862,12 +888,11 @@ test('выбранный человеком снапшот переживает 
   var dom = load();
   store.add([snap('os-9.1', JUL, { builds: [build('nginx')] })], 'a.json');
   store.add([snap('os-9.2', AUG, { builds: [build('apache')] })], 'b.json');
-  pressPick(dom, 'tag-select', 'data-tag', '0');   /* явный выбор: os-9.1 */
+  clickNode(dom, 0);                                /* явный выбор: os-9.1 */
   await dom.tick();
   store.add([snap('os-9.3', SEP, { builds: [build('httpd')] })], 'c.json');
   await dom.tick();
-  assert.strictEqual(pressedTag(dom.id('tag-select').innerHTML), 'os-9.1',
-                     dom.id('tag-select').innerHTML);
+  assert.strictEqual(openTag(chain(dom)), 'os-9.1', chain(dom));
 });
 
 test('выбранный человеком переход переживает приход нового файла',
@@ -970,10 +995,9 @@ test('выбранный снапшот убрали — снова открыв
   store.add([snap('os-9.1', JUL, { builds: [build('nginx')] })], 'a.json');
   store.add([snap('os-9.2', AUG, { builds: [build('apache')] })], 'b.json');
   store.add([snap('os-9.3', SEP, { builds: [build('httpd')] })], 'c.json');
-  pressPick(dom, 'tag-select', 'data-tag', '0');
+  clickNode(dom, 0);
   store.remove(0);
-  assert.strictEqual(pressedTag(dom.id('tag-select').innerHTML), 'os-9.3',
-                     dom.id('tag-select').innerHTML);
+  assert.strictEqual(openTag(chain(dom)), 'os-9.3', chain(dom));
 });
 
 /* Всё, что приходит из снапшота, попадает в разметку через innerHTML, и

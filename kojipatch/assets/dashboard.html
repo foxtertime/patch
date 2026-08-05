@@ -87,8 +87,8 @@ h1 .dot { color: var(--muted); font-weight: 400; }
 .chain .l { color: var(--muted); font-size: .64rem; text-transform: uppercase;
   letter-spacing: .09em; margin-right: .75rem; }
 /* Появление узла не анимируется намеренно: рельс перерисовывается целиком,
-   и узел рождается уже в конечном виде. Плавность наведения на «Изменениях»
-   достаётся ему от общего правила button — там узел и правда кнопка.
+   и узел рождается уже в конечном виде. Плавность наведения достаётся ему
+   от общего правила button — рельс выбирает, и узел там правда кнопка.
    Остального вида кнопки ему не надо: рельс рисуют узлы и отрезки, а не
    пилюли, поэтому рамка, фон и радиус сбрасываются, а font: inherit
    возвращает размер шрифта самого рельса. */
@@ -171,22 +171,6 @@ button.stop:hover { background: var(--card); color: var(--fg); }
 .tab[aria-selected=true] { color: var(--fg); border-bottom-color: var(--fg); }
 .tab[hidden] { display: none; }
 
-/* Селектор тега или пары тегов. Всегда виден, даже когда выбор один:
-   он подписывает, на что именно смотрит страница. */
-.selector { display: flex; flex-wrap: wrap; gap: .4rem; margin-bottom: .9rem; }
-.pick { display: flex; align-items: baseline; gap: .45rem; padding: .34rem .8rem;
-  border-radius: 999px; border: 1px solid var(--line); background: var(--card);
-  color: var(--fg); font: inherit; font-size: .8rem; cursor: pointer;
-  transition: border-color var(--dur) var(--ease),
-              background var(--dur) var(--ease),
-              color var(--dur) var(--ease); }
-.pick:hover { border-color: var(--fg); }
-.pick .sub { color: var(--muted); font-size: .72rem; }
-/* Выбранный снапшот залит, а не обведён: на странице, где цвет означает
-   класс патча, «сейчас смотрим сюда» честнее показать плотностью. */
-.pick[aria-pressed=true] { background: var(--fg); border-color: var(--fg);
-  color: var(--bg); }
-.pick[aria-pressed=true] .sub { color: var(--bg); opacity: .7; }
 /* «Итог» — метка диапазона во всю цепочку. Живёт на рельсе: селектор пар,
    где она стояла раньше, ушёл вместе с готовым списком переходов. */
 .sum { font-size: .68rem; text-transform: uppercase; letter-spacing: .05em;
@@ -558,7 +542,6 @@ tr.detail-row > td { background: var(--card); padding: .85rem .7rem 1.1rem 2.2re
     <button class="tab" data-tab="diff" data-tip="Что изменилось между двумя тегами: компоненты, версии, патчи, состав RPM, ветки.">Изменения</button>
   </nav>
   <section id="tab-state">
-    <div class="selector" id="tag-select"></div>
     <div class="cards global" id="state-cards"></div>
     <div class="cards diff" id="class-cards"></div>
     <div class="controls" id="controls">
