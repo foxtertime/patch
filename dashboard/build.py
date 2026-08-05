@@ -17,6 +17,7 @@ TEMPLATE_PATH = os.path.join(ASSETS, "dashboard.html")
 # Порядок по зависимостям, а не по алфавиту: каждый следующий скрипт
 # рассчитывает, что предыдущие уже положили себя в KP.
 SCRIPTS = ("vercmp.js", "rpms.js", "diff.js", "viewmodel.js", "store.js",
+           "text.js", "labels.js", "markup.js", "tables.js", "cards.js",
            "ui.js")
 
 

@@ -1,23 +1,27 @@
-/* Поведение страницы: загрузка снапшотов, разметка, фильтры, поиск,
-   адресная строка. Считает данные viewmodel.js, а что именно считать —
-   решает store.js; здесь это только рисуют и связывают с событиями. */
+/* Поведение страницы: загрузка снапшотов, фильтры, поиск, адресная строка.
+   Считает данные viewmodel.js, а что именно считать — решает store.js;
+   разметку строит tables.js с cards.js, а здесь её кладут в узлы и
+   связывают с событиями. */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
     module.exports = factory(require('./viewmodel.js'), require('./store.js'),
-                             require('./rpms.js'), require('./diff.js'));
+                             require('./diff.js'), require('./text.js'),
+                             require('./labels.js'), require('./markup.js'),
+                             require('./tables.js'), require('./cards.js'));
   } else {
     root.KP = root.KP || {};
-    root.KP.ui = factory(root.KP.viewmodel, root.KP.store, root.KP.rpms,
-                         root.KP.diff);
+    root.KP.ui = factory(root.KP.viewmodel, root.KP.store, root.KP.diff,
+                         root.KP.text, root.KP.labels, root.KP.markup,
+                         root.KP.tables, root.KP.cards);
   }
 }(typeof globalThis !== 'undefined' ? globalThis : this,
-  function (viewmodel, store, rpmsmod, diffmod) {
+  function (viewmodel, store, diffmod, text, labels, markup, tables, cards) {
   'use strict';
 
   /* Данные страницы считаются здесь же, из снапшотов, которые человек
      подгружает в дашборд сам. */
   var DATA = { generated: '', patch_classes: [], snapshots: [], pairs: [] };
-  var SNAPS = [], PAIRS = [], CLASSES = [];
+  var SNAPS = [], PAIRS = [];
   /* Выбранный переход — имена снапшотов, а не номер в массиве. Номер
      значил что-то, только пока переходы приходили готовым списком в
      известном порядке; с произвольными диапазонами он не значит ничего, а
@@ -53,17 +57,7 @@
     DATA = pageData;
     SNAPS = pageData.snapshots || [];
     PAIRS = pageData.pairs || [];
-    CLASSES = pageData.patch_classes || [];
-    /* Классы патчей задаются конфигом, поэтому подписи для них берём из
-       данных. Ключ — тот же slug(), что стоит в теге строки и в карточке
-       класса: имя вроде «C++» иначе дало бы три разных ключа и карточку
-       без строк. Карта заводится заново: подпись класса из выгруженного
-       снапшота пережила бы его и держала бы живым фильтр, которого на
-       странице больше нет ни на одной карточке. */
-    CLASS_LABELS = {};
-    for (ci = 0; ci < CLASSES.length; ci++) {
-      CLASS_LABELS[slug(CLASSES[ci])] = 'патчи ' + CLASSES[ci];
-    }
+    labels.setClasses(pageData.patch_classes || []);
     /* Умолчание: последний снапшот цепочки и самый широкий переход. Именно
        это обещает README, и обещание не должно зависеть от того, одним
        файлом человек подгрузил снапшоты или пятью. */
@@ -105,35 +99,6 @@
     rebuild();
   }
 
-  /* Подписи фильтров: ключ приходит из данных (метки строк, статусы диффа),
-     а по-русски он должен читаться и в чипе, и в подсказке. */
-  var LABELS = {
-    "all": "все",
-    "has-patch": "с патчами", "problem": "с проблемами",
-    "no-patch": "нет каталога PATCH", "no-source": "нет источника",
-    "from-commit": "собран с коммита", "gitlab-error": "ошибка GitLab",
-    "internal-error": "внутренняя ошибка",
-    "inherited": "унаследован из другого тега",
-    "tag-changed": "переехал между тегами",
-    "added": "появился", "removed": "исчез", "unchanged": "версия та же",
-    "upgraded": "версия выросла", "downgraded": "версия упала",
-    "repackaged": "состав RPM изменился", "patches+": "патчи пришли",
-    "patches-": "патчи ушли", "branch-changed": "сменил ветку",
-    "changed": "что-то изменилось"
-  };
-  /* Подписи классов патчей живут отдельно от постоянных: классы приходят с
-     данными и уходят вместе с ними, а LABELS — словарь самой страницы. */
-  var CLASS_LABELS = {};
-  var ARROW = { added: "+", removed: "−", upgraded: "↑",
-                downgraded: "↓", unchanged: "=" };
-  var KNOWN_CLASS = { "autogen": 1, "cve": 1, "sast": 1, "dast": 1,
-                      "coverage": 1, "distsuffix": 1, "spec": 1,
-                      "changelog": 1, "files": 1, "other": 1 };
-  var CALM_MARKS = { "from-commit": "warn", "no-patch": "calm",
-                    "no-source": "bad", "gitlab-error": "bad",
-                    "internal-error": "bad", "inherited": "calm" };
-  var STATUS_MARKS = { "added": 1, "removed": 1, "unchanged": 1, "upgraded": 1,
-                      "downgraded": 1, "repackaged": 1 };
 
   var stateSection = document.getElementById('tab-state');
   var diffSection = document.getElementById('tab-diff');
@@ -188,117 +153,13 @@
 
   /* ---------- вспомогательное ---------- */
 
-  function esc(s) {
-    return String(s === null || s === undefined ? '' : s)
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-  }
+  /* Считалки строк, подписи и куски разметки живут в своих модулях. Здесь
+     только короткие имена для тех, кого зовут отсюда: тела оставшихся
+     функций читаются лучше, когда в них стоит esc(), а не text.esc(). */
+  var esc = text.esc, own = text.own, has = text.has, keys = text.keys,
+      setFrom = text.setFrom, slug = text.slug, plural = text.plural,
+      stampOf = text.stampOf, gapLabel = text.gapLabel;
 
-  /* Экранирует и подсвечивает вхождения текущего запроса. Всё, что попадает
-     в DOM из DATA, проходит либо через esc(), либо через hl(). */
-  function hl(s, q) {
-    s = String(s === null || s === undefined ? '' : s);
-    if (!q) return esc(s);
-    var low = s.toLowerCase(), out = '', from = 0, at;
-    while ((at = low.indexOf(q, from)) !== -1) {
-      out += esc(s.slice(from, at)) + '<span class="hit">'
-          + esc(s.slice(at, at + q.length)) + '</span>';
-      from = at + q.length;
-    }
-    return out + esc(s.slice(from));
-  }
-
-  /* Значение по ключу, который пришёл из данных. Голый объект несёт свойства
-     Object.prototype, и на ключ «constructor» — а так может называться класс
-     патчей, имена им задаёт конфиг — он отвечает функцией Object вместо
-     «ничего нет». Она уезжает прямо на экран: подписью в карточке, числом в
-     полоске (width:NaN%), именем css-класса. */
-  function own(map, key) {
-    return Object.prototype.hasOwnProperty.call(map, key) ? map[key] : undefined;
-  }
-
-  function has(value, q) {
-    return String(value === null || value === undefined ? '' : value)
-      .toLowerCase().indexOf(q) !== -1;
-  }
-
-  function slug(s) {
-    return String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-');
-  }
-
-  /* Класс патчей задаётся конфигом, а цвета в CSS перечислены поимённо.
-     Незнакомый класс не должен остаться бесцветным — уводим его в c-x. */
-  function classCls(name) {
-    var key = slug(name);
-    return own(KNOWN_CLASS, key) ? 'c-' + key : 'c-x';
-  }
-
-  function label(key) {
-    return own(LABELS, key) || own(CLASS_LABELS, key) || key;
-  }
-
-  function plural(n, one, few, many) {
-    var a = Math.abs(n) % 100, b = a % 10;
-    if (a > 10 && a < 20) return many;
-    if (b > 1 && b < 5) return few;
-    if (b === 1) return one;
-    return many;
-  }
-
-  /* Время сбора для подписи узла: дата и время до минуты. Строку режем, а не
-     разбираем: «неизвестно» из неё выдумывать нечего, формат задан самим
-     dashboard, а разбор увёл бы подпись в часовой пояс читателя — снапшот
-     же собран там, где стоит хаб. */
-  function stampOf(value) {
-    var text = String(value === null || value === undefined ? '' : value);
-    return text.slice(0, 16).replace('T', ' ');
-  }
-
-  var MINUTE = 60000, HOUR = 60 * MINUTE, DAY = 24 * HOUR;
-
-  /* Расстояние между соседними снапшотами — над отрезком рельса. Единица
-     берётся крупная: под узлами и так стоят полные даты, а от подписи нужен
-     порядок величины — «месяц», а не «31 день 4 часа». Меньше минуты не
-     подписываем вовсе: «0 мин» занял бы место, ничего не сообщив.
-
-     Порядок концов не важен, берётся модуль: цепочку переставляют руками, и
-     у переставленной пары расстояние то же самое. */
-  function gapLabel(from, to) {
-    var a = Date.parse(from), b = Date.parse(to), ms;
-    if (isNaN(a) || isNaN(b)) return '';
-    ms = Math.abs(b - a);
-    if (ms < MINUTE) return '';
-    if (ms < HOUR) return Math.round(ms / MINUTE) + ' мин';
-    if (ms < 2 * DAY) return Math.round(ms / HOUR) + ' ч';
-    if (ms < 60 * DAY) return Math.round(ms / DAY) + ' дн';
-    return Math.round(ms / (30 * DAY)) + ' мес';
-  }
-
-  function keys(obj) {
-    var out = [];
-    for (var k in obj) { if (obj.hasOwnProperty(k)) out.push(k); }
-    return out;
-  }
-
-  function setFrom(list) {
-    var out = {};
-    for (var i = 0; i < (list || []).length; i++) out[list[i]] = 1;
-    return out;
-  }
-
-  /* Порядок классов: сначала как их перечислил классификатор, потом всё,
-     что встретилось в данных, но в списке классов отсутствует. */
-  function classOrder(counts) {
-    var out = [], i;
-    for (i = 0; i < CLASSES.length; i++) {
-      if (own(counts, CLASSES[i])) out.push(CLASSES[i]);
-    }
-    var extra = keys(counts).sort();
-    for (i = 0; i < extra.length; i++) {
-      if (out.indexOf(extra[i]) === -1) out.push(extra[i]);
-    }
-    return out;
-  }
 
   /* ---------- фильтры ---------- */
 
@@ -595,505 +456,20 @@
     return table.querySelectorAll('th').length;
   }
 
-  function markHtml(key) {
-    var cls = 'mark';
-    if (key === 'patches+') cls += ' added';
-    else if (key === 'patches-') cls += ' removed';
-    else if (key === 'branch-changed' || key === 'tag-changed') cls += ' warn';
-    else if (own(CALM_MARKS, key)) cls += ' ' + CALM_MARKS[key];
-    else if (own(STATUS_MARKS, key)) cls += ' ' + key;
-    else cls += ' ' + classCls(key);   /* остаётся класс патчей */
-    return '<span class="' + cls + '" data-filter="' + esc(key) + '" role="button"'
-         + ' tabindex="0" data-tip="' + esc(label(key)) + '. Клик — фильтр.">'
-         + esc(key) + '</span>';
-  }
 
-  /* Колонка «тег»: прочерк — билд затегован прямо в выбранный тег, имя —
-     унаследован оттуда. Прочерк, а не повтор имени тега в каждой строке:
-     в теге на восемьсот сборок повторов было бы восемьсот. */
-  function taggedCell(row, q) {
-    if (row.inherited === null) return '<span class="none">?</span>';
-    if (!row.inherited) return '<span class="none">—</span>';
-    return hl(row.tagged_in, q);
-  }
-
-  /* Время сборки в таблице: дата обычная, время бледнее. Колонку сканируют
-     по дате — секунды нужны, когда до строки уже дошли. Снапшоты, собранные
-     до появления времени, несут одну дату: тогда второй половины просто нет. */
-  function builtHtml(value, q) {
-    if (!value) return '';
-    var date = value.slice(0, 10), time = value.slice(11);
-    return hl(date, q)
-         + (time ? ' <span class="tm">' + hl(time, q) + '</span>' : '');
-  }
-
-  function inheritedNote(inherited) {
-    if (inherited === null) return '';
-    return '<span class="note">(' + (inherited ? 'унаследован' : 'прямой')
-         + ')</span>';
-  }
-
-  /* Тег, через который билд попал в этот снапшот. */
-  function mainTagHtml(row, q) {
-    if (!row.tagged_in) return '<span class="none">неизвестно</span>';
-    return '<span class="ktag main">' + hl(row.tagged_in, q) + '</span>'
-         + inheritedNote(row.inherited);
-  }
-
-  /* Остальные теги, в которых висит тот же билд. Строка остаётся на месте и
-     когда их нет: блоки соседних раскрытых строк не должны разъезжаться. */
-  function otherTagsHtml(row, q) {
-    var all = row.koji_tags || [], list = [], i;
-    for (i = 0; i < all.length; i++) {
-      if (all[i] !== row.tagged_in) list.push(all[i]);
-    }
-    if (!list.length) return '<span class="none">—</span>';
-    var out = '<div class="ktags">';
-    for (i = 0; i < list.length; i++) {
-      out += '<span class="ktag">' + hl(list[i], q) + '</span>';
-    }
-    return out + '</div>';
-  }
-
-  /* То же для сторон «было/стало»: там места на две строки нет. */
-  function taggedText(taggedIn, inherited, q) {
-    if (inherited === null || !taggedIn) {
-      return '<span class="none">неизвестно</span>';
-    }
-    return '<span class="mono">' + hl(taggedIn, q) + '</span>'
-         + inheritedNote(inherited);
-  }
-
-  function marksHtml(marks) {
-    var out = '';
-    for (var i = 0; i < marks.length; i++) out += markHtml(marks[i]);
-    return out || '<span class="none">—</span>';
-  }
-
-  /* Адреса приходят из koji и GitLab, то есть снаружи. В href пускаем только
-     http(s) и относительный путь: javascript: в ссылке нам ни к чему.
-     «//host/x» — не относительный путь, а ссылка на чужой хост по текущей
-     схеме, поэтому её тоже не пускаем. */
-  function safeUrl(url) {
-    if (!url) return null;
-    return /^(https?:\/\/|\/(?!\/))/i.test(String(url)) ? String(url) : null;
-  }
-
-  function linkHtml(url, text) {
-    var safe = safeUrl(url);
-    if (!safe) return '';
-    return '<a class="link" href="' + esc(safe) + '" target="_blank" rel="noopener">'
-         + esc(text) + ' ↗</a>';
-  }
-
-  /* Полоска патчей: длина — размер стека относительно самого большого в
-     выдаче, доли внутри — классы. Одна метка отвечает сразу на «много ли» и
-     «чего именно», а точные числа даёт подсказка. */
-  /* Полоска состава патчей. Ширина у неё постоянная, и это осознанно: раньше
-     длина полоски означала «сколько патчей относительно самой обвешанной
-     сборки», а доли цветов — состав, и две величины в одной картинке читались
-     как одна непонятная. Сколько патчей — говорит число слева от полоски;
-     полоска отвечает только на вопрос «из чего они». */
-  function meterHtml(row) {
-    var total = row.patches.length;
-    if (!total) return '';
-    var order = classOrder(row.patch_counts), parts = [], bars = '', i, n;
-    for (i = 0; i < order.length; i++) {
-      n = row.patch_counts[order[i]];
-      parts.push(order[i] + ' ' + n);
-      bars += '<i class="' + classCls(order[i]) + '" style="width:'
-           + (100 * n / total).toFixed(2) + '%"></i>';
-    }
-    return '<span class="meter" data-tip="' + esc(parts.join(' · '))
-         + ', всего ' + total + '">' + bars + '</span>';
-  }
-
-  function kv(k, v) {
-    return '<div class="kv"><span class="k">' + esc(k) + '</span><span class="v">'
-         + v + '</span></div>';
-  }
-
-  function signHtml(markCls) {
-    return '<span class="sign">' + (markCls === 'is-added' ? '+' : '−') + '</span>';
-  }
-
-  /* Патчи одной стороны, сгруппированные по классам. mark — множество путей,
-     которые нужно выделить как пришедшие или ушедшие. */
-  function patchesHtml(patches, q, mark, markCls) {
-    if (!patches.length) return '<div class="none">патчей нет</div>';
-    var counts = {}, i, p, cls;
-    for (i = 0; i < patches.length; i++) {
-      cls = patches[i]['class'];
-      counts[cls] = (own(counts, cls) || 0) + 1;
-    }
-    var order = classOrder(counts), out = '', ci, name;
-    for (ci = 0; ci < order.length; ci++) {
-      name = order[ci];
-      out += '<div class="pgroup ' + classCls(name) + '">'
-          + '<div class="pclass">' + esc(name) + ' <span class="n">'
-          + counts[name] + '</span></div><ul class="plist">';
-      for (i = 0; i < patches.length; i++) {
-        p = patches[i];
-        if (p['class'] !== name) continue;
-        var hot = mark && mark[p.path];
-        var li = hot ? ' class="' + markCls + '"' : '';
-        var href = safeUrl(p.url);
-        var title = href
-          ? '<a href="' + esc(href) + '" target="_blank" rel="noopener">'
-            + hl(p.name, q) + '</a>'
-          : '<span class="mono">' + hl(p.name, q) + '</span>';
-        out += '<li' + li + '>' + (hot ? signHtml(markCls) : '') + title
-            + '<div class="ppath">' + hl(p.path, q) + '</div></li>';
-      }
-      out += '</ul></div>';
-    }
-    return out;
-  }
-
-  /* Архитектуру считает rpms.js — тот же модуль, что раскладывает пакеты по
-     порядку. Своя копия здесь уже разошлась с ним и падала на пакете, который
-     не строка: снапшот приходит из файла, который выбрал человек, а падало это
-     не при отрисовке, а на раскрытии строки — там, где откатить нечего. */
-  var archOf = rpmsmod.archOf;
-
-  function rowArch(row) {
-    return archOf(row[0] === null ? row[1] : row[0]);
-  }
-
-  function archGroupHtml(arch, count, body, cls) {
-    return '<div class="pgroup arch"><div class="pclass">' + esc(arch)
-         + ' <span class="n">' + count + '</span></div><ul class="rlist'
-         + (cls || '') + '">' + body + '</ul></div>';
-  }
-
-  /* Пакеты приходят из Python уже разложенными: сначала src, потом noarch,
-     дальше остальные архитектуры. Здесь список только режется на блоки по
-     смене архитектуры — своего порядка фронтенд не заводит, иначе колонки
-     «было» и «стало» разъехались бы. */
-  function rpmsHtml(list, q) {
-    if (!list.length) return '<div class="none">пакетов нет</div>';
-    var out = '', i = 0;
-    while (i < list.length) {
-      var arch = archOf(list[i]), body = '', n = 0;
-      while (i < list.length && archOf(list[i]) === arch) {
-        body += '<li>' + hl(list[i], q) + '</li>';
-        i++; n++;
-      }
-      out += archGroupHtml(arch, n, body, '');
-    }
-    return out;
-  }
-
-  /* Одна колонка выровненной таблицы пакетов. rows приходят из diff.js уже
-     спаренными: [было, стало], где null означает «на этой стороне пакета
-     нет». Обе стороны печатают одинаковое число строк и одинаковые блоки,
-     поэтому один и тот же подпакет стоит слева и справа на одной высоте, а
-     пустая ячейка напротив соседа читается как «пропал» или «пришёл».
-     В заголовке блока — счётчик своей стороны, поэтому у исчезнувшей
-     целиком архитектуры он честно показывает 0. */
-  function rpmSideHtml(rows, at, q, markCls) {
-    if (!rows.length) return '<div class="none">пакетов нет</div>';
-    var out = '', i = 0;
-    while (i < rows.length) {
-      var arch = rowArch(rows[i]), body = '', n = 0;
-      while (i < rows.length && rowArch(rows[i]) === arch) {
-        var mine = rows[i][at], other = rows[i][1 - at];
-        if (mine === null) {
-          body += '<li class="rgap">·</li>';
-        } else {
-          var hot = other === null;
-          body += '<li' + (hot ? ' class="' + markCls + '"' : '') + '>'
-               + (hot ? signHtml(markCls) : '') + hl(mine, q) + '</li>';
-          n++;
-        }
-        i++;
-      }
-      out += archGroupHtml(arch, n, body, ' fixed');
-    }
-    return out;
-  }
-
-  function rpmSideCount(rows, at) {
-    var n = 0;
-    for (var i = 0; i < rows.length; i++) if (rows[i][at] !== null) n++;
-    return n;
-  }
-
-  /* ---------- вкладка «Состояние» ---------- */
-
-  function stateDetail(row, q) {
-    var out = '<div class="detail">';
-
-    out += '<div class="block"><div class="bl">koji</div>'
-        + kv('NVR', '<span class="mono">' + hl(row.nvr, q) + '</span>')
-        + kv('основной тег', mainTagHtml(row, q))
-        + kv('другие теги', otherTagsHtml(row, q))
-        + kv('собран', row.completed
-              ? hl(row.completed, q) + (row.completed.length > 10
-                  ? '<span class="note">МСК</span>' : '')
-              : '<span class="none">—</span>')
-        + kv('владелец', hl(row.owner || '—', q))
-        + kv('build id', esc(row.build_id === null ? '—' : row.build_id))
-        + kv('task id', esc(row.task_id === null ? '—' : row.task_id))
-        + '</div>';
-
-    var branch = row.branch
-      ? '<span class="mono">' + hl(row.branch, q) + '</span>'
-        + (row.ref_kind === 'commit' ? ' ' + markHtml('from-commit') : '')
-      : '<span class="none">источник неизвестен</span>';
-    var dir = row.patch_dir_present === true ? 'есть'
-            : (row.patch_dir_present === false ? 'нет' : 'не проверялся');
-    out += '<div class="block"><div class="bl">gitlab</div>'
-        + kv('проект', row.project
-              ? '<span class="mono">' + hl(row.project, q) + '</span>'
-              : '<span class="none">—</span>')
-        + kv('ветка', branch)
-        + kv('каталог PATCH', esc(dir))
-        + kv('ссылка', row.source_url
-              ? linkHtml(row.source_url, 'gitlab') : '<span class="none">—</span>')
-        + '</div>';
-
-    /* Порядок блоков — не косметика: сетка в два столбца ставит их под
-       предыдущей парой, и каждый оказывается под своим источником. RPM
-       приезжают из koji, патчи лежат в GitLab, поэтому RPM идут первыми
-       и встают под koji, а патчи — под gitlab. */
-    out += '<div class="block"><div class="bl">RPM · ' + row.rpms.length
-        + '</div>' + rpmsHtml(row.rpms, q) + '</div>';
-
-    out += '<div class="block"><div class="bl">патчи · ' + row.patches.length
-        + '</div>' + patchesHtml(row.patches, q, null, '') + '</div>';
-
-    if (row.problems.length) {
-      out += '<div class="block wide"><div class="bl">проблемы</div>'
-          + '<ul class="problems">';
-      for (var i = 0; i < row.problems.length; i++) {
-        out += '<li>' + hl(row.problems[i], q) + '</li>';
-      }
-      out += '</ul></div>';
-    }
-    return out + '</div>';
-  }
-
-  function stateRowsHtml(items) {
-    var q = st.q, html = '', i, cols = colCount('state');
-    for (i = 0; i < items.length; i++) {
-      var row = items[i].row;
-      var key = rowKey(row);
-      var open = openOf(key, items[i].open);
-      var bad = row.problems.length || row.marks.indexOf('no-source') !== -1;
-      /* Число и полоска разведены по краям ячейки, а не стоят подряд:
-         подробности — у .patcell в стилях. */
-      var patches = row.patches.length
-        ? '<span class="patcell">' + row.patches.length + meterHtml(row) + '</span>'
-        : '<span class="zero">0</span>';
-      html += '<tr class="main-row' + (bad ? ' bad' : '') + '" data-row="' + esc(key) + '">'
-           + '<td class="src"><span class="chev" role="button" tabindex="0"'
-           + ' aria-expanded="' + (open ? 'true' : 'false') + '">'
-           + (open ? '▾' : '▸') + '</span> ' + hl(row.name, q) + '</td>'
-           /* Версии может не быть: снапшот приходит из файла, который выбрал
-              человек, и прочерк здесь честнее пустой ячейки. */
-           + '<td class="ver">' + (row.evr ? hl(row.evr, q)
-                : '<span class="none">—</span>') + '</td>'
-           + '<td class="tagged">' + taggedCell(row, q) + '</td>'
-           + '<td class="branch">' + (row.branch ? hl(row.branch, q)
-                : '<span class="none">—</span>') + '</td>'
-           + '<td class="pat">' + patches + '</td>'
-           + '<td class="num">' + row.rpms.length + '</td>'
-           + '<td class="built">' + builtHtml(row.completed, q) + '</td>'
-           + '<td class="marks">' + marksHtml(row.marks) + '</td>'
-           + '<td class="links">' + linkHtml(row.koji_url, 'koji')
-           + linkHtml(row.source_url, 'git') + '</td></tr>';
-      if (open) {
-        html += '<tr class="detail-row"><td colspan="' + cols + '">'
-             + stateDetail(row, q)
-             + '</td></tr>';
-      }
-    }
-    return html;
-  }
-
-  /* ---------- вкладка «Изменения» ---------- */
-
-  /* Одна сторона «было/стало». Параметры собраны в объект: их тринадцать, и
-     позиционным списком такой вызов читался бы как шифровка. */
-  function side(s, q) {
-    var out = '<div class="side"><div class="bl">' + esc(s.title) + ' · <b>'
-            + esc(s.tag) + '</b></div>';
-    out += kv('версия', s.evr ? '<span class="mono">' + hl(s.evr, q) + '</span>'
-                              : '<span class="none">—</span>');
-    out += kv('тег', s.tagChanged
-      ? '<span class="' + s.markCls + '">'
-        + taggedText(s.taggedIn, s.inherited, q) + '</span>'
-      : taggedText(s.taggedIn, s.inherited, q));
-    out += kv('ветка', s.branch
-      ? '<span class="mono' + (s.branchChanged ? ' ' + s.markCls : '') + '">'
-        + hl(s.branch, q) + '</span>'
-      : '<span class="none">—</span>');
-    out += '<div class="bl" style="margin-top:.7rem">патчи · ' + s.patches.length
-        + '</div>' + patchesHtml(s.patches, q, s.mark, s.markCls);
-    out += '<div class="bl" style="margin-top:.7rem">RPM · '
-        + rpmSideCount(s.rpmRows, s.at)
-        + '</div>' + rpmSideHtml(s.rpmRows, s.at, q, s.markCls);
-    return out + '</div>';
-  }
-
-  function diffDetail(row, q) {
-    var pair = curPair();
-    var oldTag = pair ? pair.old : 'было', newTag = pair ? pair.new : 'стало';
-    var branchChanged = row.marks.indexOf('branch-changed') !== -1;
-    var tagChanged = row.marks.indexOf('tag-changed') !== -1;
-    return '<div class="sides">'
-      + side({ title: 'было', tag: oldTag, evr: row.old_evr,
-               branch: row.old_branch, taggedIn: row.old_tagged_in,
-               inherited: row.old_inherited, patches: row.old_patches,
-               rpmRows: row.rpm_rows, at: 0, mark: setFrom(row.patches_removed),
-               markCls: 'is-removed', branchChanged: branchChanged,
-               tagChanged: tagChanged }, q)
-      + side({ title: 'стало', tag: newTag, evr: row.new_evr,
-               branch: row.new_branch, taggedIn: row.new_tagged_in,
-               inherited: row.new_inherited, patches: row.new_patches,
-               rpmRows: row.rpm_rows, at: 1, mark: setFrom(row.patches_added),
-               markCls: 'is-added', branchChanged: branchChanged,
-               tagChanged: tagChanged }, q)
-      + '</div>';
-  }
-
-  function delta(added, removed) {
-    if (!added && !removed) return '<span class="zero">—</span>';
-    var out = '';
-    if (added) out += '<span class="plus">+' + added + '</span> ';
-    if (removed) out += '<span class="minus">−' + removed + '</span>';
-    return out;
-  }
-
-  function diffRowsHtml(items) {
-    var q = st.q, html = '', i, cols = colCount('diff');
-    for (i = 0; i < items.length; i++) {
-      var row = items[i].row;
-      var key = rowKey(row);
-      var open = openOf(key, items[i].open);
-      html += '<tr class="main-row ' + esc(row.status) + '" data-row="' + esc(key) + '">'
-           + '<td class="src"><span class="chev" role="button" tabindex="0"'
-           + ' aria-expanded="' + (open ? 'true' : 'false') + '">'
-           + (open ? '▾' : '▸') + '</span> ' + hl(row.name, q) + '</td>'
-           + '<td class="ver">' + (row.old_evr ? hl(row.old_evr, q) : '—') + '</td>'
-           + '<td class="dir">' + (own(ARROW, row.status) || '') + '</td>'
-           + '<td class="ver new">' + (row.new_evr ? hl(row.new_evr, q) : '—') + '</td>'
-           + '<td class="pat">' + delta(row.patches_added.length,
-                                        row.patches_removed.length) + '</td>'
-           + '<td class="pat">' + delta(row.rpms_added.length,
-                                        row.rpms_removed.length) + '</td>'
-           + '<td class="marks">' + marksHtml(row.marks) + '</td>'
-           + '<td class="links">' + linkHtml(row.koji_url, 'koji')
-           + linkHtml(row.source_url, 'git') + '</td></tr>';
-      if (open) {
-        html += '<tr class="detail-row"><td colspan="' + cols + '">'
-             + diffDetail(row, q)
-             + '</td></tr>';
-      }
-    }
-    return html;
-  }
 
   /* ---------- карточки, селекторы, чипы ---------- */
 
-  function cardHtml(filter, big, number, unit, sub, text, tip, labelCls) {
-    var cls = 'card' + (big ? ' big' : '') + (filter ? ' clickable' : '');
-    var open = filter
-      ? '<button type="button" class="' + cls + '" data-filter="' + esc(filter)
-        + '" aria-pressed="false"'
-      : '<div class="' + cls + '"';
-    return open + ' data-tip="' + esc(tip) + '">'
-      + (big ? '<div class="l' + (labelCls ? ' ' + labelCls : '') + '">' + esc(text) + '</div>' : '')
-      + '<div class="n">' + esc(number)
-      + (unit ? ' <span class="unit">' + esc(unit) + '</span>' : '') + '</div>'
-      + '<div class="rpm">' + esc(sub || '') + '</div>'
-      + (big ? '' : '<div class="l' + (labelCls ? ' ' + labelCls : '') + '">'
-               + esc(text) + '</div>')
-      + (filter ? '</button>' : '</div>');
-  }
-
   function renderStateCards() {
-    var snap = curSnap();
-    var big = document.getElementById('state-cards');
-    var small = document.getElementById('class-cards');
-    if (!snap) { big.innerHTML = ''; small.innerHTML = ''; return; }
-    var c = snap.counts, rpms = 0, i;
-    for (i = 0; i < snap.builds.length; i++) rpms += snap.builds[i].rpms.length;
-
-    big.innerHTML =
-        cardHtml('all', true, c.builds, plural(c.builds, 'сборка', 'сборки', 'сборок'),
-          rpms + ' RPM', 'в теге',
-          'Все последние сборки тега ' + snap.tag + ' и собранные из них бинарные '
-          + 'пакеты. Клик снимает все фильтры.')
-      + cardHtml('has-patch', true, c.with_patches,
-          plural(c.with_patches, 'сборка', 'сборки', 'сборок'),
-          c.patch_files + ' ' + plural(c.patch_files, 'файл', 'файла', 'файлов')
-          + ' патчей', 'с патчами',
-          'Сборки, у которых в каталоге PATCH ветки лежит хотя бы один файл. '
-          + 'Клик оставит в таблице только их.')
-      + cardHtml('inherited', true, c.inherited,
-          plural(c.inherited, 'сборка', 'сборки', 'сборок'),
-          c.direct + ' затегованы прямо', 'унаследованы',
-          'Сборки, которые висят не в теге ' + snap.tag + ', а в одном из его '
-          + 'родителей, и попали сюда наследованием. В колонке «тег» видно, '
-          + 'из какого именно. Клик оставит в таблице только их.')
-      + cardHtml('problem', true, c.problems,
-          plural(c.problems, 'сборка', 'сборки', 'сборок'),
-          c.without_patches + ' без каталога PATCH', 'с проблемами',
-          'Сборки, при сборе данных по которым что-то пошло не так: нет исходника, '
-          + 'GitLab ответил ошибкой, ветка исчезла. Клик оставит только их.');
-
-    var order = classOrder(c.by_class), out = '';
-    for (i = 0; i < order.length; i++) {
-      var name = order[i], b = c.by_class[name];
-      out += cardHtml(slug(name), false, b.builds,
-        plural(b.builds, 'сборка', 'сборки', 'сборок'),
-        b.files + ' ' + plural(b.files, 'файл', 'файла', 'файлов'),
-        name, 'Сборки, где есть хотя бы один патч класса ' + name + ', и сколько '
-        + 'таких файлов всего. Клик оставит в таблице только их.', classCls(name));
-    }
-    small.innerHTML = out;
+    var out = cards.stateCards(curSnap());
+    document.getElementById('state-cards').innerHTML = out.big;
+    document.getElementById('class-cards').innerHTML = out.classes;
   }
 
   function renderDiffCards() {
-    var pair = curPair();
-    var box = document.getElementById('diff-cards');
-    if (!pair) { box.innerHTML = ''; return; }
-    var c = pair.counts;
-    var spec = [
-      ['changed', c.changed, 'изменились',
-       'Компоненты, у которых изменилось хоть что-нибудь: версия, набор патчей, '
-       + 'состав RPM или ветка.'],
-      ['added', c.added, 'появились', 'Компонентов не было в старом теге.'],
-      ['removed', c.removed, 'исчезли', 'Компонентов нет в новом теге.'],
-      ['upgraded', c.upgraded, 'версия выросла',
-       'Сравнение version-release по правилам rpm.'],
-      ['downgraded', c.downgraded, 'версия упала',
-       'Версия в новом теге ниже, чем в старом. Обычно это откат.'],
-      ['unchanged', c.unchanged, 'версия та же',
-       'Version-release совпал. Патчи и состав RPM при этом могли измениться.'],
-      ['patches+', c.patches_added, 'патчи пришли',
-       'В каталоге PATCH появились новые файлы.'],
-      ['patches-', c.patches_removed, 'патчи ушли',
-       'Из каталога PATCH исчезли файлы. Стоит проверить, не потеряно ли исправление.'],
-      ['repackaged', c.repackaged, 'состав RPM',
-       'Компонент остался, но набор его бинарных пакетов изменился.'],
-      ['branch-changed', c.branch_changed, 'сменили ветку',
-       'Сборка приехала из другой ветки GitLab, чем в старом теге.'],
-      ['tag-changed', c.tag_changed, 'переехали между тегами',
-       'Билд теперь висит в другом koji-теге: был унаследован — стал '
-       + 'затегован прямо, или наоборот. Обычное наследование сюда не '
-       + 'попадает: сравнивается сам тег билда, а не то, каким он выглядит '
-       + 'из выбранного.']
-    ];
-    var out = '';
-    for (var i = 0; i < spec.length; i++) {
-      out += cardHtml(spec[i][0], false, spec[i][1], 'из ' + pair.rows.length, '',
-                      spec[i][2], spec[i][3] + ' Клик — фильтр.');
-    }
-    box.innerHTML = out;
+    document.getElementById('diff-cards').innerHTML = cards.diffCards(curPair());
   }
+
 
   function syncCards() {
     var set = activeFilters();
@@ -1107,21 +483,20 @@
     }
   }
 
-  function renderChips() {
-    var set = activeFilters(), list = keys(set).sort(), out = '';
-    for (var i = 0; i < list.length; i++) {
-      out += '<button type="button" class="chip" data-chip="' + esc(list[i]) + '"'
-          + ' data-tip="Снять фильтр">' + esc(list[i]) + ' · '
-          + esc(label(list[i])) + ' ✕</button>';
-    }
-    if (list.length > 1) {
-      out += '<button type="button" class="chip clear" data-chip="all"'
-          + ' data-tip="Снять все фильтры">сбросить всё</button>';
-    }
-    chipsBox.innerHTML = out;
-  }
+  function renderChips() { chipsBox.innerHTML = cards.chips(activeFilters()); }
+
 
   /* ---------- рендер ---------- */
+
+  /* Что таблицам нужно знать о странице: запрос, ширина таблицы, ключ строки
+     и её раскрытость. Собрано в одном месте, чтобы обе таблицы получали одно
+     и то же — разойдись они здесь, разъехались бы и colspan у деталей. */
+  function rowOpts() {
+    var pair = st.tab === 'diff' ? curPair() : null;
+    return { q: st.q, cols: colCount(st.tab), keyOf: rowKey, openOf: openOf,
+             oldTag: pair ? pair.old : 'было',
+             newTag: pair ? pair['new'] : 'стало' };
+  }
 
   /* Считаем по тому же правилу, что и рендер, иначе подпись кнопки обещала бы
      одно, а нажатие делало другое. */
@@ -1163,7 +538,8 @@
         + (total ? 'Под фильтры и запрос ничего не подходит'
                  : 'В этой выборке нет строк') + '</td></tr>';
     } else {
-      body.innerHTML = st.tab === 'diff' ? diffRowsHtml(items) : stateRowsHtml(items);
+      body.innerHTML = st.tab === 'diff' ? tables.diffRows(items, rowOpts())
+                                         : tables.stateRows(items, rowOpts());
     }
     writeHash();
   }
@@ -1264,11 +640,11 @@
      одной карточке. Вкладка приходит доводом, а не берётся из st: судить
      приходится и о той, на которой человека сейчас нет. */
   function knownFilter(key, tab) {
-    var i;
+    var classes = labels.classes(), i;
     if (!key || key === 'all') return false;
-    if (LABELS.hasOwnProperty(key)) return true;
-    for (i = 0; i < CLASSES.length; i++) {
-      if (slug(CLASSES[i]) === key) return true;
+    if (labels.LABELS.hasOwnProperty(key)) return true;
+    for (i = 0; i < classes.length; i++) {
+      if (slug(classes[i]) === key) return true;
     }
     var host = tab === 'diff' ? curPair() : curSnap();
     var rows = host ? (tab === 'diff' ? host.rows : host.builds) : [];
