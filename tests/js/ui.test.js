@@ -54,14 +54,47 @@ function load(options) {
   return dom;
 }
 
-/* Кнопки панели источников скрипт рисует через innerHTML, а заглушка
-   разметку из строк не разбирает. Ставим такую же кнопку настоящим узлом:
-   проверяется делегированный обработчик, а не то, как браузер её отрисует. */
-function pressInList(dom, name, value) {
+/* Кнопки рельса скрипт рисует через innerHTML, а заглушка разметку из строк
+   не разбирает. Ставим такую же кнопку настоящим узлом: проверяется
+   делегированный обработчик, а не то, как браузер её отрисует. */
+function pressOnRail(dom, name, value) {
   var node = dom.document.createElement('button');
   node.setAttribute(name, value);
-  dom.id('sourcelist').appendChild(node);
+  dom.id('chain').appendChild(node);
   dom.fire(node, 'click', {});
+}
+
+/* Поддельный перенос: от настоящего нужны только types и setData. Файлов в
+   нём нет — этим он и отличается от брошенного на страницу файла. */
+function transfer() {
+  var types = [];
+  return { types: types, files: [],
+           setData: function (kind) { types.push(kind); },
+           effectAllowed: null };
+}
+
+/* Живого перетаскивания заглушка не даёт: события стреляем сами. Чипы тоже
+   ставим настоящими узлами — по ним обработчик ищет номер и прямоугольник.
+   Заглушка всем отдаёт один прямоугольник 0..100, поэтому «слева» — это
+   курсор в 10, «справа» — в 90. */
+function chipNode(dom, at) {
+  var found = dom.id('chain').querySelectorAll('[data-node]'), i;
+  for (i = 0; i < found.length; i++) {
+    if (found[i].getAttribute('data-node') === String(at)) return found[i];
+  }
+  var node = dom.document.createElement('button');
+  node.setAttribute('class', 'pick');
+  node.setAttribute('data-node', String(at));
+  dom.id('chain').appendChild(node);
+  return node;
+}
+
+function dragNode(dom, from, to, side) {
+  var data = transfer();
+  dom.fire(chipNode(dom, from), 'dragstart', { dataTransfer: data });
+  dom.fire(chipNode(dom, to), 'dragover',
+           { dataTransfer: data, clientX: side === 'after' ? 90 : 10 });
+  dom.fire(chipNode(dom, to), 'drop', { dataTransfer: data });
 }
 
 test('пустая страница показывает зону загрузки и прячет вкладки', function () {
@@ -114,11 +147,11 @@ test('второй снапшот включает «Изменения» и с�
   assert.ok(chain.indexOf('os-9.1') < chain.indexOf('os-9.2'), chain);
 });
 
-test('стрелка в списке источников разворачивает сравнение', function () {
+test('перетаскивание узла разворачивает сравнение', function () {
   var dom = load();
   store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
   store.add([snap('os-9.2', '2026-08-01T00:00:00+03:00')], 'b.json');
-  pressInList(dom, 'data-move', '1:-1');
+  dragNode(dom, 1, 0, 'before');
   assert.deepStrictEqual(store.list().map(function (i) { return i.tag; }),
                          ['os-9.2', 'os-9.1']);
   var chain = dom.id('chain').innerHTML;
@@ -128,11 +161,59 @@ test('стрелка в списке источников разворачива
                dom.location.hash);
 });
 
+/* Сторону вставки задаёт курсор: у левой половины узла — перед ним, у
+   правой — за ним. Без этого узел можно было бы уронить только в одну
+   сторону, и последним в цепочке никого было бы не сделать. */
+function railTags() {
+  return store.list().map(function (i) { return i.tag; });
+}
+
+test('узел встаёт с той стороны, с какой его поднесли', function () {
+  var dom = load();
+  store.add([snap('os-9.1', '2026-06-01T00:00:00+03:00')], 'a.json');
+  store.add([snap('os-9.2', '2026-07-01T00:00:00+03:00')], 'b.json');
+  store.add([snap('os-9.3', '2026-08-01T00:00:00+03:00')], 'c.json');
+  dragNode(dom, 0, 2, 'after');
+  assert.deepStrictEqual(railTags(), ['os-9.2', 'os-9.3', 'os-9.1']);
+  dragNode(dom, 2, 1, 'before');
+  assert.deepStrictEqual(railTags(), ['os-9.2', 'os-9.1', 'os-9.3']);
+});
+
+test('узел, брошенный на своё же место, порядок не меняет', function () {
+  var dom = load();
+  store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
+  store.add([snap('os-9.2', '2026-08-01T00:00:00+03:00')], 'b.json');
+  dragNode(dom, 1, 1, 'before');
+  assert.deepStrictEqual(railTags(), ['os-9.1', 'os-9.2']);
+  dragNode(dom, 0, 0, 'after');
+  assert.deepStrictEqual(railTags(), ['os-9.1', 'os-9.2']);
+});
+
+/* Узел, который тащат по рельсу, — не файл, который несут на страницу.
+   Приёмник файлов зажигал бы под ним зону загрузки и обещал то, чего не
+   будет: в переносе узла файлов нет. */
+test('перетаскивание узла не зажигает зону загрузки', function () {
+  var dom = load();
+  store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
+  dom.fire(chipNode(dom, 0), 'dragstart', { dataTransfer: transfer() });
+  dom.fire(chipNode(dom, 0), 'dragover',
+           { dataTransfer: transfer(), clientX: 10 });
+  assert.strictEqual(dom.id('drop').className, 'drop', dom.id('drop').className);
+});
+
+test('файл, поднесённый к странице, зону загрузки зажигает', function () {
+  var dom = load();
+  var data = transfer();
+  data.types.push('Files');
+  dom.fire(dom.id('drop'), 'dragover', { dataTransfer: data });
+  assert.strictEqual(dom.id('drop').className, 'drop over');
+});
+
 test('✕ убирает снапшот, и «Изменения» снова нечего показывать', function () {
   var dom = load();
   store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
   store.add([snap('os-9.2', '2026-08-01T00:00:00+03:00')], 'b.json');
-  pressInList(dom, 'data-drop-snap', '1');
+  pressOnRail(dom, 'data-drop-snap', '1');
   assert.deepStrictEqual(store.list().map(function (i) { return i.tag; }),
                          ['os-9.1']);
   var tabs = dom.document.querySelectorAll('.tab'), i, diffTab = null;
@@ -146,7 +227,7 @@ test('✕ убирает снапшот, и «Изменения» снова н
 test('последний снапшот убрали — страница снова ждёт загрузки', function () {
   var dom = load();
   store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
-  pressInList(dom, 'data-drop-snap', '0');
+  pressOnRail(dom, 'data-drop-snap', '0');
   assert.strictEqual(dom.id('tab-empty').hidden, false);
   assert.strictEqual(dom.id('tab-state').hidden, true);
   assert.strictEqual(dom.document.querySelector('.tabs').hidden, true);
@@ -383,7 +464,7 @@ test('на «Изменениях» каждый узел рельса — кн�
   var dom = load();
   threeChain(dom);
   var html = dom.id('chain').innerHTML;
-  assert.match(html, /<button type="button" class="stop[^"]*" data-node="0"/,
+  assert.match(html, /<button type="button" class="pick[^"]*" data-node="0"/,
                html);
   assert.strictEqual((html.match(/data-node="/g) || []).length, 3, html);
 });
@@ -448,9 +529,9 @@ test('первый клик только отмечает узел и табли
   var before = dom.id('diff-rows').innerHTML;
   clickNode(dom, 0);
   assert.strictEqual(dom.id('diff-rows').innerHTML, before);
-  /* Между «stop» и «anchor» может стоять «on»: отмеченный узел бывает и
+  /* Между «pick» и «anchor» может стоять «on»: отмеченный узел бывает и
      концом того диапазона, который выбран сейчас. */
-  assert.match(dom.id('chain').innerHTML, /class="stop[^"]*anchor"/,
+  assert.match(dom.id('chain').innerHTML, /class="pick[^"]*anchor"/,
                dom.id('chain').innerHTML);
 });
 
@@ -615,12 +696,50 @@ test('после клика фокус остаётся на том же узл�
 test('подсказка узла говорит то, что клик и сделает', function () {
   var dom = load();
   threeChain(dom);
-  assert.match(chain(dom), /data-tip="Отметить началом сравнения"/, chain(dom));
+  assert.match(chain(dom), /data-tip="Отметить началом сравнения\./, chain(dom));
   pressTab(dom, 'state');
   assert.strictEqual(chain(dom).indexOf('Отметить началом'), -1, chain(dom));
-  assert.match(chain(dom), /data-tip="Открыть этот снапшот"/, chain(dom));
-  assert.match(chain(dom), /aria-pressed="true" data-tip="Открыт сейчас"/,
+  assert.match(chain(dom), /data-tip="Открыть этот снапшот\./, chain(dom));
+  assert.match(chain(dom), /aria-pressed="true" data-tip="Открыт сейчас\./,
                chain(dom));
+});
+
+/* Список источников ушёл, и то, что он один умел говорить, теперь говорит
+   подсказка узла: сколько в снапшоте сборок и из какого файла он приехал. */
+test('подсказка узла называет число сборок и файл', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { builds: [build('nginx')] })], 'a.json');
+  store.add([snap('os-9.2', AUG, { builds: [build('nginx'), build('httpd')] })],
+            'b.json');
+  assert.match(chain(dom), /1 сборка, файл a\.json/, chain(dom));
+  assert.match(chain(dom), /2 сборки, файл b\.json/, chain(dom));
+});
+
+/* Призрак стоит в конце рельса всегда: добавить снапшот можно в любой
+   момент, и место, где это делают, не должно появляться и исчезать. */
+test('призрак стоит в конце рельса при любом составе', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL)], 'a.json');
+  assert.match(chain(dom), /data-add="1"/, chain(dom));
+  assert.ok(chain(dom).indexOf('os-9.1') < chain(dom).indexOf('data-add'),
+            chain(dom));
+  store.add([snap('os-9.2', AUG)], 'b.json');
+  assert.strictEqual((chain(dom).match(/data-add=/g) || []).length, 1,
+                     chain(dom));
+  assert.ok(chain(dom).indexOf('os-9.2') < chain(dom).indexOf('data-add'),
+            chain(dom));
+});
+
+/* У каждого снапшота свой крестик, в том числе у единственного: убрать
+   последний — законный ход, страница вернётся к зоне загрузки. */
+test('крестик есть у каждого узла, включая единственный', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL)], 'a.json');
+  assert.strictEqual((chain(dom).match(/data-drop-snap=/g) || []).length, 1,
+                     chain(dom));
+  store.add([snap('os-9.2', AUG)], 'b.json');
+  assert.strictEqual((chain(dom).match(/data-drop-snap=/g) || []).length, 2,
+                     chain(dom));
 });
 
 test('файл роняют на страницу — снапшот загружается', async function () {
@@ -753,17 +872,15 @@ test('разные хабы — предупреждение на страниц
             dom.id('warnings').innerHTML);
 });
 
-test('«изменить» раскрывает список источников', function () {
+/* Добавляют снапшоты с рельса: призрак в его конце открывает тот же
+   файловый диалог, что и зона загрузки на пустой странице. */
+test('призрак в конце рельса открывает файловый диалог', function () {
   var dom = load();
   store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
-  var button = dom.id('edit-sources');
-  assert.strictEqual(dom.id('sourcelist').hidden, true);
-  dom.fire(button, 'click', {});
-  assert.strictEqual(dom.id('sourcelist').hidden, false);
-  assert.strictEqual(button.getAttribute('aria-expanded'), 'true');
-  dom.fire(button, 'click', {});
-  assert.strictEqual(dom.id('sourcelist').hidden, true);
-  assert.strictEqual(button.getAttribute('aria-expanded'), 'false');
+  var opened = 0;
+  dom.id('file-input').addEventListener('click', function () { opened += 1; });
+  pressOnRail(dom, 'data-add', '1');
+  assert.strictEqual(opened, 1);
 });
 
 test('подписи классов не переживают выгрузку снапшота', async function () {
@@ -1315,13 +1432,13 @@ test('на «Состоянии» рельс отмечает снапшот, к
     var dom = load();
     store.add(threeSnapshots(), 'a.json');
     var chain = dom.id('chain').innerHTML;
-    assert.strictEqual(chain.split('class="stop').length - 1, 3,
+    assert.strictEqual(chain.split('class="pick').length - 1, 3,
                        'три узла на рельсе: ' + chain);
     /* Отмечен ровно один, и это свежий снапшот — тот, что открывается по
        умолчанию. Отрезки на «Состоянии» не подсвечиваются: сравнение
        живёт на другой вкладке. */
-    assert.strictEqual(chain.split('class="stop on"').length - 1, 1, chain);
-    assert.ok(chain.indexOf('class="stop on"') > chain.indexOf('os-9.2'),
+    assert.strictEqual(chain.split('class="pick on"').length - 1, 1, chain);
+    assert.ok(chain.indexOf('class="pick on"') > chain.indexOf('os-9.2'),
               'отмечен должен быть os-9.3: ' + chain);
     assert.strictEqual(chain.indexOf('class="rl on"'), -1, chain);
   });
@@ -1336,7 +1453,7 @@ test('на «Изменениях» рельс отмечает отрезок �
        значит отмечены оба конца и оба отрезка между ними. */
     assert.strictEqual(chain.split('class="rl on"').length - 1, 2,
                        'оба отрезка сводной пары: ' + chain);
-    assert.strictEqual(chain.split('class="stop on"').length - 1, 2,
+    assert.strictEqual(chain.split('class="pick on"').length - 1, 2,
                        'оба конца пары: ' + chain);
   });
 

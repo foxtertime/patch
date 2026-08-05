@@ -95,8 +95,11 @@ class TemplateContractTest(unittest.TestCase):
         self.assertIn('type="file"', self.html)
 
     def test_has_a_sources_panel(self):
+        # Состав снапшотов весь на рельсе: отдельного списка источников со
+        # своими кнопками у страницы нет.
         self.assertIn('id="sources"', self.html)
-        self.assertIn('id="sourcelist"', self.html)
+        self.assertIn('id="chain"', self.html)
+        self.assertNotIn('id="sourcelist"', self.html)
 
     def test_hidden_panels_really_hide(self):
         # display: flex у .tabs сильнее hidden из стилей браузера: без

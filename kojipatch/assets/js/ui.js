@@ -151,14 +151,11 @@
   var emptySection = document.getElementById('tab-empty');
   var sourcesBox = document.getElementById('sources');
   var chainBox = document.getElementById('chain');
-  var sourceList = document.getElementById('sourcelist');
   var loadErrors = document.getElementById('load-errors');
   var warningsBox = document.getElementById('warnings');
   var fileInput = document.getElementById('file-input');
   var dropZone = document.getElementById('drop');
   var pickBtn = document.getElementById('pick');
-  var addMoreBtn = document.getElementById('add-more');
-  var editBtn = document.getElementById('edit-sources');
 
   /* Всё состояние страницы в одном месте: отсюда же оно уезжает в
      location.hash и оттуда же восстанавливается при перезагрузке. */
@@ -1503,14 +1500,9 @@
         }
         var tab = node.getAttribute('data-tab');
         if (tab) { showTab(tab); render(); return; }
-        /* Список источников тоже перерисовывается целиком, поэтому его
-           кнопки живут здесь же, а не на своих обработчиках. */
-        var move = node.getAttribute('data-move');
-        if (move) {
-          var at = move.split(':');
-          store.move(parseInt(at[0], 10), parseInt(at[1], 10));
-          return;
-        }
+        /* Крестик и призрак живут на рельсе, а он перерисовывается целиком,
+           поэтому их обработчики здесь, а не на самих кнопках. */
+        if (node.getAttribute('data-add')) { openPicker(); return; }
         var gone = node.getAttribute('data-drop-snap');
         if (gone !== null && gone !== undefined) {
           store.remove(parseInt(gone, 10));
@@ -1735,9 +1727,13 @@
                         ends && i > ends[0] && i <= ends[1]);
       }
       here = ends ? (i === ends[0] || i === ends[1]) : i === st.tag;
-      out += stopHtml(i, items[i].tag, stampOf(items[i].generated), here,
+      out += stopHtml(i, items[i], stampOf(items[i].generated), here,
                       live, items.length > 1);
     }
+    /* Призрак идёт последним и всегда: добавить снапшот можно в любой
+       момент, а место, где это делают, не должно ни появляться, ни
+       исчезать от того, сколько их уже загружено. */
+    out += ghostHtml();
     /* Сводность спрашиваем у самого перехода, а не считаем заново: правило
        «вся цепочка, и только когда снапшотов больше двух» уже сказано —
        для посчитанных на месте пар в pairFor, для предпосчитанных в
@@ -1758,27 +1754,55 @@
       + (gap ? '<span class="gap">' + esc(gap) + '</span>' : '') + '</span>';
   }
 
-  /* Узел рельса. Кнопка, пока снапшот на странице не один: на единственном
-     переключать нечего и сравнивать не с чем, а кнопка, которая ничего не
-     делает, обещает лишнее.
+  /* Узел рельса — обёртка вокруг чипа и крестика: чипом снапшот открывают
+     и таскают, крестиком убирают. Чип нажимается, пока снапшот на странице
+     не один: на единственном переключать нечего и сравнивать не с чем, а
+     кнопка, которая ничего не делает, обещает лишнее. Крестик есть всегда —
+     убрать последний снапшот законно, страница вернётся к зоне загрузки.
 
-     На «Состоянии» узел — выбор из ряда, и aria-pressed говорит, какой
-     снапшот открыт. На «Изменениях» нажатого узла нет: там выбирают не
+     На «Состоянии» чип — выбор из ряда, и aria-pressed говорит, какой
+     снапшот открыт. На «Изменениях» нажатого чипа нет: там выбирают не
      узел, а отрезок, и концы диапазона показаны заливкой. */
-  function stopHtml(at, tag, when, here, live, hot) {
-    var cls = 'stop' + (here ? ' on' : '') + (anchor === at ? ' anchor' : '');
-    var body = '<span class="node"></span><span class="nm">' + esc(tag)
+  function stopHtml(at, item, when, here, live, hot) {
+    var cls = 'pick' + (here ? ' on' : '') + (anchor === at ? ' anchor' : '');
+    var body = '<span class="node"></span><span class="nm">' + esc(item.tag)
       + '</span><span class="when">' + esc(when) + '</span>';
-    if (!hot) return '<span class="' + cls + '">' + body + '</span>';
-    var open = '<button type="button" class="' + cls + '" data-node="' + at + '"';
-    if (!live) {
-      return open + ' aria-pressed="' + (here ? 'true' : 'false')
-        + '" data-tip="' + (here ? 'Открыт сейчас' : 'Открыть этот снапшот')
+    var chip;
+    if (!hot) chip = '<span class="' + cls + '">' + body + '</span>';
+    else {
+      /* Подсказка называет сперва то, что сделает клик, а следом — то, что
+         раньше стояло строкой в списке источников: сколько сборок и из
+         какого файла снапшот приехал. */
+      chip = '<button type="button" class="' + cls + '" data-node="' + at
+        + '" draggable="true"'
+        + (live ? '' : ' aria-pressed="' + (here ? 'true' : 'false') + '"')
+        + ' data-tip="' + esc(nodeTip(at, here, live) + ' ' + source(item))
         + '">' + body + '</button>';
     }
-    var tip = anchor === null ? 'Отметить началом сравнения'
-      : (anchor === at ? 'Снять отметку' : 'Сравнить с отмеченным');
-    return open + ' data-tip="' + esc(tip) + '">' + body + '</button>';
+    return '<span class="stop">' + chip
+      + '<button type="button" class="kill" data-drop-snap="' + at
+      + '" aria-label="Убрать снапшот ' + esc(item.tag)
+      + '" data-tip="Убрать этот снапшот">✕</button></span>';
+  }
+
+  function nodeTip(at, here, live) {
+    if (!live) return here ? 'Открыт сейчас.' : 'Открыть этот снапшот.';
+    if (anchor === null) return 'Отметить началом сравнения.';
+    return anchor === at ? 'Снять отметку.' : 'Сравнить с отмеченным.';
+  }
+
+  function source(item) {
+    return item.builds + ' '
+      + plural(item.builds, 'сборка', 'сборки', 'сборок') + ', файл '
+      + item.file;
+  }
+
+  /* Место, куда цепочка может продолжиться. */
+  function ghostHtml() {
+    return '<span class="rl dash"></span>'
+      + '<button type="button" class="ghost" data-add="1"'
+      + ' data-tip="Добавить снапшоты из файлов">'
+      + '<span class="sign">+</span>добавить</button>';
   }
 
   /* Рельс перерисовывается целиком, и нажатая кнопка исчезает вместе с
@@ -1832,24 +1856,101 @@
     focusNode(at);
   }
 
-  function renderSources() {
-    var items = store.list(), i;
-    renderChain();
-    var out = '';
-    for (i = 0; i < items.length; i++) {
-      out += '<li><span class="mono">' + esc(items[i].tag) + '</span>'
-          + '<span class="sub">' + esc(items[i].generated) + ' · '
-          + items[i].builds + ' ' + plural(items[i].builds, 'сборка', 'сборки', 'сборок')
-          + ' · ' + esc(items[i].file) + '</span>'
-          + '<button type="button" class="mini" data-move="' + i + ':-1"'
-          + (i === 0 ? ' disabled' : '') + ' data-tip="Выше по цепочке">↑</button>'
-          + '<button type="button" class="mini" data-move="' + i + ':1"'
-          + (i === items.length - 1 ? ' disabled' : '') + ' data-tip="Ниже по цепочке">↓</button>'
-          + '<button type="button" class="mini" data-drop-snap="' + i + '"'
-          + ' data-tip="Убрать этот снапшот">✕</button></li>';
+  /* ---------- перестановка узлов ---------- */
+
+  /* Свой тип переноса: данные из него браузер отдаёт только на drop, а вот
+     types видны и раньше — по ним приёмник файлов на странице узнаёт, что
+     тащат не файл. */
+  var NODE_MIME = 'text/x-kojipatch-node';
+  /* Номер узла, который тащат, и промежуток, куда его поставят. Промежуток
+     считается в границах между узлами: 0 — перед первым, items.length —
+     за последним. */
+  var dragFrom = null, dropAt = null;
+
+  function chipOf(target) {
+    var node = target;
+    while (node && node !== chainBox) {
+      if (node.getAttribute && node.getAttribute('data-node') !== null
+          && node.getAttribute('data-node') !== undefined) {
+        return node;
+      }
+      node = node.parentNode;
     }
-    sourceList.innerHTML = out;
-    var warns = store.warnings(), wout = '';
+    return null;
+  }
+
+  /* Пометки живут прямо на узлах, а не в состоянии страницы: перерисовать
+     рельс посреди перетаскивания значило бы убрать из-под курсора то, что
+     он тащит. */
+  function marks(node, add) {
+    var base = String(node.className).replace(/\s*\b(before|after|moving)\b/g, '');
+    node.className = add ? base + ' ' + add : base;
+  }
+
+  function clearMarks() {
+    var nodes = chainBox.querySelectorAll('[data-node]'), i;
+    for (i = 0; i < nodes.length; i++) marks(nodes[i], '');
+  }
+
+  function endDrag() { dragFrom = null; dropAt = null; clearMarks(); }
+
+  chainBox.addEventListener('dragstart', function (e) {
+    var chip = chipOf(e.target);
+    if (!chip) return;
+    dragFrom = parseInt(chip.getAttribute('data-node'), 10);
+    dropAt = null;
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData(NODE_MIME, String(dragFrom));
+    }
+    marks(chip, 'moving');
+  });
+
+  /* Место вставки — по ближнему краю узла, к которому подносят: курсор в
+     левой половине значит «перед ним», в правой — «за ним». */
+  chainBox.addEventListener('dragover', function (e) {
+    if (dragFrom === null) return;
+    var chip = chipOf(e.target);
+    if (!chip) return;
+    /* Без preventDefault браузер считает, что сюда ронять нельзя, и drop
+       не случится вовсе. */
+    e.preventDefault();
+    var at = parseInt(chip.getAttribute('data-node'), 10);
+    var box = chip.getBoundingClientRect();
+    var after = e.clientX > box.left + box.width / 2;
+    clearMarks();
+    marks(chip, after ? 'after' : 'before');
+    if (dragFrom !== null) {
+      var moved = chainBox.querySelectorAll('[data-node="' + dragFrom + '"]');
+      if (moved.length) marks(moved[0], 'moving');
+    }
+    dropAt = at + (after ? 1 : 0);
+  });
+
+  chainBox.addEventListener('drop', function (e) {
+    if (dragFrom === null) return;
+    /* Узел, брошенный на рельс, — не файл, брошенный на страницу: без
+       остановки всплытия его принял бы приёмник файлов. */
+    e.preventDefault();
+    e.stopPropagation();
+    var from = dragFrom, place = dropAt;
+    endDrag();
+    if (place === null) return;
+    /* Узел сначала вынимают, и промежутки правее него сдвигаются на один. */
+    var to = place > from ? place - 1 : place;
+    if (to !== from) store.move(from, to - from);
+  });
+
+  /* Перетаскивание может кончиться и мимо рельса — пометки снимаются в
+     любом случае, а порядок меняет только drop. */
+  chainBox.addEventListener('dragend', endDrag);
+
+  /* Состав снапшотов весь живёт на рельсе: там его показывают, там же
+     добавляют, переставляют и убирают. Отдельного списка источников с теми
+     же строками у страницы больше нет. */
+  function renderSources() {
+    renderChain();
+    var warns = store.warnings(), wout = '', i;
     for (i = 0; i < warns.length; i++) wout += '<div class="warn">' + esc(warns[i]) + '</div>';
     warningsBox.innerHTML = wout;
   }
@@ -1933,7 +2034,6 @@
   function openPicker() { fileInput.click(); }
 
   pickBtn.addEventListener('click', openPicker);
-  addMoreBtn.addEventListener('click', openPicker);
 
   fileInput.addEventListener('change', function () {
     loadFiles(fileInput.files);
@@ -1942,20 +2042,32 @@
     fileInput.value = '';
   });
 
-  editBtn.addEventListener('click', function () {
-    var open = sourceList.hidden;
-    sourceList.hidden = !open;
-    editBtn.setAttribute('aria-expanded', String(open));
-  });
-
   function markOver(on) {
     dropZone.className = on ? 'drop over' : 'drop';
+  }
+
+  /* Тащат файл или узел рельса — разные вещи, и путать их нельзя: узел,
+     принятый за файл, зажигал бы зону загрузки и уезжал в loadFiles, где
+     файлов нет.
+
+     Спрашиваем два признака, потому что до отпускания доступен только
+     первый: пока перенос идёт, сами файлы браузер прячет и о них говорит
+     одна запись Files в types; на drop появляются и файлы. */
+  function hasFiles(e) {
+    var data = e.dataTransfer, types = data && data.types, i;
+    if (!data) return false;
+    if (data.files && data.files.length) return true;
+    for (i = 0; types && i < types.length; i++) {
+      if (types[i] === 'Files') return true;
+    }
+    return false;
   }
 
   /* Ронять файл можно на всю страницу, а не только на зону: браузер по
      умолчанию открывает брошенный файл вместо страницы, и без
      preventDefault на dragover дашборд просто заменился бы содержимым JSON. */
   document.addEventListener('dragover', function (e) {
+    if (!hasFiles(e)) return;
     e.preventDefault();
     markOver(true);
   });
@@ -1965,9 +2077,10 @@
     if (!e.relatedTarget) markOver(false);
   });
   document.addEventListener('drop', function (e) {
+    if (!hasFiles(e)) return;
     e.preventDefault();
     markOver(false);
-    loadFiles(e.dataTransfer ? e.dataTransfer.files : []);
+    loadFiles(e.dataTransfer.files);
   });
 
   /* ---------- старт ---------- */
