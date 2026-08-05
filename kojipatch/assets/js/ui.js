@@ -537,7 +537,9 @@
      причине, что и в адресе: у двух прогонов одного тега иначе было бы одно
      состояние раскрытия на двоих. */
   function rowKey(row) {
-    if (st.tab === 'diff') return 'diff:' + pairKey(currentEnds()) + ':' + row.name;
+    if (st.tab === 'diff') {
+      return 'diff:' + pairKey(currentEnds()) + ':' + row.name;
+    }
     return 'state:' + snapKey(curSnap()) + ':' + row.name;
   }
 
@@ -1043,17 +1045,26 @@
     return esc(tag) + (mine ? ' <span class="when">' + esc(mine) + '</span>' : '');
   }
 
+  /* Концы перехода, который называет кнопка селектора. Раскладку diffChain
+     — сперва соседи по цепочке в её порядке, затем сводная пара «первый
+     против последнего» — знает только эта функция; звать её есть кому
+     дважды, из рендера кнопок и из обработчика клика по ним. Живёт рядом с
+     селектором и уходит вместе с ним: выбор кликом по рельсу номеров пар
+     не знает вовсе. */
+  function selectorEnds(at) {
+    var p = PAIRS[at];
+    if (!p) return null;
+    return p.summary ? [0, SNAPS.length - 1] : [at, at + 1];
+  }
+
   function renderPairSelect() {
     var box = document.getElementById('pair-select'), out = '', i;
     var when = whenLabels(SNAPS), here = currentEnds(), ends, on;
     for (i = 0; i < PAIRS.length; i++) {
       var p = PAIRS[i];
-      /* Раскладку diffChain — сперва соседи по цепочке, затем сводная пара
-         «первый против последнего» — знает только этот цикл: сам селектор
-         уходит следующей задачей, и тащить её в общие функции незачем.
-         Нажата та кнопка, чьи концы совпали с выбранным переходом: номер
+      /* Нажата та кнопка, чьи концы совпали с выбранным переходом: номер
          пары больше ничего не выбирает. */
-      ends = p.summary ? [0, SNAPS.length - 1] : [i, i + 1];
+      ends = selectorEnds(i);
       on = Boolean(here && here[0] === ends[0] && here[1] === ends[1]);
       out += '<button type="button" class="pick" data-pair="' + i + '" aria-pressed="'
           + (on ? 'true' : 'false')
@@ -1344,22 +1355,45 @@
     }
   }
 
-  /* Имя диапазона из адреса. Полная форма называет прогоны
-     («os-9.2@2026-08-01T00:00:00+03:00»), короткая — теги; короткую
-     оставляем читаемой, потому что её пишут руками и присылают в
-     переписке. У двойников тега она выбирает последний подходящий — так
-     было и раньше. */
+  /* Так ли назван этот снапшот. Полное имя, с временем сбора, называет
+     прогон и однозначно; голый тег у двойников подходит нескольким.
+     Спутать их нельзя: в полном имени есть «@», в теге его не бывает. */
+  function snapNamed(index, name) {
+    return snapKey(SNAPS[index]) === name || SNAPS[index].tag === name;
+  }
+
+  /* Последний диапазон, концы которого названы в этом порядке: левый конец
+     левее правого. Ищем именно парой, а не каждый конец сам по себе:
+     у двойников тега «os-9.2..os-9.3» на цепочке 9.2, 9.3, 9.2 самый
+     свежий os-9.2 стоит правее os-9.3, и независимый поиск открыл бы
+     обратное сравнение, поменяв местами «появился» и «исчез».
+
+     Последний — значит с самым свежим левым концом, а при нём с самым
+     свежим правым: тот же выбор, что и у ссылки «tag=os-9.2», которая из
+     двух прогонов одного тега берёт последний по цепочке. */
+  function lastEndsNamed(left, right) {
+    var lo, hi, found = null;
+    for (lo = 0; lo < SNAPS.length; lo++) {
+      if (!snapNamed(lo, left)) continue;
+      for (hi = lo + 1; hi < SNAPS.length; hi++) {
+        if (snapNamed(hi, right)) found = [lo, hi];
+      }
+    }
+    return found;
+  }
+
+  /* Имя диапазона из адреса. Полная форма называет прогоны, короткая —
+     теги; короткую оставляем читаемой, потому что её пишут руками и
+     присылают в переписке.
+
+     Ссылку, написанную задом наперёд, разворачиваем по цепочке — но только
+     когда в этом порядке она не читается вовсе. Иначе разворот молча
+     подменял бы сравнение, которое человек назвал сам. */
   function endsFromHash(value) {
     var at = String(value).indexOf('..');
     if (at === -1) return null;
     var left = value.slice(0, at), right = value.slice(at + 2);
-    var lo = snapIndexByKey(left), hi = snapIndexByKey(right), i;
-    if (lo === -1) { for (i = 0; i < SNAPS.length; i++) {
-      if (SNAPS[i].tag === left) lo = i; } }
-    if (hi === -1) { for (i = 0; i < SNAPS.length; i++) {
-      if (SNAPS[i].tag === right) hi = i; } }
-    if (lo === -1 || hi === -1 || lo === hi) return null;
-    return lo < hi ? [lo, hi] : [hi, lo];
+    return lastEndsNamed(left, right) || lastEndsNamed(right, left);
   }
 
   function readHash() {
@@ -1530,11 +1564,8 @@
         if (pair !== null && pair !== undefined) {
           /* Кнопка селектора по-прежнему названа номером пары, но выбор
              из неё уезжает именами: номер живёт ровно до этой строки. */
-          var pairAt = parseInt(pair, 10), p = PAIRS[pairAt];
-          if (p) {
-            setPairEnds.apply(null, p.summary ? [0, SNAPS.length - 1]
-                                              : [pairAt, pairAt + 1]);
-          }
+          var chosen = selectorEnds(parseInt(pair, 10));
+          if (chosen) setPairEnds(chosen[0], chosen[1]);
           renderPairSelect(); renderDiffCards(); render();
           return;
         }
