@@ -4,6 +4,7 @@ import unittest
 
 from kojipatch import __version__
 from kojipatch.build import SCRIPTS, BuildError, build_html
+from kojipatch.config import DEFAULT_PATCH_CLASSES
 
 RICH = "tests/fixtures/rich-old.json"
 
@@ -61,6 +62,16 @@ class TemplateContractTest(unittest.TestCase):
 
     def setUp(self):
         self.html = build_html()
+
+    def test_every_default_class_has_its_own_colour(self):
+        # Класс, которого страница не знает, красится общим акцентом — и
+        # полоска состава начинает показывать два разных класса одним
+        # цветом. Заводя класс, легко забыть про цвет: тест об этом скажет.
+        for name, _ in DEFAULT_PATCH_CLASSES:
+            key = name.lower()
+            self.assertIn("--%s:" % key, self.html, name)
+            self.assertIn(".meter i.c-%s" % key, self.html, name)
+            self.assertIn('"%s": 1' % key, self.html, name)
 
     def test_html_has_both_tab_containers(self):
         self.assertIn('id="tab-state"', self.html)

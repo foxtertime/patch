@@ -30,6 +30,10 @@ patch_classes:
   # а не отдельной категорией: иначе отчёт дробился бы без пользы.
   - { name: DAST, pattern: '(?i)(?:dast|fuzz)' }
   - { name: COVERAGE, pattern: '(?i)coverage' }
+  # Патч суффикса дистрибутива: nginx-distsuffix.patch. Стоит перед SPEC:
+  # правит он спек, но затем, чтобы переклеить суффикс сборки, а класс
+  # отвечает на вопрос «зачем патч». Расширение в шаблоне обязательно.
+  - { name: DISTSUFFIX, pattern: '(?i)distsuffix\.patch' }
   # Патч на спек: nginx.spec.patch, httpd-2.4.62.spec.patch.new. Точки в
   # шаблоне обязательны, иначе сюда уедут specialcase.patch и respec-fix.patch.
   # Правило стоит после CVE/SAST/DAST: спек-патч, закрывающий CVE, — прежде

@@ -127,8 +127,8 @@
   var ARROW = { added: "+", removed: "−", upgraded: "↑",
                 downgraded: "↓", unchanged: "=" };
   var KNOWN_CLASS = { "autogen": 1, "cve": 1, "sast": 1, "dast": 1,
-                      "coverage": 1, "spec": 1, "changelog": 1, "files": 1,
-                      "other": 1 };
+                      "coverage": 1, "distsuffix": 1, "spec": 1,
+                      "changelog": 1, "files": 1, "other": 1 };
   var CALM_TAGS = { "from-commit": "warn", "no-patch": "calm",
                     "no-source": "bad", "gitlab-error": "bad",
                     "internal-error": "bad", "inherited": "calm" };

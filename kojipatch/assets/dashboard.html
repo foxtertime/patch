@@ -32,6 +32,11 @@
   --autogen: #818cf8; --cve: #fb7185; --sast: #a78bfa; --dast: #22d3ee;
   --coverage: #a3e635; --spec: #fbbf24; --changelog: #e879f9;
   --files: #5eead4; --other: #9ca3af;
+  /* Десятый цвет взят синим, а не ещё одним тёплым: жёлтый уже занят
+     спеком, и оранжевый рядом с ним в полоске состава читался бы как он
+     же. Синий стоит между индиго и циановым, но отличается от обоих
+     насыщенностью. */
+  --distsuffix: #60a5fa;
   /* высоту панели фильтров проставляет JS — от неё зависит смещение
      «липкой» шапки таблицы. Значение здесь — запасное, до первого замера. */
   --controls-h: 3.4rem;
@@ -331,6 +336,8 @@ button.pick:hover { background: var(--card); color: var(--fg);
 .card .l.c-dast, .tag.c-dast, .pgroup.c-dast, .meter i.c-dast { color: var(--dast); }
 .card .l.c-coverage, .tag.c-coverage, .pgroup.c-coverage,
 .meter i.c-coverage { color: var(--coverage); }
+.card .l.c-distsuffix, .tag.c-distsuffix, .pgroup.c-distsuffix,
+.meter i.c-distsuffix { color: var(--distsuffix); }
 .card .l.c-spec, .tag.c-spec, .pgroup.c-spec, .meter i.c-spec { color: var(--spec); }
 .card .l.c-changelog, .tag.c-changelog, .pgroup.c-changelog,
 .meter i.c-changelog { color: var(--changelog); }

@@ -4,7 +4,7 @@
 (с учётом наследования тегов), по `extra.source.original_url` определяет
 ветку GitLab, с которой собран каждый билд, читает в этой ветке каталог
 `PATCH`, классифицирует найденные файлы (AUTOGEN / CVE / SAST / DAST /
-COVERAGE / SPEC / CHANGELOG / FILES / other) и показывает всё это в
+COVERAGE / DISTSUFFIX / SPEC / CHANGELOG / FILES / other) и показывает всё это в
 HTML-дашборде с вкладкой «Состояние» по каждому тегу и вкладкой «Изменения»,
 сравнивающей теги между собой.
 
@@ -93,8 +93,9 @@ tests/fixtures/rich-newer.json   os-9.3
 ```
 
 Берите все три: на двух не видно ни сводной пары, ни рельса из трёх узлов.
-В них нарочно собрано то, ради чего дашборд и написан — все девять классов
-патчей, унаследованные и затегованные прямо сборки, компонент с неизвестным
+В них нарочно собрано то, ради чего дашборд и написан — классы патчей от
+AUTOGEN до other (кроме DISTSUFFIX: он появился позже фикстур),
+унаследованные и затегованные прямо сборки, компонент с неизвестным
 тегом, подпакеты по четырём архитектурам, ошибка GitLab и внутренняя
 ошибка. И два случая, которые видны только на трёх тегах: `vim` уходил в
 os-9.2 и вернулся тем же билдом, `zlib` откатывался и поднялся обратно на
@@ -167,7 +168,7 @@ python3 -m kojipatch dashboard -o dashboard.html
 | `gitlab.hosts.<host>.api` | да для каждого описанного хоста | — | база REST v4, например `https://gitlab.example.com/api/v4` |
 | `gitlab.hosts.<host>.web` | нет | `api` до `/api/...` | база для веб-ссылок на дерево и файлы репозитория |
 | `patch_dir` | нет | `PATCH` | имя каталога патчей в корне репозитория; можно перекрыть `--patch-dir` |
-| `patch_classes` | нет | правила для AUTOGEN, CVE, SAST, DAST, COVERAGE, SPEC, CHANGELOG, FILES + `other: '.*'` | список правил `{name, pattern}` — регулярка по имени файла патча → класс |
+| `patch_classes` | нет | правила для AUTOGEN, CVE, SAST, DAST, COVERAGE, DISTSUFFIX, SPEC, CHANGELOG, FILES + `other: '.*'` | список правил `{name, pattern}` — регулярка по имени файла патча → класс |
 
 Правила `patch_classes` применяются по порядку, побеждает первое совпадение
 (`re.search`, без привязки к началу строки). Первым идёт AUTOGEN — имена,
@@ -187,6 +188,11 @@ SAST, DAST и COVERAGE — по вхождению маркера, тоже в �
 `dast` попадает и `fuzz` (`FUZZ-parser.patch.new`,
 `httpd-2.4.62-fuzz-parser.patch.new`): фаззинг — то же динамическое
 тестирование, и отдельной категорией он бы только дробил отчёт.
+DISTSUFFIX — по `distsuffix.patch` (`nginx-distsuffix.patch`,
+`kernel.spec.distsuffix.patch`): такой патч переклеивает суффикс сборки, и
+правило стоит выше SPEC — правит он и правда спек, но класс отвечает на
+вопрос «зачем патч». Расширение в правиле обязательно, иначе в класс уехал
+бы и `distsuffix.inc`.
 SPEC опознаётся по `.spec.` с точками
 (`nginx.spec.patch`, `httpd-2.4.62.spec.patch.new`), CHANGELOG — по
 `changelog.yaml` (короткое `.yml` тоже ловится), а FILES — по `.tar.gz`.
@@ -533,7 +539,7 @@ python3 -m kojipatch --config kojipatch.yaml --log-level debug collect \
   "koji_hub": "https://hub/kojihub",
   "koji_web": "https://hub/koji",
   "patch_classes": ["AUTOGEN", "CVE", "SAST", "DAST", "COVERAGE",
-                    "SPEC", "CHANGELOG", "FILES", "other"],
+                    "DISTSUFFIX", "SPEC", "CHANGELOG", "FILES", "other"],
   "builds": [
    {
     "nvr": "nginx-1.24.0-1.el9",

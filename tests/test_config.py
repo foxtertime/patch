@@ -220,6 +220,31 @@ class DefaultRulesOnRealNamesTest(unittest.TestCase):
             self.classifier.classify("sast-cve-2024-42516-fix.patch.new"),
             "CVE")
 
+    def test_distsuffix_patch(self):
+        self.assertEqual(self.classifier.classify("nginx-distsuffix.patch"),
+                         "DISTSUFFIX")
+
+    def test_distsuffix_with_the_new_tail(self):
+        self.assertEqual(
+            self.classifier.classify("httpd-2.4.62-distsuffix.patch.new"),
+            "DISTSUFFIX")
+
+    def test_distsuffix_wins_over_spec(self):
+        # Правит такой патч и правда спек, но затем, чтобы переклеить
+        # суффикс сборки: класс отвечает на вопрос «зачем патч».
+        self.assertEqual(
+            self.classifier.classify("kernel.spec.distsuffix.patch"),
+            "DISTSUFFIX")
+
+    def test_distsuffix_needs_the_patch_extension(self):
+        # «distsuffix» без .patch — не тот файл: так называют и включаемые
+        # куски спека, и переменные внутри них
+        self.assertEqual(self.classifier.classify("distsuffix.inc"), "other")
+
+    def test_cve_still_wins_over_distsuffix(self):
+        self.assertEqual(
+            self.classifier.classify("cve-2024-42516-distsuffix.patch"), "CVE")
+
     def test_spec_patch(self):
         self.assertEqual(self.classifier.classify("nginx.spec.patch"), "SPEC")
 
