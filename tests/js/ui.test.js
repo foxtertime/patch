@@ -1432,7 +1432,9 @@ test('на «Состоянии» рельс отмечает снапшот, к
     var dom = load();
     store.add(threeSnapshots(), 'a.json');
     var chain = dom.id('chain').innerHTML;
-    assert.strictEqual(chain.split('class="pick').length - 1, 3,
+    /* Считаем по data-node, а не по классу: класс чипа носит ещё и призрак
+       в конце рельса, и счёт по нему считал бы узлом место, где узла нет. */
+    assert.strictEqual((chain.match(/data-node="/g) || []).length, 3,
                        'три узла на рельсе: ' + chain);
     /* Отмечен ровно один, и это свежий снапшот — тот, что открывается по
        умолчанию. Отрезки на «Состоянии» не подсвечиваются: сравнение

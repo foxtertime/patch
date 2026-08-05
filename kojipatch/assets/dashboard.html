@@ -180,18 +180,18 @@ button.pick:hover { background: var(--card); color: var(--fg);
               border-color var(--dur) var(--ease); }
 .stop:hover .kill, .kill:focus-visible { opacity: 1; }
 .kill:hover { color: var(--fg); border-color: var(--fg); }
-/* Призрак в конце рельса: место, куда цепочка может продолжиться. Пунктир
-   на странице уже значит «начато, но не случилось» — им обведён отмеченный
-   узел; здесь он значит то же. Ни точки, ни времени у призрака нет: он не
-   снапшот, и притворяться им ему нечем. */
-.ghost { display: flex; align-items: center; gap: .4rem; color: var(--muted);
-  padding: .5rem .7rem; background: none; box-shadow: none;
-  border: 1px dashed var(--line); border-radius: var(--r-1); font: inherit;
-  font-size: .8rem; line-height: 1.2rem; }
-.ghost:hover { color: var(--fg); border-color: var(--fg); background: none; }
+/* Призрак в конце рельса: место, куда цепочка может продолжиться. Он и
+   набран как узел — той же сеткой, теми же строками, — потому что стоит с
+   узлами в одном ряду: чип на голову ниже соседей читался бы не как «ещё
+   один, которого пока нет», а как обрубок. Отличает его пунктир: он на
+   странице уже значит «начато, но не случилось» — им обведён отмеченный
+   узел. Точки у призрака нет, на её месте знак: точка — это снапшот, а
+   снапшота тут как раз и нет. */
+.ghost { border-style: dashed; }
 /* Не .plus: этим классом на странице покрашены прибавившиеся RPM, и знак
    на призраке позеленел бы вместе с ними. */
-.ghost .sign { font-size: 1rem; line-height: 1; }
+.ghost .sign { grid-row: 1; font-size: .95rem; line-height: 1.2rem;
+  font-weight: 600; width: 9px; text-align: center; }
 .rl.dash::after { background: none;
   border-top: 1px dashed var(--line); height: 0; }
 /* Метка сводного диапазона стоит в конце рельса — там, где кончается
