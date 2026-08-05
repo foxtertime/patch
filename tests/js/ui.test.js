@@ -425,13 +425,33 @@ test('диапазон во всю цепочку помечен итогом, �
 
 /* «Итог» подписывает диапазон во всю цепочку, но на двух снапшотах вся
    цепочка и есть единственный переход: подписывать его итогом значит
-   сообщать очевидное. Правило одно и считается в pairFor. */
+   сообщать очевидное.
+
+   Переход здесь предпосчитан и приезжает готовым, так что правило рельсу
+   сообщает diff.js. Случай, когда его считают на месте, — ниже. */
 test('на двух снапшотах итога на рельсе нет', function () {
   var dom = load();
   store.add([snap('os-9.1', JUL, { builds: [build('nginx', { version: '1.0' })] }),
              snap('os-9.2', AUG, { builds: [build('nginx', { version: '2.0' })] })],
             'a.json');
   pressTab(dom, 'diff');
+  assert.strictEqual(dom.id('chain').innerHTML.indexOf('итог'), -1,
+                     dom.id('chain').innerHTML);
+});
+
+/* Два прогона одного тега в кэш предпосчитанных пар не попадают: по имени
+   тега такую пару не опознать. Значит, переход считается на месте, и
+   сводность решает уже pairFor — то самое правило, которое на разных
+   тегах сторожит diff.js. */
+test('у двух прогонов одного тега итога тоже нет', function () {
+  var dom = load();
+  store.add([snap('os-9.2', JUL, { builds: [build('nginx', { version: '1.0' })] }),
+             snap('os-9.2', AUG, { builds: [build('nginx', { version: '2.0' })] })],
+            'a.json');
+  pressTab(dom, 'diff');
+  assert.ok(dom.id('diff-rows').innerHTML.indexOf('nginx') !== -1,
+            'переход не посчитался, сценарий проверяет не то: '
+            + dom.id('diff-rows').innerHTML);
   assert.strictEqual(dom.id('chain').innerHTML.indexOf('итог'), -1,
                      dom.id('chain').innerHTML);
 });
@@ -449,21 +469,11 @@ test('после клика фокус остаётся на том же узл�
   assert.strictEqual(dom.focused().getAttribute('data-node'), '2');
 });
 
-/* Подсказка привязана к узлу, а клик перерисовывает рельс целиком: без
-   снятия она пережила бы свой узел и висела бы с текстом, который после
-   клика уже неверен — «отметить» вместо «снять отметку». */
-test('клик по узлу убирает подсказку', function () {
-  var dom = load();
-  threeChain(dom);
-  var node = dom.document.createElement('button');
-  node.setAttribute('data-node', '0');
-  node.setAttribute('data-tip', 'Отметить началом сравнения');
-  dom.id('chain').appendChild(node);
-  dom.fire(node, 'focusin', {});
-  assert.strictEqual(dom.id('tip').style.display, 'block');
-  dom.fire(node, 'click', {});
-  assert.strictEqual(dom.id('tip').style.display, 'none');
-});
+/* Теста на снятие подсказки при клике здесь намеренно нет. В браузере
+   фокус сразу уезжает на перерисованный узел, focusin показывает
+   подсказку заново, и «подсказки не видно» — неправда. Заглушка на
+   focus() событий не поднимает, так что такой тест был бы зелён только
+   в ней: уверенность без покрытия хуже, чем её отсутствие. */
 
 test('на вкладке «Состояние» узлы рельса не нажимаются', function () {
   var dom = load();
