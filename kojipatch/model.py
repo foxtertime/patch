@@ -3,6 +3,8 @@ import json
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
+from . import __version__
+
 SCHEMA = 1
 
 
@@ -130,7 +132,11 @@ class Snapshot:
 
 
 def snapshot_to_dict(snapshot: Snapshot) -> Dict[str, Any]:
-    return {"schema": SCHEMA, "tag": snapshot.tag,
+    # Версия инструмента стоит рядом со схемой, но значит другое: schema —
+    # формат файла, kojipatch — та версия, которая файл записала. Поле
+    # необязательное и добавленное, поэтому схема остаётся прежней: снапшот
+    # с ним читают и старые версии, снапшот без него — новые.
+    return {"schema": SCHEMA, "kojipatch": __version__, "tag": snapshot.tag,
             "generated": snapshot.generated, "koji_hub": snapshot.koji_hub,
             "koji_web": snapshot.koji_web,
             "patch_classes": list(snapshot.patch_classes),

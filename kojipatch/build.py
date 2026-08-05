@@ -3,9 +3,15 @@ import logging
 import os
 from typing import Optional
 
+from . import __version__
+
 logger = logging.getLogger(__name__)
 
 PLACEHOLDER = "<!--__SCRIPTS__-->"
+# Один токен на две подстановки: он стоит и в meta generator, и в заголовке
+# страницы. Версия нужна в собранном файле именно потому, что файл этот
+# пересылают: у того, кто его открыл, исходников под рукой нет.
+VERSION_TOKEN = "__KOJIPATCH_VERSION__"
 ASSETS = os.path.join(os.path.dirname(__file__), "assets")
 TEMPLATE_PATH = os.path.join(ASSETS, "dashboard.html")
 # Порядок по зависимостям, а не по алфавиту: каждый следующий скрипт
@@ -33,6 +39,9 @@ def build_html(template_path: Optional[str] = None) -> str:
     if PLACEHOLDER not in template:
         raise BuildError("в шаблоне %s нет плейсхолдера %s"
                          % (path, PLACEHOLDER))
+    if VERSION_TOKEN not in template:
+        raise BuildError("в шаблоне %s нет плейсхолдера %s"
+                         % (path, VERSION_TOKEN))
 
     blocks = []
     for name in SCRIPTS:
@@ -40,5 +49,6 @@ def build_html(template_path: Optional[str] = None) -> str:
         blocks.append("<script>\n/* %s */\n%s\n</script>" % (name, source))
 
     html = template.replace(PLACEHOLDER, "\n".join(blocks))
+    html = html.replace(VERSION_TOKEN, __version__)
     logger.debug("страница: %d КБ", len(html) // 1024)
     return html

@@ -2,6 +2,7 @@
 import re
 import unittest
 
+from kojipatch import __version__
 from kojipatch.build import SCRIPTS, BuildError, build_html
 
 RICH = "tests/fixtures/rich-old.json"
@@ -11,6 +12,15 @@ class BuildHtml(unittest.TestCase):
     def test_no_placeholder_remains(self):
         html = build_html()
         self.assertNotIn("<!--__SCRIPTS__-->", html)
+        self.assertNotIn("__KOJIPATCH_VERSION__", html)
+
+    def test_version_is_stamped_into_the_page(self):
+        # Страницу пересылают файлом, и у того, кто её открыл, исходников
+        # под рукой нет: чем собрана, должно быть видно в ней самой.
+        html = build_html()
+        self.assertIn('<meta name="generator" content="kojipatch %s">'
+                      % __version__, html)
+        self.assertIn('<span class="ver">%s</span>' % __version__, html)
 
     def test_every_script_is_inlined(self):
         html = build_html()

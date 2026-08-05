@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Koji patch dashboard</title>
+<!-- Версию подставляет build.py: страницу присылают друг другу файлом, и
+     по ней должно быть видно, чем она собрана. -->
+<meta name="generator" content="kojipatch __KOJIPATCH_VERSION__">
 <style>
 :root {
   /* Тема одна — тёмная, и это выбор, а не умолчание. color-scheme говорит
@@ -67,6 +70,10 @@ body {
 h1 { font-size: 1.35rem; font-weight: 600; letter-spacing: -.02em;
   margin: 0 0 1.6rem; }
 h1 .dot { color: var(--muted); font-weight: 400; }
+/* Версия при названии: мельче и приглушённее — она уточняет, чем страница
+   собрана, а не называет её. */
+h1 .ver { color: var(--muted); font-size: .68em; font-weight: 400;
+  letter-spacing: 0; }
 /* Класс остался ради смысла: он помечает строку как данные, даже когда
    вся страница и так набрана моноширинным. */
 .mono { font-family: var(--mono); }
@@ -627,7 +634,7 @@ tr.detail-row > td { background: var(--card); padding: .85rem .7rem 1.1rem 2.2re
 </head>
 <body>
 <div class="wrap">
-  <h1>kojipatch</h1>
+  <h1>kojipatch <span class="ver">__KOJIPATCH_VERSION__</span></h1>
   <div class="sources" id="sources" hidden>
     <div class="srchead">
       <span class="l">снапшоты</span>

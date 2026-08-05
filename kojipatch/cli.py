@@ -5,7 +5,7 @@ import os
 import time
 from typing import List, Optional
 
-from . import logs
+from . import __version__, logs
 from .build import BuildError, build_html
 from .collect import collect_tag
 from .config import ConfigError, load_config
@@ -23,6 +23,13 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="kojipatch",
         description="Дашборд патчей: агрегация koji и GitLab")
+    # Версия стоит до подкоманды и печатается даже без неё: у argparse
+    # действие version завершает разбор на месте, не доходя до проверки
+    # обязательного подпараметра. Спрашивают её как раз тогда, когда
+    # собирать нечего — например, разбирая чужой снапшот.
+    parser.add_argument("--version", action="version",
+                        version="kojipatch " + __version__,
+                        help="напечатать версию и выйти")
     parser.add_argument("--config", default=os.environ.get("KOJIPATCH_CONFIG"),
                         help="путь к YAML-конфигу")
     parser.add_argument("--koji-hub", help="перекрыть koji.hub из конфига")
