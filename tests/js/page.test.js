@@ -240,6 +240,78 @@ test('отметка узла живёт в состоянии и снимает
   assert.strictEqual(p.anchor(), null);
 });
 
+/* Разобранный адрес встречается с цепочкой ровно здесь: hash.js имён не
+   разрешает, а page — не разбирает строк. */
+function parsed(over) {
+  var out = { tab: null, tag: null, pair: null, filters: null,
+              q: null, sort: null };
+  for (var k in over) { if (over.hasOwnProperty(k)) out[k] = over[k]; }
+  return out;
+}
+
+test('ссылка на снапшот — такой же выбор, как клик по узлу', function () {
+  var p = make([snap('os-9.1', JUL), snap('os-9.2', AUG)]);
+  p.restore(parsed({ tag: 'os-9.1' }));
+  assert.strictEqual(p.curSnap().tag, 'os-9.1');
+  assert.strictEqual(p.picked.tag, true);
+});
+
+test('короткая форма tag= у двойников берёт последний прогон', function () {
+  var p = make([snap('os-9.2', JUL), snap('os-9.3', AUG), snap('os-9.2', SEP)]);
+  p.restore(parsed({ tag: 'os-9.2' }));
+  assert.strictEqual(p.st.tag, 2);
+});
+
+test('неизвестное имя в ссылке оставляет умолчание', function () {
+  var p = make([snap('os-9.1', JUL), snap('os-9.2', AUG)]);
+  p.restore(parsed({ tag: 'os-9.9' }));
+  assert.strictEqual(p.curSnap().tag, 'os-9.2');
+});
+
+test('ссылка на диапазон восстанавливает оба конца', function () {
+  var p = make([snap('os-9.1', JUL), snap('os-9.2', AUG), snap('os-9.3', SEP)]);
+  p.restore(parsed({ pair: 'os-9.1..os-9.2' }));
+  assert.deepStrictEqual(p.currentEnds(), [0, 1]);
+});
+
+test('ссылка на «Изменения» без второго снапшота уводит на состояние',
+  function () {
+    var p = make([snap('os-9.1', JUL)]);
+    p.restore(parsed({ tab: 'diff', filters: ['changed'] }));
+    assert.strictEqual(p.st.tab, 'state');
+    /* Фильтры из такой ссылки — диффовые: на вкладке состояния они дали бы
+       пустую таблицу без единого намёка почему. */
+    assert.deepStrictEqual(p.activeFilters(), {});
+  });
+
+test('фильтры из ссылки заменяют прежние, а не добавляются к ним', function () {
+  var p = make([snap('os-9.1', JUL)]);
+  p.toggleFilter('problem');
+  p.restore(parsed({ filters: ['no-patch'] }));
+  assert.deepStrictEqual(p.activeFilters(), { 'no-patch': 1 });
+});
+
+test('чего в ссылке не было, то и не трогается', function () {
+  var p = make([snap('os-9.1', JUL)]);
+  p.toggleFilter('problem');
+  p.st.q = 'nginx';
+  p.restore(parsed({ tab: 'state' }));
+  assert.deepStrictEqual(p.activeFilters(), { problem: 1 });
+  assert.strictEqual(p.st.q, 'nginx');
+});
+
+test('части для ссылки называют снапшот полным именем', function () {
+  var p = make([snap('os-9.1', JUL), snap('os-9.2', AUG)]);
+  var parts = p.hashParts();
+  assert.strictEqual(parts.tab, 'state');
+  assert.strictEqual(parts.tag, 'os-9.2@' + AUG);
+  assert.strictEqual(parts.pair, 'os-9.1@' + JUL + '..os-9.2@' + AUG);
+});
+
+test('на единственном снапшоте диапазона в ссылке нет', function () {
+  assert.strictEqual(make([snap('os-9.1', JUL)]).hashParts().pair, null);
+});
+
 test('две страницы не делят состояния', function () {
   var a = make([snap('os-9.1', JUL), snap('os-9.2', AUG)]);
   var b = pagemod.create({ viewmodel: viewmodel, diffmod: diffmod,

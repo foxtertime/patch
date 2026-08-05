@@ -496,6 +496,57 @@
       if (picked.pair && !foundPair) picked.pair = false;
     }
 
+    /* Разобранный адрес превращается в состояние страницы. Имена снапшотов
+       сопоставляются с цепочкой здесь, а не при разборе: разбор не должен
+       знать, что за снапшоты сейчас на странице. */
+    function restore(parsed) {
+      var filters = parsed.filters, dropped = false, j;
+      if (parsed.tab !== null) {
+        /* Сравнивать нечего — вкладки «Изменения» на странице тоже нет. */
+        if (parsed.tab === 'diff' && SNAPS.length < 2) dropped = true;
+        st.tab = (parsed.tab === 'diff' && SNAPS.length > 1) ? 'diff' : 'state';
+      }
+      if (parsed.tag !== null) {
+        /* Ссылку правят руками, и «tag=os-9.2» без времени сбора — её
+           законная форма. Два прогона одного тега она не различает: берём
+           последний по цепочке, самый свежий. Сама страница пишет всегда
+           полное имя, поэтому её ссылки однозначны.
+
+           Ссылка — такой же выбор человека, как клик по узлу: он должен
+           пережить приход следующего файла, потому и selectSnapshot. */
+        for (j = 0; j < SNAPS.length; j++) {
+          if (snapNamed(j, parsed.tag)) selectSnapshot(j);
+        }
+      }
+      if (parsed.pair !== null) {
+        /* Не разобрали — остаёмся на переходе по умолчанию. */
+        var ends = endsFromName(parsed.pair);
+        if (ends) setPairEnds(ends[0], ends[1]);
+      }
+      /* Ссылка вела на «Изменения», но сравнивать в этом прогоне нечего.
+         Фильтры из неё — диффовые; на вкладке состояния они дали бы пустую
+         таблицу без единого намёка почему. */
+      if (dropped) filters = null;
+      /* Что из этого живое, решает dropDeadFilters() — его зовут оба, кто
+         читает хеш, и оба по той же причине, что и после смены данных. */
+      if (filters) st.filters[st.tab] = setFrom(filters);
+      if (parsed.sort) st.sort[st.tab] = parsed.sort;
+      if (parsed.q !== null) st.q = parsed.q;
+    }
+
+    /* Части текущего состояния под сборку ссылки: имена уже разрешены, а
+       склеивать из них строку — дело hash.js. */
+    function hashParts() {
+      return {
+        tab: st.tab,
+        tag: SNAPS.length ? snapKey(SNAPS[st.tag]) : null,
+        pair: SNAPS.length > 1 ? pairKey(currentEnds()) : null,
+        filters: keys(activeFilters()).sort(),
+        q: st.q,
+        sort: st.sort[st.tab]
+      };
+    }
+
     function snapshots() { return SNAPS; }
     function data() { return DATA; }
 
@@ -512,7 +563,8 @@
       knownFilter: knownFilter, dropDeadFilters: dropDeadFilters,
       visibleRows: visibleRows, totalRows: totalRows,
       sortRows: sortRows, sortBy: sortBy,
-      rowKey: rowKey, openOf: openOf, setOpen: setOpen
+      rowKey: rowKey, openOf: openOf, setOpen: setOpen,
+      restore: restore, hashParts: hashParts
     };
   }
 
