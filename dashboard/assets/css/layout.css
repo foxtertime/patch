@@ -103,8 +103,12 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* Чипы активных фильтров: карточки уезжают при прокрутке, а фильтры
-   складываются по И — без этой строки непонятно, почему таблица пуста. */
-.chips { display: flex; flex-wrap: wrap; gap: .35rem; padding: .5rem 0 0; }
+   складываются по И — без этой строки непонятно, почему таблица пуста.
+
+   Стоят они между панелью поиска и таблицей и принадлежат таблице: это
+   ответ на вопрос «почему строк так мало». Отбивка снизу больше, чем
+   сверху, — иначе чип прилипает к линии шапки и читается как её часть. */
+.chips { display: flex; flex-wrap: wrap; gap: .35rem; padding: .5rem 0 .9rem; }
 .chips:empty { padding: 0; }
 .chip { display: inline-flex; align-items: center; gap: .35rem; padding: .16rem .55rem;
   border-radius: 999px; border: 1px solid var(--line); background: var(--card);

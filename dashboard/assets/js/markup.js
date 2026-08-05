@@ -116,6 +116,23 @@
     return `<span class="sign">${markCls === 'is-added' ? '+' : '−'}</span>`;
   }
 
+  /* Путь патча второй строкой — только когда он что-то добавляет к имени.
+     Почти всегда путь это «PATCH/<имя>», то есть имя, повторённое с
+     приставкой: строка вдвое длиннее, а нового в ней ноль. Показываем путь
+     у патчей из подкаталога — и тогда вторая строка сама становится
+     сигналом «этот лежит не там, где все».
+
+     Второй случай — поиск попал в путь, но не в имя: спрятать строку,
+     из-за которой патч оказался в выдаче, значит соврать, почему он тут. */
+  function pathAdds(p, q) {
+    const tail = `/${p.name}`;
+    const path = String(p.path || '');
+    if (!path.endsWith(tail)) return true;
+    const dir = path.slice(0, -tail.length);
+    if (dir.indexOf('/') !== -1) return true;
+    return Boolean(q) && text.has(path, q) && !text.has(p.name, q);
+  }
+
   /* Патчи одной стороны, сгруппированные по классам. mark — множество путей,
      которые нужно выделить как пришедшие или ушедшие. */
   function patchesHtml(patches, q, mark, markCls) {
@@ -132,9 +149,10 @@
           ? `<a href="${esc(href)}" target="_blank" rel="noopener">`
             + `${hl(p.name, q)}</a>`
           : `<span class="mono">${hl(p.name, q)}</span>`;
+        const path = pathAdds(p, q)
+          ? `<div class="ppath">${hl(p.path, q)}</div>` : '';
         return `<li${hot ? ` class="${markCls}"` : ''}>`
-             + `${hot ? signHtml(markCls) : ''}${title}`
-             + `<div class="ppath">${hl(p.path, q)}</div></li>`;
+             + `${hot ? signHtml(markCls) : ''}${title}${path}</li>`;
       });
       return `<div class="pgroup ${labels.classCls(name)}">`
            + `<div class="pclass">${esc(name)} `
@@ -218,7 +236,7 @@
          + (removed ? `<span class="minus">−${removed}</span>` : '');
   }
 
-  return { markHtml, marksHtml, linkHtml, kv, signHtml, meterHtml,
+  return { markHtml, marksHtml, linkHtml, kv, signHtml, meterHtml, pathAdds,
            patchesHtml, rpmsHtml, rpmSideHtml, rpmSideCount,
            taggedCell, builtHtml, inheritedNote, mainTagHtml, otherTagsHtml,
            taggedText, delta };

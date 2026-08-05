@@ -72,6 +72,43 @@ test('патчи группируются по классам и считают�
   assert.match(out, /other <span class="n">1<\/span>/);
 });
 
+/* Путь второй строкой — только когда он что-то добавляет. Почти всегда он
+   «PATCH/<имя>», то есть имя, повторённое с приставкой: список патчей из-за
+   этого был вдвое длиннее, а нового в нём ноль. */
+test('путь, повторяющий имя, второй строкой не печатается', function () {
+  labels.setClasses(['CVE']);
+  var out = markup.patchesHtml([patch('a.patch', 'CVE')], '', null, '');
+  assert.doesNotMatch(out, /ppath/, out);
+});
+
+test('патч из подкаталога путь показывает', function () {
+  labels.setClasses(['CVE']);
+  var p = patch('a.patch', 'CVE');
+  p.path = 'PATCH/sub/a.patch';
+  var out = markup.patchesHtml([p], '', null, '');
+  assert.match(out, /class="ppath">PATCH\/sub\/a\.patch</, out);
+});
+
+test('путь показывается, если поиск попал в него, а не в имя', function () {
+  labels.setClasses(['CVE']);
+  var out = markup.patchesHtml([patch('a.patch', 'CVE')], 'patch/a', null, '');
+  assert.match(out, /ppath/, out);
+});
+
+test('поиск по имени лишней строки не добавляет', function () {
+  labels.setClasses(['CVE']);
+  var out = markup.patchesHtml([patch('a.patch', 'CVE')], 'a.pat', null, '');
+  assert.doesNotMatch(out, /ppath/, out);
+});
+
+test('путь, устроенный не как «каталог/имя», печатается целиком',
+  function () {
+    labels.setClasses(['CVE']);
+    var p = patch('a.patch', 'CVE');
+    p.path = 'совсем-другое';
+    assert.match(markup.patchesHtml([p], '', null, ''), /ppath/);
+  });
+
 test('пришедший патч помечен знаком', function () {
   labels.setClasses(['CVE']);
   var out = markup.patchesHtml([patch('a.patch', 'CVE')], '',
