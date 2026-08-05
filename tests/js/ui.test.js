@@ -440,11 +440,16 @@ test('приход снапшота снимает отметку', async functi
                      dom.id('chain').innerHTML);
 });
 
-test('пока отметка стоит, рельс просит выбрать второй конец', function () {
+/* Подпись рельса называет, что на нём стоит, и остаётся собой при отметке:
+   про начатый выбор говорят обведённый узел и подсказки, а прыгающий
+   заголовок только уводил бы глаз от них. */
+test('отметка не меняет подпись рельса', function () {
   var dom = load();
   threeChain(dom);
+  assert.match(dom.id('chain').innerHTML, /class="l">снапшоты</,
+               dom.id('chain').innerHTML);
   clickNode(dom, 1);
-  assert.match(dom.id('chain').innerHTML, /выберите второй конец/,
+  assert.match(dom.id('chain').innerHTML, /class="l">снапшоты</,
                dom.id('chain').innerHTML);
 });
 
