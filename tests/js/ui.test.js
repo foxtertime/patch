@@ -279,21 +279,30 @@ test('пары одинаковых тегов различимы в адрес�
 
 test('ссылка на пару открывает тот же переход', async function () {
   var dom = load();
-  store.add([snap('os-9.2', JUL)], 'b.json');
-  store.add([snap('os-9.2', AUG)], 'c.json');
-  store.add([snap('os-9.2', SEP)], 'd.json');
+  /* Версии у прогонов разные, чтобы у двух диапазонов и таблицы были
+     разные: совпадение адреса тут ничего не значило бы — его тест сам
+     туда и присвоил. Смотреть надо на то, что страница нарисовала. */
+  store.add([snap('os-9.2', JUL, { builds: [build('nginx', { version: '1.0' })] })],
+            'b.json');
+  store.add([snap('os-9.2', AUG, { builds: [build('nginx', { version: '2.0' })] })],
+            'c.json');
+  store.add([snap('os-9.2', SEP, { builds: [build('nginx', { version: '3.0' })] })],
+            'd.json');
   pressTab(dom, 'diff');
   clickNode(dom, 0);
   clickNode(dom, 1);
   var link = dom.location.hash;
+  var narrow = dom.id('diff-rows').innerHTML;
   clickNode(dom, 0);
   clickNode(dom, 2);
+  assert.notStrictEqual(dom.id('diff-rows').innerHTML, narrow,
+                        'два разных диапазона дали одну таблицу, сценарий '
+                        + 'проверяет не то');
   await dom.tick();
   dom.location.hash = link;
   dom.fireWindow('hashchange');
-  /* Адрес называет диапазон целиком: страница перезаписывает его своей же
-     записью, и совпадение значит, что открылся тот самый переход. */
-  assert.strictEqual(dom.location.hash, link, dom.location.hash);
+  assert.strictEqual(dom.id('diff-rows').innerHTML, narrow,
+                     dom.id('diff-rows').innerHTML);
 });
 
 function threeChain(dom) {
@@ -303,6 +312,18 @@ function threeChain(dom) {
             'a.json');
   pressTab(dom, 'diff');
 }
+
+/* Клики в тестах приходят с подставного узла, поэтому саму разметку рельса
+   надо проверить отдельно: скрипт может перестать рисовать кнопки, и
+   делегированный обработчик останется зелёным, а страница — мёртвой. */
+test('на «Изменениях» каждый узел рельса — кнопка', function () {
+  var dom = load();
+  threeChain(dom);
+  var html = dom.id('chain').innerHTML;
+  assert.match(html, /<button type="button" class="stop[^"]*" data-node="0"/,
+               html);
+  assert.strictEqual((html.match(/data-node="/g) || []).length, 3, html);
+});
 
 test('два клика по узлам задают диапазон', function () {
   var dom = load();
@@ -339,10 +360,20 @@ test('первый клик только отмечает узел и табли
 test('повторный клик по отмеченному узлу снимает отметку', function () {
   var dom = load();
   threeChain(dom);
+  /* Сперва выбираем узкий диапазон: отмена обязана вернуть страницу к
+     нему, а не к умолчанию. На умолчании подмену было бы не видно. */
   clickNode(dom, 0);
-  clickNode(dom, 0);
+  clickNode(dom, 1);
+  var link = dom.location.hash, rows = dom.id('diff-rows').innerHTML;
+  clickNode(dom, 2);
+  clickNode(dom, 2);
   assert.strictEqual(dom.id('chain').innerHTML.indexOf('anchor'), -1,
                      dom.id('chain').innerHTML);
+  /* Отмена не выбирает ничего: ни адрес, ни таблица не трогаются. Без
+     ветки снятия второй клик задал бы пару из одного и того же узла, а
+     она молча читается как «вся цепочка». */
+  assert.strictEqual(dom.location.hash, link, dom.location.hash);
+  assert.strictEqual(dom.id('diff-rows').innerHTML, rows);
 });
 
 /* Отметка — шаг выбора, а не состояние страницы: пережив уход с вкладки,
@@ -391,6 +422,48 @@ test('диапазон во всю цепочку помечен итогом, �
     assert.strictEqual(dom.id('chain').innerHTML.indexOf('итог'), -1,
                        dom.id('chain').innerHTML);
   });
+
+/* «Итог» подписывает диапазон во всю цепочку, но на двух снапшотах вся
+   цепочка и есть единственный переход: подписывать его итогом значит
+   сообщать очевидное. Правило одно и считается в pairFor. */
+test('на двух снапшотах итога на рельсе нет', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { builds: [build('nginx', { version: '1.0' })] }),
+             snap('os-9.2', AUG, { builds: [build('nginx', { version: '2.0' })] })],
+            'a.json');
+  pressTab(dom, 'diff');
+  assert.strictEqual(dom.id('chain').innerHTML.indexOf('итог'), -1,
+                     dom.id('chain').innerHTML);
+});
+
+/* Клик перерисовывает рельс целиком, и нажатая кнопка исчезает вместе с
+   фокусом. Выбор двухшаговый: с клавиатуры второй конец пришлось бы
+   искать табом заново, начав всё сначала. */
+test('после клика фокус остаётся на том же узле', function () {
+  var dom = load();
+  threeChain(dom);
+  clickNode(dom, 1);
+  assert.strictEqual(dom.focused().getAttribute('data-node'), '1');
+  /* Второй конец перерисовывает не только рельс, но и всю страницу. */
+  clickNode(dom, 2);
+  assert.strictEqual(dom.focused().getAttribute('data-node'), '2');
+});
+
+/* Подсказка привязана к узлу, а клик перерисовывает рельс целиком: без
+   снятия она пережила бы свой узел и висела бы с текстом, который после
+   клика уже неверен — «отметить» вместо «снять отметку». */
+test('клик по узлу убирает подсказку', function () {
+  var dom = load();
+  threeChain(dom);
+  var node = dom.document.createElement('button');
+  node.setAttribute('data-node', '0');
+  node.setAttribute('data-tip', 'Отметить началом сравнения');
+  dom.id('chain').appendChild(node);
+  dom.fire(node, 'focusin', {});
+  assert.strictEqual(dom.id('tip').style.display, 'block');
+  dom.fire(node, 'click', {});
+  assert.strictEqual(dom.id('tip').style.display, 'none');
+});
 
 test('на вкладке «Состояние» узлы рельса не нажимаются', function () {
   var dom = load();

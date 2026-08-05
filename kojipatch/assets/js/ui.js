@@ -83,10 +83,6 @@
       }
     }
     if (!foundPair) { pairSel.from = null; pairSel.to = null; }
-    /* Отметку первого конца состав снапшотов не переживает: она названа
-       номером в цепочке, а после прихода или ухода файла тот же номер стоит
-       у другого снапшота. */
-    anchor = null;
     /* Выбранного больше нет на странице — значит, нет и выбора: дальше снова
        работает умолчание. Иначе следующий файл открылся бы «прежним
        выбором», которого человек не делал. */
@@ -454,9 +450,11 @@
     return snapKey(SNAPS[ends[0]]) + '..' + snapKey(SNAPS[ends[1]]);
   }
 
-  function setPairEnds(lo, hi) {
-    pairSel.from = snapKey(SNAPS[lo]);
-    pairSel.to = snapKey(SNAPS[hi]);
+  /* Концы принимаются в любом порядке: направление задаёт цепочка, и
+     выправляет его currentEnds(). */
+  function setPairEnds(a, b) {
+    pairSel.from = snapKey(SNAPS[a]);
+    pairSel.to = snapKey(SNAPS[b]);
     picked.pair = true;
   }
 
@@ -1221,9 +1219,11 @@
   }
 
   function showTab(name) {
-    /* Начатый выбор диапазона со сменой вкладки теряет смысл: на «Состоянии»
-       узлы не нажимаются, и отметка ждала бы второго клика, которого там
-       некому сделать. */
+    /* Единственное место, где снимается отметка: начатый выбор со сменой
+       вкладки теряет смысл — на «Состоянии» узлы не нажимаются, и отметка
+       ждала бы второго клика, которого там некому сделать. Смена состава
+       снапшотов проходит здесь же: applyData заканчивается showTab, а
+       номер узла после прихода файла стоит уже у другого снапшота. */
     anchor = null;
     if (name === 'diff' && SNAPS.length < 2) name = 'state';
     st.tab = name;
@@ -1533,9 +1533,9 @@
           renderTagSelect(); renderStateCards(); render();
           return;
         }
-        var at = node.getAttribute('data-node');
-        if (at !== null && at !== undefined) {
-          pickNode(parseInt(at, 10));
+        var stop = node.getAttribute('data-node');
+        if (stop !== null && stop !== undefined) {
+          pickNode(parseInt(stop, 10));
           return;
         }
         var tab = node.getAttribute('data-tab');
@@ -1773,10 +1773,11 @@
     /* Подпись рельса договаривает начатый выбор: отметка стоит, а что с ней
        делать дальше, из одного обведённого узла не видно. */
     var label = anchor === null ? 'цепочка' : 'выберите второй конец';
-    /* Итогом помечен диапазон во всю цепочку — тот, что раньше стоял
-       отдельной кнопкой «сводная пара». */
-    var sum = live && ends && ends[0] === 0 && ends[1] === items.length - 1
-      && items.length > 2 ? '<span class="sum">итог</span>' : '';
+    /* Сводность спрашиваем у самого перехода, а не считаем заново: правило
+       «вся цепочка, и только когда снапшотов больше двух» уже сказано в
+       pairFor, и второе такое же однажды разошлось бы с ним. */
+    var pair = ends ? pairFor(ends) : null;
+    var sum = pair && pair.summary ? '<span class="sum">итог</span>' : '';
     chainBox.innerHTML = '<span class="l">' + esc(label) + '</span>' + out + sum;
   }
 
@@ -1794,19 +1795,41 @@
       + '" data-tip="' + esc(tip) + '">' + body + '</button>';
   }
 
+  /* Рельс перерисовывается целиком, и нажатая кнопка исчезает вместе с
+     фокусом. Выбор здесь двухшаговый: без возврата фокуса второй конец
+     пришлось бы искать табом заново, пройдя весь рельс сначала. */
+  function focusNode(at) {
+    var nodes = chainBox.querySelectorAll('[data-node]'), i;
+    for (i = 0; i < nodes.length; i++) {
+      if (nodes[i].getAttribute('data-node') === String(at)) {
+        nodes[i].focus();
+        return;
+      }
+    }
+  }
+
   /* Диапазон выбирается двумя кликами: первый отмечает конец, второй
      задаёт пару. Клик по отмеченному узлу снимает отметку — иначе из
      начатого выбора нельзя было бы выйти, не выбрав чего-нибудь. */
   function pickNode(at) {
-    if (anchor === null) { anchor = at; renderChain(); return; }
-    if (anchor === at) { anchor = null; renderChain(); return; }
-    /* Порядок концов задаёт цепочка, а не порядок кликов: «было» всегда
-       левее. Иначе «появился» и «исчез» молча менялись бы местами. */
-    var lo = Math.min(anchor, at), hi = Math.max(anchor, at);
-    anchor = null;
-    setPairEnds(lo, hi);
-    renderDiffCards();
-    render();
+    /* Подсказка привязана к узлу, а узел сейчас будет перерисован: без
+       этого она пережила бы его и висела бы с прежним текстом, который
+       после клика уже неверен — «отметить» вместо «снять отметку». */
+    hideTip();
+    if (anchor === null) { anchor = at; renderChain(); }
+    else if (anchor === at) { anchor = null; renderChain(); }
+    else {
+      /* Концы отдаём в порядке кликов: направление задаёт цепочка, и
+         выправляет его currentEnds() — единственное место, где это правило
+         записано. Второе такое же здесь однажды разошлось бы с ним. */
+      var mark = anchor;
+      anchor = null;
+      setPairEnds(mark, at);
+      renderDiffCards();
+      render();
+    }
+    /* Рельс перерисован в любой из веток, и нажатый узел в нём уже новый. */
+    focusNode(at);
   }
 
   function renderSources() {
