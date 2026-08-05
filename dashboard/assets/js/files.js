@@ -9,7 +9,7 @@
     root.KP = root.KP || {};
     root.KP.files = factory();
   }
-}(typeof globalThis !== 'undefined' ? globalThis : this, function () {
+}(typeof globalThis !== 'undefined' ? globalThis : this, () => {
   'use strict';
 
   /* Сообщение о загрузке — событие, а не состояние страницы: файл
@@ -21,14 +21,14 @@
      Предупреждение о разных хабах в соседнем блоке так не гасят, и это
      не забывчивость: оно описывает не событие, а то, что на экране
      сейчас, и правдиво ровно до смены состава. */
-  var ERRORS_LIFE = 10000;
-  var ERRORS_FADE = 400;
+  const ERRORS_LIFE = 10000;
+  const ERRORS_FADE = 400;
 
   function create(deps) {
-    var store = deps.store, esc = deps.text.esc;
-    var input = deps.dom.input, dropZone = deps.dom.drop;
-    var errorsBox = deps.dom.errors, pickBtn = deps.dom.pick;
-    var timers = [];
+    const store = deps.store, esc = deps.text.esc;
+    const input = deps.dom.input, dropZone = deps.dom.drop;
+    const errorsBox = deps.dom.errors, pickBtn = deps.dom.pick;
+    let timers = [];
 
     function stopTimers() {
       for (var i = 0; i < timers.length; i++) clearTimeout(timers[i]);
@@ -36,8 +36,7 @@
     }
 
     function showErrors(errors) {
-      var out = '', i;
-      for (i = 0; i < errors.length; i++) out += '<li>' + esc(errors[i]) + '</li>';
+      const out = errors.map((e) => `<li>${esc(e)}</li>`).join('');
       /* Свежее сообщение начинает свой срок с нуля: догорающий чужой таймер
          погасил бы его раньше, чем человек успел прочитать. */
       stopTimers();
@@ -47,43 +46,46 @@
       /* Два независимых таймера, а не вложенных: гашение и уборка — разные
          события, и заводить второе изнутри первого значит связать их
          порядком выполнения там, где связи нет. */
-      timers.push(setTimeout(function () {
+      timers.push(setTimeout(() => {
         errorsBox.className = 'problems loaderrors fading';
       }, ERRORS_LIFE));
-      timers.push(setTimeout(function () {
+      timers.push(setTimeout(() => {
         errorsBox.innerHTML = '';
         errorsBox.className = 'problems loaderrors';
       }, ERRORS_LIFE + ERRORS_FADE));
     }
 
+    /* Сообщение показываем одно на всю пачку и только когда прочитан
+       последний файл: читаются они вразнобой, и по сообщению на каждый
+       перебило бы предыдущее раньше, чем его успели прочесть. */
     function loadFiles(list) {
-      var errors = [], pending = list.length, i;
+      let errors = [], pending = list.length;
       if (!pending) return;
       function done() {
         pending -= 1;
         if (pending) return;
         showErrors(errors);
       }
-      for (i = 0; i < list.length; i++) {
-        (function (file) {
-          var reader = new FileReader();
-          reader.onload = function () {
-            var parsed = store.parseText(String(reader.result), file.name);
-            if (!parsed.ok) errors.push(parsed.error);
-            else {
-              var res = store.add(parsed.snapshots, file.name);
-              errors = errors.concat(res.rejected);
-            }
-            done();
-          };
-          /* Нечитаемый файл — не повод молчать: без этой ветки страница
-             просто ничего не сделала бы в ответ на выбор. */
-          reader.onerror = function () {
-            errors.push(file.name + ': файл не читается');
-            done();
-          };
-          reader.readAsText(file);
-        }(list[i]));
+      /* file объявлен на каждый виток, поэтому обработчики читателя видят
+         свой файл, а не последний из пачки. Раньше это делала обёртка-IIFE. */
+      for (const file of list) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const parsed = store.parseText(String(reader.result), file.name);
+          if (!parsed.ok) errors.push(parsed.error);
+          else {
+            const res = store.add(parsed.snapshots, file.name);
+            errors = errors.concat(res.rejected);
+          }
+          done();
+        };
+        /* Нечитаемый файл — не повод молчать: без этой ветки страница
+           просто ничего не сделала бы в ответ на выбор. */
+        reader.onerror = () => {
+          errors.push(`${file.name}: файл не читается`);
+          done();
+        };
+        reader.readAsText(file);
       }
     }
 
@@ -101,18 +103,15 @@
        первый: пока перенос идёт, сами файлы браузер прячет и о них говорит
        одна запись Files в types; на drop появляются и файлы. */
     function hasFiles(e) {
-      var data = e.dataTransfer, types = data && data.types, i;
+      const data = e.dataTransfer;
       if (!data) return false;
       if (data.files && data.files.length) return true;
-      for (i = 0; types && i < types.length; i++) {
-        if (types[i] === 'Files') return true;
-      }
-      return false;
+      return Array.from(data.types || []).indexOf('Files') !== -1;
     }
 
     pickBtn.addEventListener('click', openPicker);
 
-    input.addEventListener('change', function () {
+    input.addEventListener('change', () => {
       loadFiles(input.files);
       /* Тот же файл, выбранный второй раз, не даёт события, пока в поле
          лежит его прежнее значение. */
@@ -122,25 +121,25 @@
     /* Ронять файл можно на всю страницу, а не только на зону: браузер по
        умолчанию открывает брошенный файл вместо страницы, и без
        preventDefault на dragover дашборд просто заменился бы содержимым JSON. */
-    document.addEventListener('dragover', function (e) {
+    document.addEventListener('dragover', (e) => {
       if (!hasFiles(e)) return;
       e.preventDefault();
       markOver(true);
     });
-    document.addEventListener('dragleave', function (e) {
+    document.addEventListener('dragleave', (e) => {
       /* Уход за пределы окна: внутри страницы dragleave приходит на каждой
          границе, и снимать подсветку по ним значило бы мигать ею. */
       if (!e.relatedTarget) markOver(false);
     });
-    document.addEventListener('drop', function (e) {
+    document.addEventListener('drop', (e) => {
       if (!hasFiles(e)) return;
       e.preventDefault();
       markOver(false);
       loadFiles(e.dataTransfer.files);
     });
 
-    return { openPicker: openPicker };
+    return { openPicker };
   }
 
-  return { create: create };
+  return { create };
 }));
