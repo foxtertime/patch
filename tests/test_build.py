@@ -1,9 +1,9 @@
-"""Сборка страницы: шаблон и скрипты в одном файле."""
+"""Сборка страницы: шаблон, стили и скрипты в одном файле."""
 import re
 import unittest
 
 from dashboard import __version__
-from dashboard.build import SCRIPTS, BuildError, build_html
+from dashboard.build import STYLES, SCRIPTS, BuildError, build_html
 from dashboard.config import DEFAULT_PATCH_CLASSES
 
 RICH = "tests/fixtures/rich-old.json"
@@ -13,6 +13,7 @@ class BuildHtml(unittest.TestCase):
     def test_no_placeholder_remains(self):
         html = build_html()
         self.assertNotIn("<!--__SCRIPTS__-->", html)
+        self.assertNotIn("<!--__STYLES__-->", html)
         self.assertNotIn("__DASHBOARD_VERSION__", html)
 
     def test_version_is_stamped_into_the_page(self):
@@ -34,6 +35,25 @@ class BuildHtml(unittest.TestCase):
         positions = [html.index("/* %s */" % name) for name in SCRIPTS]
         self.assertEqual(positions, sorted(positions))
 
+    def test_every_style_is_inlined(self):
+        html = build_html()
+        for name in STYLES:
+            self.assertIn("/* %s */" % name, html,
+                          "в собранном файле нет %s" % name)
+
+    def test_styles_keep_cascade_order(self):
+        # При равной специфичности выигрывает то, что ниже: перестановка
+        # файлов в STYLES молча меняет вид страницы.
+        html = build_html()
+        positions = [html.index("/* %s */" % name) for name in STYLES]
+        self.assertEqual(positions, sorted(positions))
+
+    def test_styles_go_before_scripts(self):
+        # Стили стоят в head, скрипты — в конце body: страница не должна
+        # успеть показаться неоформленной.
+        html = build_html()
+        self.assertLess(html.index("/* base.css */"), html.index("/* ui.js */"))
+
     def test_no_external_resources(self):
         """Дашборд открывают там, где интернета нет."""
         html = build_html()
@@ -53,6 +73,8 @@ class BuildHtml(unittest.TestCase):
             build_html(template_path="/nope/dashboard.html")
 
     def test_template_without_placeholder_is_reported(self):
+        # Любого из трёх плейсхолдеров достаточно, чтобы сборка отказалась:
+        # страница без стилей или без скриптов открылась бы молча сломанной.
         with self.assertRaises(BuildError):
             build_html(template_path=RICH)
 

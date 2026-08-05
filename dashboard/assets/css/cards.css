@@ -1,0 +1,36 @@
+/* Карточки-счётчики над таблицами. */
+
+.cards { display: grid; gap: .6rem; }
+/* Итоги тега — крупно; разрезы по классам и статусам — плотной сеткой. */
+.cards.global { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  margin-bottom: .6rem; }
+.cards.diff { grid-template-columns: repeat(auto-fit, minmax(122px, 1fr));
+  margin-bottom: 1.5rem; }
+.card { background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--r-2); padding: .6rem .7rem; box-shadow: var(--shadow);
+  transition: border-color var(--dur) var(--ease),
+              box-shadow var(--dur) var(--ease),
+              transform var(--dur) var(--ease); }
+.card .n { font-size: 1.2rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+.card .unit { font-size: .72rem; font-weight: 500; color: var(--muted);
+  letter-spacing: .02em; }
+.card .rpm { font-size: .74rem; font-weight: 500; color: var(--muted);
+  font-variant-numeric: tabular-nums; margin-bottom: .15rem; min-height: 1em; }
+.card .l { font-size: .7rem; color: var(--muted); text-transform: uppercase;
+  letter-spacing: .03em; }
+.card.big { padding: .85rem 1rem; }
+.card.big .l { font-size: .74rem; font-weight: 700; color: var(--fg);
+  margin-bottom: .35rem; }
+.card.big .n { font-size: 2rem; line-height: 1.1; }
+.card.big .rpm { margin: .3rem 0 0; }
+.card.clickable { cursor: pointer; text-align: left; font: inherit;
+  color: var(--fg); width: 100%; }
+.card.clickable:hover { border-color: var(--fg); box-shadow: var(--lift);
+  transform: translateY(-1px); }
+.card.clickable:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Выбранная карточка не красится — она наливается чернилами. Оттенка для
+   выделения на этой странице просто нет: все свободные заняты классами
+   патчей, а десятый спорил бы с ними. */
+.card[aria-pressed=true] { border-color: var(--fg);
+  box-shadow: inset 0 0 0 1px var(--fg), var(--shadow); }
+.card[aria-pressed=true] .l { color: var(--fg); }

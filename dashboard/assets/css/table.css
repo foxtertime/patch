@@ -1,0 +1,203 @@
+/* Таблицы обеих вкладок: шапка, строки, метки, полоска состава
+   патчей и всё, что раскрывается под строкой. */
+
+/* Никакого overflow на обёртке: он сделал бы её скролл-контейнером,
+   и sticky-шапка стала бы отсчитываться от неё, а не от окна. */
+.tablewrap { border-top: 1px solid var(--line); }
+table { border-collapse: collapse; width: 100%; font-size: .82rem; }
+th, td { text-align: left; padding: .5rem .7rem; border-bottom: 1px solid var(--line);
+  vertical-align: top; }
+/* Шапка — подпись к колонке, а не заголовок: мелко, вразрядку, строчными.
+   Читают её один раз, а данные под ней — постоянно. */
+thead th {
+  position: sticky; top: var(--controls-h); background: var(--bg); z-index: 10;
+  user-select: none; white-space: nowrap;
+  font-size: .68rem; font-weight: 500; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--muted); padding: .55rem .7rem;
+  /* border-bottom у sticky-ячейки при border-collapse не рисуется */
+  box-shadow: inset 0 -1px 0 var(--line);
+}
+thead th[data-sort] { cursor: pointer;
+  transition: color var(--dur) var(--ease); }
+thead th[data-sort]:hover { color: var(--fg); }
+thead th .arrow { color: var(--fg); font-size: .7rem; }
+tr.main-row { cursor: pointer; }
+tr.main-row > td { transition: background var(--dur) var(--ease); }
+tr.main-row:hover > td { background: var(--card); }
+/* Проблемные сборки помечены полосой у левого края: это ответ на вопрос
+   «где смотреть» ещё до того, как строка развёрнута. */
+tr.main-row.bad > td:first-child { box-shadow: inset 3px 0 0 var(--removed); }
+/* break-word, а не anywhere: последний рвёт версию посередине, и 'el10'
+   превращается в 'el1 0'. */
+td.src { font-weight: 600; overflow-wrap: break-word; }
+td.ver { color: var(--muted); overflow-wrap: break-word; }
+td.ver.new { color: var(--fg); }
+td.branch, td.tagged { font-size: .85em; color: var(--muted);
+  overflow-wrap: break-word; }
+/* Имя koji-тега не переносим: разорванное посередине, оно перестаёт быть
+   именем, а искать его глазами приходится в каждой унаследованной строке.
+   Колонка при auto-раскладке возьмёт ширину самого длинного тега — а он
+   стоит не в каждой строке, у затегованных прямо здесь прочерк. */
+td.tagged { white-space: nowrap; overflow-wrap: normal; }
+td.dir { text-align: center; font-weight: 700; white-space: nowrap; }
+tr.upgraded td.dir { color: var(--up); }
+tr.downgraded td.dir { color: var(--down); }
+tr.added td.dir { color: var(--added); }
+tr.removed td.dir { color: var(--removed); }
+td.num, td.built { text-align: right; font-variant-numeric: tabular-nums;
+  color: var(--muted); white-space: nowrap; }
+td.built { font-size: .82rem; }
+/* Время рядом с датой: та же строка, но бледнее, чтобы колонка читалась
+   по датам, а точное время не мешало их сравнивать. */
+td.built .tm { opacity: .65; }
+td.pat { white-space: nowrap; font-variant-numeric: tabular-nums; }
+td.pat .zero { color: var(--muted); }
+td.links { text-align: right; white-space: nowrap; }
+td.marks { white-space: nowrap; }
+.plus { color: var(--added); }
+.minus { color: var(--removed); }
+/* На узком экране девять колонок не помещаются. Пусть скроллится таблица,
+   а не вся страница вместе с панелью поиска; sticky-шапкой жертвуем. */
+@media (max-width: 900px) {
+  .tablewrap { overflow-x: auto; }
+  thead th { position: static; }
+  /* td.tagged здесь не трогаем: таблица уже скроллится, и целое имя тега
+     полезнее сэкономленных пикселей. */
+  td.src, td.ver, td.branch { overflow-wrap: anywhere; }
+  td.marks { white-space: normal; }
+}
+a.link { display: inline-block; padding: .1rem .5rem; border-radius: 999px;
+  border: 1px solid var(--line); color: var(--accent); text-decoration: none;
+  font-size: .7rem; font-weight: 500; margin-left: .2rem;
+  transition: border-color var(--dur) var(--ease),
+              background var(--dur) var(--ease),
+              color var(--dur) var(--ease); }
+a.link:hover { border-color: var(--accent); background: var(--accent);
+  color: var(--card); }
+.chev { display: inline-block; width: 1em; color: var(--muted); font-size: .8em; }
+.mark { display: inline-block; font-size: .72rem; padding: .1rem .45rem; border-radius: 999px;
+  border: 1px solid currentColor; white-space: nowrap; margin-right: .2rem; }
+/* Метки строк — те же фильтры, что и карточки: клик включает. */
+.mark[data-filter] { cursor: pointer; }
+.mark[data-filter]:hover { box-shadow: 0 0 0 1px currentColor; }
+.mark.added { color: var(--added); }
+.mark.removed { color: var(--removed); }
+.mark.upgraded { color: var(--up); }
+.mark.downgraded { color: var(--down); }
+.mark.unchanged { color: var(--muted); }
+.mark.repackaged { color: var(--repack); }
+.mark.bad { color: var(--removed); }
+.mark.warn { color: var(--major); }
+.mark.calm { color: var(--muted); }
+
+/* Полоска состава патчей: доли классов в одной сборке. В колонке из сотен
+   строк по ней видно, где стек патчей — это CVE, а где — «прочее».
+   Ширина одна для всех строк: доли сравнимы между сборками только тогда,
+   когда полоски одной длины. Радиус скругления небольшой — при пилюле
+   крайние сегменты срезались бы, и доля читалась бы меньше настоящей. */
+.meter { display: inline-flex; width: 120px; height: 10px; border-radius: 3px;
+  overflow: hidden; vertical-align: middle; background: var(--line); }
+/* Число прижато к левому краю ячейки, полоска — к правому. Стоя сразу за
+   числом, полоска ездила бы вправо-влево от того, одна в нём цифра или
+   три, и колонку полосок стало бы не сравнить одним взглядом: сравнивают
+   их по долям цвета, а для этого они должны стоять друг под другом.
+   Отбивка остаётся минимумом на случай, когда ячейка узкая. */
+.patcell { display: flex; align-items: center; gap: .55rem; }
+.patcell .meter { margin-left: auto; }
+/* Класс, представленный одним патчем из сотни, даёт долю тоньше пикселя.
+   Пол в 2px оставляет его видимым: «класс есть, но его не видно» — худшая
+   из ошибок этой полоски, а точные числа всё равно в подсказке. */
+.meter i { display: block; height: 100%; background: currentColor;
+  min-width: 2px; }
+
+/* Развёрнутая строка. Один и тот же скелет для обеих вкладок:
+   подписанные блоки, внутри — пары «ключ — значение» и списки. */
+tr.detail-row > td { background: var(--card); padding: .85rem .7rem 1.1rem 2.2rem; }
+/* Ровно две колонки, как у «было/стало»: koji и gitlab, под ними патчи и
+   RPM, проблемы во всю ширину. Прежний auto-fit ужимал блоки тем сильнее,
+   чем шире экран — на широком все пять вставали в одну строку, и списку
+   пакетов доставалась колонка, в которую NVRA не влезает. */
+.detail { display: grid; gap: 1rem 1.6rem;
+  grid-template-columns: 1fr 1fr; align-items: start; }
+@media (max-width: 760px) { .detail { grid-template-columns: 1fr; } }
+.block { min-width: 0; }
+.block.wide { grid-column: 1 / -1; }
+/* Подпись блока: та же величина и разрядка, что у шапки таблицы, — на
+   странице ровно один способ подписать колонку данных. */
+.bl { font-size: .68rem; text-transform: uppercase; letter-spacing: .06em;
+  color: var(--muted); font-weight: 500; padding-bottom: .32rem;
+  margin-bottom: .5rem; border-bottom: 1px solid var(--line); }
+.kv { display: flex; gap: .5rem; font-size: .82rem; padding: .08rem 0; }
+.kv .k { color: var(--muted); flex: 0 0 6.2rem; }
+.kv .v { min-width: 0; overflow-wrap: anywhere; }
+.pgroup { margin-bottom: .5rem; }
+.pgroup .pclass { font-size: .7rem; font-weight: 700; letter-spacing: .05em;
+  text-transform: uppercase; }
+.pgroup .pclass .n { color: var(--muted); font-weight: 600; }
+/* Блок архитектуры набран так же, как блок класса патчей, но без цвета:
+   цвет в этом дашборде означает класс патча, и раскрасить им ещё и
+   архитектуры значило бы завести вторую, ложную легенду. */
+.pgroup.arch .pclass { color: var(--fg); }
+.plist { list-style: none; margin: .2rem 0 0; padding: .1rem 0 .1rem .6rem;
+  border-left: 2px solid currentColor; }
+.plist li { color: var(--fg); font-size: .82rem; padding: .1rem 0;
+  overflow-wrap: anywhere; }
+.plist li.is-added { color: var(--added); }
+.plist li.is-removed { color: var(--removed); }
+.plist a { color: var(--accent); text-decoration: none;
+  border-bottom: 1px solid transparent; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.plist a:hover { border-bottom-color: var(--accent); }
+/* Пришедший и ушедший патч должны читаться и по ссылке тоже: иначе синий
+   цвет ссылки съедает единственный сигнал «что изменилось». */
+.plist li.is-added a { color: var(--added); }
+.plist li.is-removed a { color: var(--removed); text-decoration: line-through; }
+.plist .ppath { color: var(--muted); font-size: .74rem; }
+/* Знак дублирует цвет — на случай, если цвет не различим. */
+.sign { font-weight: 700; margin-right: .15rem; }
+/* Пакеты — такой же список, как патчи, по одному в строке. */
+.rlist { list-style: none; margin: .2rem 0 0; padding: .1rem 0 .1rem .6rem;
+  border-left: 2px solid var(--line); }
+/* Висячий отступ: перенесённый хвост NVRA сдвинут вправо и не читается как
+   ещё один пакет. Первая строка при этом стоит там же, где стояла. */
+.rlist li { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .78rem; padding: .1rem 0 .1rem .9rem; text-indent: -.9rem;
+  overflow-wrap: anywhere; }
+/* Только во вкладке «изменения»: там левая и правая колонки выравниваются
+   по номеру строки, и перенос длинного NVRA сдвинул бы всё, что ниже.
+   Поэтому строка ровно одна, а списку даётся горизонтальная прокрутка —
+   полоса появляется под всеми строками и высоту строк не трогает. */
+.rlist.fixed { overflow-x: auto; }
+.rlist.fixed li { white-space: nowrap; overflow-wrap: normal;
+  padding-left: 0; text-indent: 0; }
+.rlist li.is-added { color: var(--added); }
+.rlist li.is-removed { color: var(--removed); text-decoration: line-through; }
+/* Пустая ячейка напротив пришедшего или ушедшего пакета: строка обязана
+   занять место, иначе соседняя колонка уедет вверх. */
+.rlist li.rgap { color: var(--muted); opacity: .45; }
+/* Ветка, сменившаяся между тегами, красится тем же цветом, что и уехавший
+   или приехавший патч: «эта сторона потеряла» / «эта сторона получила». */
+.is-added { color: var(--added); }
+.is-removed { color: var(--removed); }
+.problems { list-style: none; margin: 0; padding: 0; }
+.problems li { color: var(--removed); font-size: .82rem; padding: .1rem 0;
+  overflow-wrap: anywhere; }
+.none { color: var(--muted); font-size: .82rem; }
+/* Приписка к значению: «прямой», «унаследован». */
+.note { color: var(--muted); font-size: .74rem; margin-left: .4rem; }
+/* Список koji-тегов билда. Основной набран цветом текста и жирным, прочие
+   приглушены: глаз должен находить «где билд сейчас» без чтения списка. */
+.ktags { display: flex; flex-wrap: wrap; gap: .05rem .55rem;
+  align-items: baseline; }
+.ktag { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: .8rem; color: var(--muted); overflow-wrap: anywhere; }
+.ktag.main { color: var(--fg); font-weight: 700; }
+/* «Было / стало» — две колонки одинаковой ширины, чтобы взгляд сравнивал
+   строки по горизонтали, а не искал соответствие. */
+.sides { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem 1.6rem; }
+@media (max-width: 760px) { .sides { grid-template-columns: 1fr; } }
+.side { min-width: 0; }
+.side .bl b { color: var(--fg); }
+
+.empty { padding: 2rem; text-align: center; color: var(--muted); }
+/* Подсказка живёт одна на всю страницу и позиционируется скриптом,
+   иначе у крайних карточек она вылезала бы за край окна. */

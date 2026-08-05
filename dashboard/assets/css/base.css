@@ -1,0 +1,112 @@
+/* Переменные, сброс, типографика и палитра классов патчей.
+   Палитра стоит здесь, а не рядом с карточками: одним и тем же
+   цветом красятся карточка класса, метка строки, заголовок группы
+   патчей и доля в полоске — четыре разных места одной таблицы. */
+
+:root {
+  /* Тема одна — тёмная, и это выбор, а не умолчание. color-scheme говорит
+     о нём браузеру: полосы прокрутки, внутренности поля поиска и системные
+     рамки фокуса рисуются тёмными, иначе они светили бы белым посреди
+     страницы, к которой их никто не приглашал. */
+  color-scheme: dark;
+  /* Глубина берётся не тенью, а светлотой: карточка светлее фона, и она
+     читается поднятой сама по себе. Акцент — приглушённый сине-серый:
+     девять цветов классов патчей уже значат что-то, и десятый яркий цвет
+     спорил бы с ними за внимание. */
+  --bg: #0f1216; --fg: #e8eaed; --muted: #99a1ab; --line: #252a31;
+  --card: #171b21; --accent: #8fb6da; --up: #4ade80; --down: #f87171;
+  --major: #fbbf24; --added: #4ade80; --removed: #f87171; --repack: #c4b5fd;
+  --hit: #78350f; --hitfg: #fef3c7;
+  --shadow: 0 1px 2px rgba(0, 0, 0, .35);
+  --lift: 0 4px 14px rgba(0, 0, 0, .5);
+  /* Цвета классов патчей. Они же красят «полоску состава» в колонке
+     патчей, метки строк и полосы групп в развёрнутой строке: один и тот же
+     класс всюду одного цвета, иначе полоска ничего не сообщает. Взяты
+     светлее и чище, чем берут для белого фона: на тёмном тёмный оттенок
+     сливается с ним и перестаёт быть меткой. */
+  --autogen: #818cf8; --cve: #fb7185; --sast: #a78bfa; --dast: #22d3ee;
+  --coverage: #a3e635; --spec: #fbbf24; --changelog: #e879f9;
+  --files: #5eead4; --other: #9ca3af;
+  /* Десятый цвет взят синим, а не ещё одним тёплым: жёлтый уже занят
+     спеком, и оранжевый рядом с ним в полоске состава читался бы как он
+     же. Синий стоит между индиго и циановым, но отличается от обоих
+     насыщенностью. */
+  --distsuffix: #60a5fa;
+  /* высоту панели фильтров проставляет JS — от неё зависит смещение
+     «липкой» шапки таблицы. Значение здесь — запасное, до первого замера. */
+  --controls-h: 3.4rem;
+
+  /* Моноширинный — голос всего интерфейса, а не только данных. Страница
+     живёт среди NVR, тегов и имён файлов, и набирать её чем-то ещё значит
+     говорить о них чужими словами. Гротеск остаётся там, где обращаются
+     к человеку: подсказки, пустой экран, тексты ошибок. Ни одного шрифта
+     не скачиваем — страницу открывают там, где интернета нет. */
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", "JetBrains Mono",
+          "Cascadia Mono", Menlo, Consolas, "DejaVu Sans Mono",
+          "Liberation Mono", monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* Одна лестница радиусов на всю страницу: пилюли только там, где
+     элемент можно нажать и отпустить, прямоугольники — у всего, что
+     содержит данные. */
+  --r-1: 6px; --r-2: 10px;
+  /* Одна длительность на все переходы: разнобой читается как небрежность,
+     а не как акцент. Движение снимается общим правилом в самом низу. */
+  --dur: .16s;
+  --ease: cubic-bezier(.2, .6, .3, 1);
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; padding: 2.4rem 1.25rem 5rem; background: var(--bg); color: var(--fg);
+  font: 14px/1.6 var(--mono);
+  font-variant-ligatures: none;
+  -webkit-font-smoothing: antialiased;
+}
+/* Проза — гротеском: моноширинный хорош для строк, которые сравнивают
+   глазами, и плох для фраз, которые читают. */
+.prose, #tip, .dropsub, .problems li, .warn { font-family: var(--sans); }
+.wrap { max-width: 1400px; margin: 0 auto; }
+/* Заголовок набран как имя тега, потому что имя тега — и есть тема
+   страницы. Разрядка отрицательная: моноширинный и без того просторен. */
+h1 { font-size: 1.35rem; font-weight: 600; letter-spacing: -.02em;
+  margin: 0 0 1.6rem; }
+h1 .dot { color: var(--muted); font-weight: 400; }
+/* Версия при названии: мельче и приглушённее — она уточняет, чем страница
+   собрана, а не называет её. */
+h1 .ver { color: var(--muted); font-size: .68em; font-weight: 400;
+  letter-spacing: 0; }
+/* Класс остался ради смысла: он помечает строку как данные, даже когда
+   вся страница и так набрана моноширинным. */
+.mono { font-family: var(--mono); }
+
+.hit { background: var(--hit); color: var(--hitfg); border-radius: 2px; }
+
+@keyframes kp-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes kp-rise {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: none; }
+}
+.wrap { animation: kp-fade .32s var(--ease) both; }
+.sources, .tabs { animation: kp-rise .28s var(--ease) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+
+/* Класс патчей — цветной, поэтому карточка класса красит только подпись:
+   номер остаётся нейтральным и колонки чисел читаются как одна сетка. */
+.card .l.c-autogen, .mark.c-autogen, .pgroup.c-autogen,
+.meter i.c-autogen { color: var(--autogen); }
+.card .l.c-cve, .mark.c-cve, .pgroup.c-cve, .meter i.c-cve { color: var(--cve); }
+.card .l.c-sast, .mark.c-sast, .pgroup.c-sast, .meter i.c-sast { color: var(--sast); }
+.card .l.c-dast, .mark.c-dast, .pgroup.c-dast, .meter i.c-dast { color: var(--dast); }
+.card .l.c-coverage, .mark.c-coverage, .pgroup.c-coverage,
+.meter i.c-coverage { color: var(--coverage); }
+.card .l.c-distsuffix, .mark.c-distsuffix, .pgroup.c-distsuffix,
+.meter i.c-distsuffix { color: var(--distsuffix); }
+.card .l.c-spec, .mark.c-spec, .pgroup.c-spec, .meter i.c-spec { color: var(--spec); }
+.card .l.c-changelog, .mark.c-changelog, .pgroup.c-changelog,
+.meter i.c-changelog { color: var(--changelog); }
+.card .l.c-files, .mark.c-files, .pgroup.c-files,
+.meter i.c-files { color: var(--files); }
+.card .l.c-other, .mark.c-other, .pgroup.c-other, .meter i.c-other { color: var(--other); }
+.card .l.c-x, .mark.c-x, .pgroup.c-x, .meter i.c-x { color: var(--accent); }
