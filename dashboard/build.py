@@ -18,7 +18,8 @@ TEMPLATE_PATH = os.path.join(ASSETS, "dashboard.html")
 # рассчитывает, что предыдущие уже положили себя в KP.
 SCRIPTS = ("vercmp.js", "rpms.js", "diff.js", "viewmodel.js", "store.js",
            "text.js", "labels.js", "hash.js", "page.js", "markup.js",
-           "tables.js", "cards.js", "ui.js")
+           "tables.js", "cards.js", "rail.js", "files.js", "tips.js",
+           "ui.js")
 
 
 class BuildError(Exception):

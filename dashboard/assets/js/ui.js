@@ -1,23 +1,30 @@
 /* Корень страницы: находит свои узлы, кладёт в них разметку, связывает
-   события. Что показывать — знает page.js, из чего строить разметку —
-   tables.js с cards.js, а что вообще есть на странице — store.js. */
+   события и раздаёт себя тем, кто держит свой участок сам.
+
+   Что показывать — знает page.js, из чего строить разметку — tables.js с
+   cards.js, что вообще есть на странице — store.js. Рельс, загрузка файлов
+   и подсказки владеют своими узлами целиком; здесь про них известно только
+   то, чем их зовут. */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
     module.exports = factory(require('./viewmodel.js'), require('./store.js'),
                              require('./diff.js'), require('./text.js'),
                              require('./labels.js'), require('./markup.js'),
                              require('./tables.js'), require('./cards.js'),
-                             require('./page.js'), require('./hash.js'));
+                             require('./page.js'), require('./hash.js'),
+                             require('./rail.js'), require('./files.js'),
+                             require('./tips.js'));
   } else {
     root.KP = root.KP || {};
     root.KP.ui = factory(root.KP.viewmodel, root.KP.store, root.KP.diff,
                          root.KP.text, root.KP.labels, root.KP.markup,
                          root.KP.tables, root.KP.cards, root.KP.page,
-                         root.KP.hash);
+                         root.KP.hash, root.KP.rail, root.KP.files,
+                         root.KP.tips);
   }
 }(typeof globalThis !== 'undefined' ? globalThis : this,
   function (viewmodel, store, diffmod, text, labels, markup, tables, cards,
-            pagemod, hash) {
+            pagemod, hash, railmod, filesmod, tipsmod) {
   'use strict';
 
   /* Состояние страницы живёт в page.js: там же и всё, что из него
@@ -30,8 +37,8 @@
   var curSnap = page.curSnap, curPair = page.curPair;
   var visibleRows = page.visibleRows, sortRows = page.sortRows;
   var rowKey = page.rowKey, openOf = page.openOf;
-  var currentEnds = page.currentEnds, activeFilters = page.activeFilters;
-  var totalRows = page.totalRows, snapshots = page.snapshots;
+  var activeFilters = page.activeFilters, totalRows = page.totalRows;
+  var snapshots = page.snapshots;
 
   var stateSection = document.getElementById('tab-state');
   var diffSection = document.getElementById('tab-diff');
@@ -65,8 +72,7 @@
   /* Считалки строк живут в text.js. Здесь — короткие имена для тех, кого
      зовут отсюда: тела оставшихся функций читаются лучше, когда в них стоит
      esc(), а не text.esc(). */
-  var esc = text.esc, own = text.own, keys = text.keys, plural = text.plural,
-      stampOf = text.stampOf, gapLabel = text.gapLabel;
+  var esc = text.esc, own = text.own, keys = text.keys, plural = text.plural;
 
   /* Фильтр ставит и снимает page — он один знает правило про «версия та же»
      и «что-то изменилось». Перерисовка остаётся здесь: страницу рисует
@@ -173,7 +179,7 @@
        переключили тег, пару или вкладку — рельс обязан это отразить.
        Список источников при этом не трогаем: перерисовывать его на каждое
        нажатие клавиши в поиске значит забирать фокус с его кнопок. */
-    renderChain();
+    rail.render();
 
     if (!items.length) {
       body.innerHTML = '<tr><td class="empty" colspan="' + colCount(st.tab) + '">'
@@ -363,14 +369,14 @@
         }
         var stop = node.getAttribute('data-node');
         if (stop !== null && stop !== undefined) {
-          pickNode(parseInt(stop, 10));
+          rail.pickNode(parseInt(stop, 10));
           return;
         }
         var tab = node.getAttribute('data-tab');
         if (tab) { showTab(tab); render(); return; }
         /* Крестик и призрак живут на рельсе, а он перерисовывается целиком,
            поэтому их обработчики здесь, а не на самих кнопках. */
-        if (node.getAttribute('data-add')) { openPicker(); return; }
+        if (node.getAttribute('data-add')) { files.openPicker(); return; }
         var gone = node.getAttribute('data-drop-snap');
         if (gone !== null && gone !== undefined) {
           store.remove(parseInt(gone, 10));
@@ -454,64 +460,24 @@
     if (readHash()) { page.dropDeadFilters(); showTab(st.tab); rebuild(); }
   });
 
-  /* ---------- подсказки ---------- */
+  /* ---------- владельцы участков страницы ---------- */
 
-  var TIP_DELAY = 450;
-  var tip = document.getElementById('tip');
-  var tipTimer = null;
-  var tipNode = null;
+  /* Корень заполняется по ходу: рельс берёт метод в момент вызова, а не в
+     момент создания, и порядок объявлений здесь ничего не решает. Городить
+     ради одного подписчика шину событий незачем — страница перерисовывается
+     целиком. */
+  var app = {};
+  var tips = tipsmod.create({ node: document.getElementById('tip') });
+  var hideTip = tips.hide;
+  var rail = railmod.create({ box: chainBox, page: page, store: store,
+                              text: text, app: app, hideTip: hideTip });
+  var files = filesmod.create({ store: store, text: text,
+    dom: { input: fileInput, drop: dropZone, errors: loadErrors,
+           pick: pickBtn } });
+  app.render = render;
+  app.renderStateCards = renderStateCards;
+  app.renderDiffCards = renderDiffCards;
 
-  function tipAnchor(node) {
-    while (node && node.getAttribute) {
-      if (node.getAttribute('data-tip')) return node;
-      node = node.parentNode;
-    }
-    return null;
-  }
-
-  function placeTip(el) {
-    tip.textContent = el.getAttribute('data-tip');
-    tip.style.visibility = 'hidden';
-    tip.style.display = 'block';
-    var host = el.getBoundingClientRect();
-    var box = tip.getBoundingClientRect();
-    var left = Math.min(Math.max(8, host.left + (host.width - box.width) / 2),
-                        window.innerWidth - box.width - 8);
-    var top = host.bottom + 8;
-    if (top + box.height > window.innerHeight - 8) top = host.top - box.height - 8;
-    tip.style.left = Math.round(left) + 'px';
-    tip.style.top = Math.round(Math.max(8, top)) + 'px';
-    tip.style.visibility = 'visible';
-  }
-
-  function hideTip() {
-    if (tipTimer) { clearTimeout(tipTimer); tipTimer = null; }
-    tipNode = null;
-    tip.style.display = 'none';
-  }
-
-  /* Делегирование, а не обход всех [data-tip]: строки таблицы и карточки
-     перерисовываются, и навешенные обработчики умирали бы вместе с ними. */
-  document.addEventListener('mouseover', function (e) {
-    var el = tipAnchor(e.target);
-    if (el === tipNode) return;
-    hideTip();
-    tipNode = el;
-    if (el) {
-      tipTimer = setTimeout(function () {
-        if (tipNode === el) placeTip(el);
-      }, TIP_DELAY);
-    }
-  });
-  document.addEventListener('mouseleave', hideTip);
-  /* С клавиатуры ждать незачем — показываем сразу. */
-  document.addEventListener('focusin', function (e) {
-    var el = tipAnchor(e.target);
-    hideTip();
-    if (el) { tipNode = el; placeTip(el); }
-  });
-  document.addEventListener('focusout', hideTip);
-  window.addEventListener('scroll', hideTip, true);
 
   /* ---------- «липкая» шапка ---------- */
 
@@ -565,257 +531,12 @@
     }
   }
 
-  /* Рельс цепочки: снапшоты — узлы на линии, идущей слева направо, от
-     старого к новому. На «Состоянии» залит узел, который сейчас в
-     таблице; на «Изменениях» — отрезок между концами сравниваемой пары,
-     включая сводную, растянутую на всю цепочку. Одна картинка отвечает
-     сразу на три вопроса: что загружено, в каком порядке сравнивается и
-     где я сейчас нахожусь.
-
-     Под тегом у каждого узла стоит время сбора: снапшот — это тег в
-     определённый момент, и два прогона одного тега различает только оно.
-     Раньше дату получали одни двойники, теперь её видно у всех: цепочка
-     из тегов без дат отвечает, что сравнивается, но не отвечает, за какой
-     срок.
-
-     Рельс ещё и выбирает — он на странице единственный, кто это делает:
-     на «Состоянии» один клик открывает снапшот, на «Изменениях» два
-     задают любой диапазон цепочки. */
-  function renderChain() {
-    var items = store.list(), out = '', i, here;
-    var live = st.tab === 'diff';
-    var ends = live ? currentEnds() : null;
-    if (!items.length) { chainBox.innerHTML = ''; return; }
-    for (i = 0; i < items.length; i++) {
-      if (i) {
-        out += railHtml(items[i - 1], items[i],
-                        ends && i > ends[0] && i <= ends[1]);
-      }
-      here = ends ? (i === ends[0] || i === ends[1]) : i === st.tag;
-      out += stopHtml(i, items[i], stampOf(items[i].generated), here,
-                      live, items.length > 1);
-    }
-    /* Призрак идёт последним и всегда: добавить снапшот можно в любой
-       момент, а место, где это делают, не должно ни появляться, ни
-       исчезать от того, сколько их уже загружено. */
-    out += ghostHtml();
-    /* Сводность спрашиваем у самого перехода, а не считаем заново: правило
-       «вся цепочка, и только когда снапшотов больше двух» уже сказано —
-       для посчитанных на месте пар в pairFor, для предпосчитанных в
-       diff.js. Двух копий и так на одну больше, чем надо; третья, тут,
-       разошлась бы с обеими молча. */
-    var pair = ends ? page.pairFor(ends) : null;
-    var sum = pair && pair.summary ? '<span class="sum">итог</span>' : '';
-    /* Подпись рельса стоит в шапке панели и написана прямо в шаблоне: она
-       одна и та же при любых данных, и рисовать её заново на каждую
-       перерисовку значило бы каждый раз доказывать, что она не изменилась. */
-    chainBox.innerHTML = out + sum;
-  }
-
-  /* Отрезок между соседними узлами, с расстоянием во времени над ним. */
-  function railHtml(from, to, on) {
-    var gap = gapLabel(from.generated, to.generated);
-    return '<span class="rl' + (on ? ' on' : '') + '">'
-      + (gap ? '<span class="gap">' + esc(gap) + '</span>' : '') + '</span>';
-  }
-
-  /* Узел рельса — обёртка вокруг чипа и крестика: чипом снапшот открывают
-     и таскают, крестиком убирают. Чип нажимается, пока снапшот на странице
-     не один: на единственном переключать нечего и сравнивать не с чем, а
-     кнопка, которая ничего не делает, обещает лишнее. Крестик есть всегда —
-     убрать последний снапшот законно, страница вернётся к зоне загрузки.
-
-     На «Состоянии» чип — выбор из ряда, и aria-pressed говорит, какой
-     снапшот открыт. На «Изменениях» нажатого чипа нет: там выбирают не
-     узел, а отрезок, и концы диапазона показаны заливкой. */
-  function stopHtml(at, item, when, here, live, hot) {
-    var cls = 'pick' + (here ? ' on' : '')
-      + (page.anchor() === at ? ' anchor' : '');
-    var body = '<span class="node"></span><span class="nm">' + esc(item.tag)
-      + '</span><span class="when">' + esc(when) + '</span>';
-    var chip;
-    if (!hot) chip = '<span class="' + cls + '">' + body + '</span>';
-    else {
-      /* Подсказка называет сперва то, что сделает клик, а следом — то, что
-         раньше стояло строкой в списке источников: сколько сборок и из
-         какого файла снапшот приехал. */
-      chip = '<button type="button" class="' + cls + '" data-node="' + at
-        + '" draggable="true"'
-        + (live ? '' : ' aria-pressed="' + (here ? 'true' : 'false') + '"')
-        + ' data-tip="' + esc(nodeTip(at, here, live) + ' ' + source(item))
-        + '">' + body + '</button>';
-    }
-    return '<span class="stop">' + chip
-      + '<button type="button" class="kill" data-drop-snap="' + at
-      + '" aria-label="Убрать снапшот ' + esc(item.tag)
-      + '" data-tip="Убрать этот снапшот">✕</button></span>';
-  }
-
-  function nodeTip(at, here, live) {
-    if (!live) return here ? 'Открыт сейчас.' : 'Открыть этот снапшот.';
-    if (page.anchor() === null) return 'Отметить началом сравнения.';
-    return page.anchor() === at ? 'Снять отметку.' : 'Сравнить с отмеченным.';
-  }
-
-  function source(item) {
-    return item.builds + ' '
-      + plural(item.builds, 'сборка', 'сборки', 'сборок') + ', файл '
-      + item.file;
-  }
-
-  /* Место, куда цепочка может продолжиться. Набран призрак как узел и
-     классом узла: он стоит с узлами в одном ряду, и ряд этот держится на
-     том, что все в нём одного роста. Второй строкой у узла время сбора, у
-     призрака — откуда возьмётся снапшот. */
-  function ghostHtml() {
-    return '<span class="rl dash"></span>'
-      + '<button type="button" class="ghost pick" data-add="1"'
-      + ' data-tip="Добавить снапшоты из файлов">'
-      + '<span class="sign">+</span><span class="nm">добавить</span>'
-      + '<span class="when">снапшот</span></button>';
-  }
-
-  /* Рельс перерисовывается целиком, и нажатая кнопка исчезает вместе с
-     фокусом. Выбор здесь двухшаговый: без возврата фокуса второй конец
-     пришлось бы искать табом заново, пройдя весь рельс сначала. */
-  function focusNode(at) {
-    var nodes = chainBox.querySelectorAll('[data-node]'), i;
-    for (i = 0; i < nodes.length; i++) {
-      if (nodes[i].getAttribute('data-node') === String(at)) {
-        nodes[i].focus();
-        return;
-      }
-    }
-  }
-
-  /* Клик по узлу значит на вкладках разное: на «Состоянии» открывает
-     снапшот одним кликом, на «Изменениях» выбирает диапазон двумя. Первый
-     клик отмечает конец, второй задаёт пару; клик по отмеченному узлу
-     снимает отметку — иначе из начатого выбора нельзя было бы выйти, не
-     выбрав чего-нибудь. */
-  function pickNode(at) {
-    /* Подсказка привязана к узлу, которого через строку не станет. Обычно
-       её обновит focusin — фокус уезжает на новый узел тут же, ниже. Но
-       если узла с таким номером в рельсе не нашлось, focusin не случится,
-       и снимать её будет некому. */
-    hideTip();
-    if (st.tab !== 'diff') {
-      page.selectSnapshot(at);
-      renderStateCards();
-      render();
-      focusNode(at);
-      return;
-    }
-    if (page.anchor() === null) { page.setAnchor(at); renderChain(); }
-    else if (page.anchor() === at) { page.setAnchor(null); renderChain(); }
-    else {
-      /* Концы отдаём в порядке кликов: направление задаёт цепочка, и
-         выправляет его currentEnds() — единственное место, где это правило
-         записано. Второе такое же здесь однажды разошлось бы с ним. */
-      var mark = page.anchor();
-      page.setAnchor(null);
-      page.setPairEnds(mark, at);
-      renderDiffCards();
-      render();
-    }
-    /* Рельс перерисован в любой из веток, и нажатый узел в нём уже новый. */
-    focusNode(at);
-  }
-
-  /* ---------- перестановка узлов ---------- */
-
-  /* Свой тип переноса: данные из него браузер отдаёт только на drop, а вот
-     types видны и раньше — по ним приёмник файлов на странице узнаёт, что
-     тащат не файл. */
-  var NODE_MIME = 'text/x-dashboard-node';
-  /* Номер узла, который тащат, и промежуток, куда его поставят. Промежуток
-     считается в границах между узлами: 0 — перед первым, items.length —
-     за последним. */
-  var dragFrom = null, dropAt = null;
-
-  function chipOf(target) {
-    var node = target;
-    while (node && node !== chainBox) {
-      if (node.getAttribute && node.getAttribute('data-node') !== null
-          && node.getAttribute('data-node') !== undefined) {
-        return node;
-      }
-      node = node.parentNode;
-    }
-    return null;
-  }
-
-  /* Пометки живут прямо на узлах, а не в состоянии страницы: перерисовать
-     рельс посреди перетаскивания значило бы убрать из-под курсора то, что
-     он тащит. */
-  function marks(node, add) {
-    var base = String(node.className).replace(/\s*\b(before|after|moving)\b/g, '');
-    node.className = add ? base + ' ' + add : base;
-  }
-
-  function clearMarks() {
-    var nodes = chainBox.querySelectorAll('[data-node]'), i;
-    for (i = 0; i < nodes.length; i++) marks(nodes[i], '');
-  }
-
-  function endDrag() { dragFrom = null; dropAt = null; clearMarks(); }
-
-  chainBox.addEventListener('dragstart', function (e) {
-    var chip = chipOf(e.target);
-    if (!chip) return;
-    dragFrom = parseInt(chip.getAttribute('data-node'), 10);
-    dropAt = null;
-    if (e.dataTransfer) {
-      e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData(NODE_MIME, String(dragFrom));
-    }
-    marks(chip, 'moving');
-  });
-
-  /* Место вставки — по ближнему краю узла, к которому подносят: курсор в
-     левой половине значит «перед ним», в правой — «за ним». */
-  chainBox.addEventListener('dragover', function (e) {
-    if (dragFrom === null) return;
-    var chip = chipOf(e.target);
-    if (!chip) return;
-    /* Без preventDefault браузер считает, что сюда ронять нельзя, и drop
-       не случится вовсе. */
-    e.preventDefault();
-    var at = parseInt(chip.getAttribute('data-node'), 10);
-    var box = chip.getBoundingClientRect();
-    var after = e.clientX > box.left + box.width / 2;
-    clearMarks();
-    marks(chip, after ? 'after' : 'before');
-    if (dragFrom !== null) {
-      var moved = chainBox.querySelectorAll('[data-node="' + dragFrom + '"]');
-      if (moved.length) marks(moved[0], 'moving');
-    }
-    dropAt = at + (after ? 1 : 0);
-  });
-
-  chainBox.addEventListener('drop', function (e) {
-    if (dragFrom === null) return;
-    /* Узел, брошенный на рельс, — не файл, брошенный на страницу: без
-       остановки всплытия его принял бы приёмник файлов. */
-    e.preventDefault();
-    e.stopPropagation();
-    var from = dragFrom, place = dropAt;
-    endDrag();
-    if (place === null) return;
-    /* Узел сначала вынимают, и промежутки правее него сдвигаются на один. */
-    var to = place > from ? place - 1 : place;
-    if (to !== from) store.move(from, to - from);
-  });
-
-  /* Перетаскивание может кончиться и мимо рельса — пометки снимаются в
-     любом случае, а порядок меняет только drop. */
-  chainBox.addEventListener('dragend', endDrag);
 
   /* Состав снапшотов весь живёт на рельсе: там его показывают, там же
      добавляют, переставляют и убирают. Отдельного списка источников с теми
      же строками у страницы больше нет. */
   function renderSources() {
-    renderChain();
+    rail.render();
     var warns = store.warnings(), wout = '', i;
     for (i = 0; i < warns.length; i++) wout += '<div class="warn">' + esc(warns[i]) + '</div>';
     warningsBox.innerHTML = wout;
@@ -849,127 +570,6 @@
     syncEmpty();
   });
 
-  /* Сообщение о загрузке — событие, а не состояние страницы: файл
-     отвергнут, состав снапшотов прежний, и через минуту эта строка
-     сообщает только о том, что человек и так уже понял. Поэтому гаснет
-     сама. Десяти секунд хватает прочитать две строки, а не хватит —
-     сообщение повторится, стоит поднести файл снова.
-
-     Предупреждение о разных хабах в соседнем блоке так не гасят, и это
-     не забывчивость: оно описывает не событие, а то, что на экране
-     сейчас, и правдиво ровно до смены состава. */
-  var ERRORS_LIFE = 10000;
-  var ERRORS_FADE = 400;
-  var errorsTimers = [];
-
-  function stopErrorsTimers() {
-    for (var i = 0; i < errorsTimers.length; i++) clearTimeout(errorsTimers[i]);
-    errorsTimers = [];
-  }
-
-  function showErrors(errors) {
-    var out = '', i;
-    for (i = 0; i < errors.length; i++) out += '<li>' + esc(errors[i]) + '</li>';
-    /* Свежее сообщение начинает свой срок с нуля: догорающий чужой таймер
-       погасил бы его раньше, чем человек успел прочитать. */
-    stopErrorsTimers();
-    loadErrors.className = 'problems loaderrors';
-    loadErrors.innerHTML = out;
-    if (!out) return;
-    /* Два независимых таймера, а не вложенных: гашение и уборка — разные
-       события, и заводить второе изнутри первого значит связать их
-       порядком выполнения там, где связи нет. */
-    errorsTimers.push(setTimeout(function () {
-      loadErrors.className = 'problems loaderrors fading';
-    }, ERRORS_LIFE));
-    errorsTimers.push(setTimeout(function () {
-      loadErrors.innerHTML = '';
-      loadErrors.className = 'problems loaderrors';
-    }, ERRORS_LIFE + ERRORS_FADE));
-  }
-
-  function loadFiles(files) {
-    var errors = [], pending = files.length, i;
-    if (!pending) return;
-    function done() {
-      pending -= 1;
-      if (pending) return;
-      showErrors(errors);
-    }
-    for (i = 0; i < files.length; i++) {
-      (function (file) {
-        var reader = new FileReader();
-        reader.onload = function () {
-          var parsed = store.parseText(String(reader.result), file.name);
-          if (!parsed.ok) errors.push(parsed.error);
-          else {
-            var res = store.add(parsed.snapshots, file.name);
-            errors = errors.concat(res.rejected);
-          }
-          done();
-        };
-        /* Нечитаемый файл — не повод молчать: без этой ветки страница
-           просто ничего не сделала бы в ответ на выбор. */
-        reader.onerror = function () {
-          errors.push(file.name + ': файл не читается');
-          done();
-        };
-        reader.readAsText(file);
-      }(files[i]));
-    }
-  }
-
-  function openPicker() { fileInput.click(); }
-
-  pickBtn.addEventListener('click', openPicker);
-
-  fileInput.addEventListener('change', function () {
-    loadFiles(fileInput.files);
-    /* Тот же файл, выбранный второй раз, не даёт события, пока в поле
-       лежит его прежнее значение. */
-    fileInput.value = '';
-  });
-
-  function markOver(on) {
-    dropZone.className = on ? 'drop over' : 'drop';
-  }
-
-  /* Тащат файл или узел рельса — разные вещи, и путать их нельзя: узел,
-     принятый за файл, зажигал бы зону загрузки и уезжал в loadFiles, где
-     файлов нет.
-
-     Спрашиваем два признака, потому что до отпускания доступен только
-     первый: пока перенос идёт, сами файлы браузер прячет и о них говорит
-     одна запись Files в types; на drop появляются и файлы. */
-  function hasFiles(e) {
-    var data = e.dataTransfer, types = data && data.types, i;
-    if (!data) return false;
-    if (data.files && data.files.length) return true;
-    for (i = 0; types && i < types.length; i++) {
-      if (types[i] === 'Files') return true;
-    }
-    return false;
-  }
-
-  /* Ронять файл можно на всю страницу, а не только на зону: браузер по
-     умолчанию открывает брошенный файл вместо страницы, и без
-     preventDefault на dragover дашборд просто заменился бы содержимым JSON. */
-  document.addEventListener('dragover', function (e) {
-    if (!hasFiles(e)) return;
-    e.preventDefault();
-    markOver(true);
-  });
-  document.addEventListener('dragleave', function (e) {
-    /* Уход за пределы окна: внутри страницы dragleave приходит на каждой
-       границе, и снимать подсветку по ним значило бы мигать ею. */
-    if (!e.relatedTarget) markOver(false);
-  });
-  document.addEventListener('drop', function (e) {
-    if (!hasFiles(e)) return;
-    e.preventDefault();
-    markOver(false);
-    loadFiles(e.dataTransfer.files);
-  });
 
   /* ---------- старт ---------- */
 
