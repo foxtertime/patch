@@ -25,27 +25,25 @@
   /* Свой тип переноса: данные из него браузер отдаёт только на drop, а вот
      types видны и раньше — по ним приёмник файлов на странице узнаёт, что
      тащат не файл. */
-  var NODE_MIME = 'text/x-dashboard-node';
+  const NODE_MIME = 'text/x-dashboard-node';
 
   function create(deps) {
-    var box = deps.box, page = deps.page, store = deps.store, app = deps.app;
-    var hideTip = deps.hideTip;
-    var esc = deps.text.esc, plural = deps.text.plural;
-    var stampOf = deps.text.stampOf, gapLabel = deps.text.gapLabel;
-    var st = page.st;
+    const { box, page, store, app, hideTip } = deps;
+    const { esc, plural, stampOf, gapLabel } = deps.text;
+    const st = page.st;
 
     /* Номер узла, который тащат, и промежуток, куда его поставят. Промежуток
        считается в границах между узлами: 0 — перед первым, items.length —
        за последним. */
-    var dragFrom = null, dropAt = null;
+    let dragFrom = null, dropAt = null;
 
     /* ---------- разметка ---------- */
 
     /* Отрезок между соседними узлами, с расстоянием во времени над ним. */
     function railHtml(from, to, on) {
-      var gap = gapLabel(from.generated, to.generated);
-      return '<span class="rl' + (on ? ' on' : '') + '">'
-        + (gap ? '<span class="gap">' + esc(gap) + '</span>' : '') + '</span>';
+      const gap = gapLabel(from.generated, to.generated);
+      return `<span class="rl${on ? ' on' : ''}">`
+        + (gap ? `<span class="gap">${esc(gap)}</span>` : '') + '</span>';
     }
 
     function nodeTip(at, here, live) {
@@ -55,9 +53,9 @@
     }
 
     function source(item) {
-      return item.builds + ' '
-        + plural(item.builds, 'сборка', 'сборки', 'сборок') + ', файл '
-        + item.file;
+      return `${item.builds} `
+        + `${plural(item.builds, 'сборка', 'сборки', 'сборок')}, файл `
+        + `${item.file}`;
     }
 
     /* Узел рельса — обёртка вокруг чипа и крестика: чипом снапшот открывают
@@ -70,26 +68,26 @@
        снапшот открыт. На «Изменениях» нажатого чипа нет: там выбирают не
        узел, а отрезок, и концы диапазона показаны заливкой. */
     function stopHtml(at, item, when, here, live, hot) {
-      var cls = 'pick' + (here ? ' on' : '')
-        + (page.anchor() === at ? ' anchor' : '');
-      var body = '<span class="node"></span><span class="nm">' + esc(item.tag)
-        + '</span><span class="when">' + esc(when) + '</span>';
-      var chip;
-      if (!hot) chip = '<span class="' + cls + '">' + body + '</span>';
+      const cls = `pick${here ? ' on' : ''}`
+        + `${page.anchor() === at ? ' anchor' : ''}`;
+      const body = `<span class="node"></span><span class="nm">${esc(item.tag)}`
+        + `</span><span class="when">${esc(when)}</span>`;
+      let chip;
+      if (!hot) chip = `<span class="${cls}">${body}</span>`;
       else {
         /* Подсказка называет сперва то, что сделает клик, а следом — то, что
            раньше стояло строкой в списке источников: сколько сборок и из
            какого файла снапшот приехал. */
-        chip = '<button type="button" class="' + cls + '" data-node="' + at
-          + '" draggable="true"'
-          + (live ? '' : ' aria-pressed="' + (here ? 'true' : 'false') + '"')
-          + ' data-tip="' + esc(nodeTip(at, here, live) + ' ' + source(item))
-          + '">' + body + '</button>';
+        const tip = `${nodeTip(at, here, live)} ${source(item)}`;
+        chip = `<button type="button" class="${cls}" data-node="${at}"`
+          + ' draggable="true"'
+          + (live ? '' : ` aria-pressed="${here ? 'true' : 'false'}"`)
+          + ` data-tip="${esc(tip)}">${body}</button>`;
       }
-      return '<span class="stop">' + chip
-        + '<button type="button" class="kill" data-drop-snap="' + at
-        + '" aria-label="Убрать снапшот ' + esc(item.tag)
-        + '" data-tip="Убрать этот снапшот">✕</button></span>';
+      return `<span class="stop">${chip}`
+        + `<button type="button" class="kill" data-drop-snap="${at}"`
+        + ` aria-label="Убрать снапшот ${esc(item.tag)}"`
+        + ' data-tip="Убрать этот снапшот">✕</button></span>';
     }
 
     /* Место, куда цепочка может продолжиться. Набран призрак как узел и
@@ -105,16 +103,17 @@
     }
 
     function render() {
-      var items = store.list(), out = '', i, here;
-      var live = st.tab === 'diff';
-      var ends = live ? page.currentEnds() : null;
+      const items = store.list();
+      const live = st.tab === 'diff';
+      const ends = live ? page.currentEnds() : null;
       if (!items.length) { box.innerHTML = ''; return; }
-      for (i = 0; i < items.length; i++) {
+      let out = '';
+      for (let i = 0; i < items.length; i++) {
         if (i) {
           out += railHtml(items[i - 1], items[i],
                           ends && i > ends[0] && i <= ends[1]);
         }
-        here = ends ? (i === ends[0] || i === ends[1]) : i === st.tag;
+        const here = ends ? (i === ends[0] || i === ends[1]) : i === st.tag;
         out += stopHtml(i, items[i], stampOf(items[i].generated), here,
                         live, items.length > 1);
       }
@@ -127,8 +126,8 @@
          для посчитанных на месте пар в page.pairFor, для предпосчитанных в
          diff.js. Двух копий и так на одну больше, чем надо; третья, тут,
          разошлась бы с обеими молча. */
-      var pair = ends ? page.pairFor(ends) : null;
-      var sum = pair && pair.summary ? '<span class="sum">итог</span>' : '';
+      const pair = ends ? page.pairFor(ends) : null;
+      const sum = pair && pair.summary ? '<span class="sum">итог</span>' : '';
       /* Подпись рельса стоит в шапке панели и написана прямо в шаблоне: она
          одна и та же при любых данных, и рисовать её заново на каждую
          перерисовку значило бы каждый раз доказывать, что она не изменилась. */
@@ -141,10 +140,9 @@
        фокусом. Выбор здесь двухшаговый: без возврата фокуса второй конец
        пришлось бы искать табом заново, пройдя весь рельс сначала. */
     function focusNode(at) {
-      var nodes = box.querySelectorAll('[data-node]'), i;
-      for (i = 0; i < nodes.length; i++) {
-        if (nodes[i].getAttribute('data-node') === String(at)) {
-          nodes[i].focus();
+      for (const node of box.querySelectorAll('[data-node]')) {
+        if (node.getAttribute('data-node') === String(at)) {
+          node.focus();
           return;
         }
       }
@@ -174,9 +172,9 @@
         /* Концы отдаём в порядке кликов: направление задаёт цепочка, и
            выправляет его page.currentEnds() — единственное место, где это
            правило записано. Второе такое же здесь однажды разошлось бы с ним. */
-        var mark = page.anchor();
+        const anchored = page.anchor();
         page.setAnchor(null);
-        page.setPairEnds(mark, at);
+        page.setPairEnds(anchored, at);
         app.renderDiffCards();
         app.render();
       }
@@ -187,7 +185,7 @@
     /* ---------- перестановка узлов ---------- */
 
     function chipOf(target) {
-      var node = target;
+      let node = target;
       while (node && node !== box) {
         if (node.getAttribute && node.getAttribute('data-node') !== null
             && node.getAttribute('data-node') !== undefined) {
@@ -202,19 +200,19 @@
        рельс посреди перетаскивания значило бы убрать из-под курсора то, что
        он тащит. */
     function mark(node, add) {
-      var base = String(node.className).replace(/\s*\b(before|after|moving)\b/g, '');
-      node.className = add ? base + ' ' + add : base;
+      const base = String(node.className)
+        .replace(/\s*\b(before|after|moving)\b/g, '');
+      node.className = add ? `${base} ${add}` : base;
     }
 
     function clearMarks() {
-      var nodes = box.querySelectorAll('[data-node]'), i;
-      for (i = 0; i < nodes.length; i++) mark(nodes[i], '');
+      for (const node of box.querySelectorAll('[data-node]')) mark(node, '');
     }
 
     function endDrag() { dragFrom = null; dropAt = null; clearMarks(); }
 
-    box.addEventListener('dragstart', function (e) {
-      var chip = chipOf(e.target);
+    box.addEventListener('dragstart', (e) => {
+      const chip = chipOf(e.target);
       if (!chip) return;
       dragFrom = parseInt(chip.getAttribute('data-node'), 10);
       dropAt = null;
@@ -227,36 +225,34 @@
 
     /* Место вставки — по ближнему краю узла, к которому подносят: курсор в
        левой половине значит «перед ним», в правой — «за ним». */
-    box.addEventListener('dragover', function (e) {
+    box.addEventListener('dragover', (e) => {
       if (dragFrom === null) return;
-      var chip = chipOf(e.target);
+      const chip = chipOf(e.target);
       if (!chip) return;
       /* Без preventDefault браузер считает, что сюда ронять нельзя, и drop
          не случится вовсе. */
       e.preventDefault();
-      var at = parseInt(chip.getAttribute('data-node'), 10);
-      var rect = chip.getBoundingClientRect();
-      var after = e.clientX > rect.left + rect.width / 2;
+      const at = parseInt(chip.getAttribute('data-node'), 10);
+      const rect = chip.getBoundingClientRect();
+      const after = e.clientX > rect.left + rect.width / 2;
       clearMarks();
       mark(chip, after ? 'after' : 'before');
-      if (dragFrom !== null) {
-        var moved = box.querySelectorAll('[data-node="' + dragFrom + '"]');
-        if (moved.length) mark(moved[0], 'moving');
-      }
+      const moved = box.querySelectorAll(`[data-node="${dragFrom}"]`);
+      if (moved.length) mark(moved[0], 'moving');
       dropAt = at + (after ? 1 : 0);
     });
 
-    box.addEventListener('drop', function (e) {
+    box.addEventListener('drop', (e) => {
       if (dragFrom === null) return;
       /* Узел, брошенный на рельс, — не файл, брошенный на страницу: без
          остановки всплытия его принял бы приёмник файлов. */
       e.preventDefault();
       e.stopPropagation();
-      var from = dragFrom, place = dropAt;
+      const from = dragFrom, place = dropAt;
       endDrag();
       if (place === null) return;
       /* Узел сначала вынимают, и промежутки правее него сдвигаются на один. */
-      var to = place > from ? place - 1 : place;
+      const to = place > from ? place - 1 : place;
       if (to !== from) store.move(from, to - from);
     });
 
@@ -264,8 +260,8 @@
        любом случае, а порядок меняет только drop. */
     box.addEventListener('dragend', endDrag);
 
-    return { render: render, pickNode: pickNode };
+    return { render, pickNode };
   }
 
-  return { create: create };
+  return { create };
 }));
