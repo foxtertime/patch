@@ -497,17 +497,18 @@ test('приход снапшота снимает отметку', async functi
                      dom.id('chain').innerHTML);
 });
 
-/* Подпись рельса называет, что на нём стоит, и остаётся собой при отметке:
-   про начатый выбор говорят обведённый узел и подсказки, а прыгающий
-   заголовок только уводил бы глаз от них. */
-test('отметка не меняет подпись рельса', function () {
+/* Подпись рельса живёт в шапке панели и написана в шаблоне: она одна и та
+   же при любых данных. Скрипт её не рисует — значит, ни отметка, ни смена
+   вкладки, ни приход файла не могут её подменить или потерять. */
+test('подпись рельса стоит в шаблоне, а не в разметке от скрипта', function () {
   var dom = load();
+  var head = dom.document.querySelector('.srchead');
+  assert.ok(head, 'в шаблоне нет шапки панели источников');
+  assert.strictEqual(head.querySelector('.l').text, 'снапшоты');
   threeChain(dom);
-  assert.match(dom.id('chain').innerHTML, /class="l">снапшоты</,
-               dom.id('chain').innerHTML);
   clickNode(dom, 1);
-  assert.match(dom.id('chain').innerHTML, /class="l">снапшоты</,
-               dom.id('chain').innerHTML);
+  assert.strictEqual(dom.id('chain').innerHTML.indexOf('class="l"'), -1,
+                     dom.id('chain').innerHTML);
 });
 
 test('диапазон во всю цепочку помечен итогом, а соседний — нет',

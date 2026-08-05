@@ -77,12 +77,15 @@ h1 .dot { color: var(--muted); font-weight: 400; }
 /* Панель источников: что сейчас загружено и в каком порядке сравнивается.
    Цепочка видна всегда, список с кнопками — по требованию: переставляют и
    убирают снапшоты редко, а знать, что лежит на странице, нужно всегда. */
-.sources { display: flex; flex-wrap: wrap; align-items: flex-start; gap: .5rem;
-  margin-bottom: 1.1rem; }
-/* Кнопки панели стоят посередине высоты рельса: он тут главный, а они при
-   нём. Своей строки они не стоят, а прижимать их к верху или к низу
-   значило бы делать вид, что рельс — такая же строчка, как раньше. */
-.sources .toggle { align-self: center; }
+.sources { margin-bottom: 1.1rem; }
+/* Шапка панели: как её зовут — слева, что с ней можно сделать — справа.
+   Рельс идёт под ней во всю ширину и ни с кем эту ширину не делит: полосе,
+   которая прокручивается, нельзя оставлять сбоку соседей — они отъедали бы
+   у неё место ровно тогда, когда его и так не хватает. */
+.srchead { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem;
+  margin-bottom: .35rem; }
+.srchead .l { color: var(--muted); font-size: .64rem; text-transform: uppercase;
+  letter-spacing: .09em; margin-right: auto; }
 /* Рельс цепочки — спина страницы: слева направо от старого снапшота к
    новому. Залитый узел говорит «здесь вы сейчас», утолщённый отрезок —
    «вот что с чем сравнивается», подпись над отрезком — сколько времени
@@ -95,21 +98,22 @@ h1 .dot { color: var(--muted); font-weight: 400; }
    Рельс не переносится, а прокручивается: перенос рвёт линию посередине и
    оставляет на конце строки отрезок, ведущий в пустоту, — то есть врёт про
    то самое, ради чего рельс и нарисован. Прокрутка длинную цепочку прячет,
-   но не искажает. */
+   но не искажает.
+
+   По левому краю выровнен сам узел, а не точка внутри него: у узла есть
+   рамка, и это она стоит в одном ряду с заголовком, подписью над рельсом и
+   карточками под ним. */
 .chain { display: flex; align-items: flex-start; flex-wrap: nowrap;
-  flex: 1 1 320px; padding-top: .95rem; overflow-x: auto;
+  padding-top: .95rem; overflow-x: auto;
   scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
-/* Всё, что стоит на рельсе рядом с узлами, поднято на строку тегов: линия
-   отрезков, подпись слева и метка «итог» читаются как один ряд. Отступ и
-   высота строки здесь те же, что у .stop и .nm ниже, — ряд держится на
-   этом совпадении. */
-.chain .l, .chain .sum, .rl { margin-top: .5rem; }
-.chain .l, .chain .sum { line-height: 1.2rem; }
+/* Метка «итог» и линия отрезков подняты на строку тегов: вместе с узлами
+   они читаются как один ряд. Отступ и высота строки здесь те же, что у
+   .stop и .nm ниже, — ряд держится на этом совпадении. */
+.chain .sum, .rl { margin-top: .5rem; }
+.chain .sum { line-height: 1.2rem; }
 /* Сжимаются в тесноте одни отрезки: тег и время сбора, ужатые до многоточия,
    перестают быть тегом и временем сбора. */
-.chain .l, .chain .sum, .stop { flex: 0 0 auto; }
-.chain .l { color: var(--muted); font-size: .64rem; text-transform: uppercase;
-  letter-spacing: .09em; margin-right: .9rem; }
+.chain .sum, .stop { flex: 0 0 auto; }
 /* Появление узла не анимируется намеренно: рельс перерисовывается целиком,
    и узел рождается уже в конечном виде. Плавность наведения достаётся ему
    от общего правила button — рельс выбирает, и узел там правда кнопка.
@@ -122,8 +126,15 @@ h1 .dot { color: var(--muted); font-weight: 400; }
    его, и в один ряд с тегом спорило бы с ним за первый взгляд. */
 .stop { display: grid; grid-template-columns: auto minmax(0, 1fr);
   column-gap: .5rem; row-gap: .05rem; align-items: center; text-align: left;
-  color: var(--muted); padding: .5rem .6rem; border: 0; background: none;
-  box-shadow: none; border-radius: var(--r-1); font: inherit; }
+  color: var(--muted); padding: .5rem .6rem; background: none;
+  box-shadow: none; border-radius: var(--r-1); font: inherit;
+  border: 1px solid transparent; }
+/* Рамка стоит у нажимаемых узлов всегда, а не только под курсором: рельс —
+   ряд кнопок, и кнопка, у которой границы видно лишь при наведении, до
+   наведения не выглядит кнопкой. У единственного снапшота узел не
+   нажимается — рамки у него и нет, прозрачная оставлена ради того, чтобы
+   ряд не съезжал на пиксель от её появления. */
+button.stop { border-color: var(--line); }
 .stop .node { grid-row: 1; width: 9px; height: 9px; border-radius: 50%;
   border: 1px solid currentColor; background: var(--bg); }
 .stop .nm { grid-row: 1; font-size: .95rem; line-height: 1.2rem;
@@ -132,20 +143,23 @@ h1 .dot { color: var(--muted); font-weight: 400; }
    тогда, когда сам тег горит белым. */
 .stop .when { grid-column: 2; color: var(--muted); font-size: .72rem;
   line-height: 1.05rem; font-variant-numeric: tabular-nums; }
+/* Выбранный узел — белая рамка и залитая точка: и на «Состоянии», где так
+   помечен открытый снапшот, и на «Изменениях», где так помечены концы
+   диапазона. */
 .stop.on { color: var(--fg); }
 .stop.on .node { background: var(--fg); border-color: var(--fg); }
-/* Открытый снапшот — единственное место на рельсе, где узел залит фоном:
-   на «Состоянии» он и правда открыт, а концы диапазона на «Изменениях» —
-   границы, а не место, где человек стоит. */
-.stop[aria-pressed=true] { background: var(--card);
-  box-shadow: inset 0 0 0 1px var(--line); }
-/* Узел, отмеченный первым кликом, обведён по контуру. Контур, а не заливка
-   точки: залитыми показаны концы выбранного сейчас диапазона, а отмеченный
-   узел сплошь и рядом — один из них, и заливкой отметку было бы не
-   отличить. */
-.stop.anchor { box-shadow: inset 0 0 0 1px var(--fg); }
+button.stop.on { border-color: var(--fg); }
+/* Открытый снапшот вдобавок залит фоном: на «Состоянии» человек и правда в
+   нём стоит, а концы диапазона на «Изменениях» — границы, а не место. */
+.stop[aria-pressed=true] { background: var(--card); }
+/* Узел, отмеченный первым кликом, обведён пунктиром: выбор начат, но не
+   закончен, и рамка у него ровно настолько же незакончена. Сплошная белая
+   уже занята концами диапазона, а отмеченный узел сплошь и рядом — один из
+   них, и одинаковой рамкой отметку было бы не отличить. */
+.stop.anchor { border-style: dashed; border-color: var(--fg); }
 /* Курсор кнопке достаётся от общего правила button. */
-button.stop:hover { background: var(--card); color: var(--fg); }
+button.stop:hover { background: var(--card); color: var(--fg);
+  border-color: var(--fg); }
 /* Метка сводного диапазона стоит в конце рельса — там, где кончается
    отрезок, который она подписывает. */
 .chain .sum { margin-left: .35rem; }
@@ -210,9 +224,10 @@ button.stop:hover { background: var(--card); color: var(--fg); }
    подчёркнута той же линией, что и шапка таблицы под ней. */
 .tabs { display: flex; gap: .25rem; border-bottom: 1px solid var(--line);
   margin-bottom: 1rem; }
-/* display у .tabs и .sources сильнее hidden из стилей браузера: без этих
-   двух строк спрятанные скриптом панели остались бы на экране. */
-.tabs[hidden], .sources[hidden] { display: none; }
+/* display: flex у .tabs сильнее hidden из стилей браузера: без этой строки
+   спрятанная скриптом полоса вкладок осталась бы на экране. Панели
+   источников такая строка не нужна — своего display у неё нет. */
+.tabs[hidden] { display: none; }
 .tab { appearance: none; background: none; border: 0; border-radius: 0;
   padding: .5rem .1rem; margin: 0 1.2rem -1px 0; color: var(--muted);
   font: inherit; font-size: .82rem; font-weight: 500; cursor: pointer;
@@ -572,9 +587,12 @@ tr.detail-row > td { background: var(--card); padding: .85rem .7rem 1.1rem 2.2re
   <h1>kojipatch</h1>
   <div class="meta" id="meta"></div>
   <div class="sources" id="sources" hidden>
+    <div class="srchead">
+      <span class="l">снапшоты</span>
+      <button type="button" class="toggle" id="add-more">добавить</button>
+      <button type="button" class="toggle" id="edit-sources" aria-expanded="false">изменить</button>
+    </div>
     <div class="chain" id="chain"></div>
-    <button type="button" class="toggle" id="add-more">добавить</button>
-    <button type="button" class="toggle" id="edit-sources" aria-expanded="false">изменить</button>
   </div>
   <ul class="sourcelist" id="sourcelist" hidden></ul>
   <div class="warnings" id="warnings"></div>

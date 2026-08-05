@@ -99,10 +99,11 @@ class TemplateContractTest(unittest.TestCase):
         self.assertIn('id="sourcelist"', self.html)
 
     def test_hidden_panels_really_hide(self):
-        # display: flex у .tabs и .sources сильнее hidden из стилей
-        # браузера: без своего правила спрятанная панель осталась бы видна.
-        self.assertIn(".tabs[hidden], .sources[hidden] { display: none; }",
-                      self.html)
+        # display: flex у .tabs сильнее hidden из стилей браузера: без
+        # своего правила спрятанная полоса вкладок осталась бы видна.
+        # Панели источников это не касается: своего display у неё нет.
+        self.assertIn(".tabs[hidden] { display: none; }", self.html)
+        self.assertNotIn(".sources { display: flex", self.html)
 
     def test_load_errors_live_outside_the_empty_screen(self):
         # Экран загрузки прячется, как только появились данные. Список
