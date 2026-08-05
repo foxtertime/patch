@@ -7,6 +7,11 @@ var test = require('node:test');
 var assert = require('node:assert');
 var domstub = require('./domstub.js');
 var store = require('../../kojipatch/assets/js/store.js');
+/* Модуль диффа тесты подменяют, чтобы считать расчёты переходов по
+   требованию. Зачем это нужно и почему считается именно здесь — у
+   countDiffs, рядом с тестами кэша. */
+var diffmod = require('../../kojipatch/assets/js/diff.js');
+var realDiffSnapshots = diffmod.diffSnapshots;
 
 var UI = require.resolve('../../kojipatch/assets/js/ui.js');
 
@@ -334,6 +339,40 @@ test('два клика по узлам задают диапазон', function
                dom.location.hash);
 });
 
+/* Карточки-счётчики скрипт рисует строкой, и достать из неё число можно
+   только разбором: заглушка разметку из строк не ищет. Число стоит в
+   первом «n» после своего data-filter — так их и пишет cardHtml. */
+function cardNumber(dom, host, key) {
+  var re = new RegExp('data-filter="' + key + '"[^>]*>.*?<div class="n">(\\d+)');
+  var m = re.exec(dom.id(host).innerHTML);
+  return m ? m[1] : null;
+}
+
+/* Счётчики диффа считаются по выбранной паре, а render() их не трогает:
+   он только подсвечивает нажатые. Без явной перерисовки карточки остались
+   бы от прошлого диапазона — и молча, потому что выглядят они одинаково. */
+test('второй клик обновляет и счётчики диффа', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { builds: [build('nginx', { version: '1.0' })] }),
+             snap('os-9.2', AUG, { builds: [build('nginx', { version: '2.0' })] }),
+             snap('os-9.3', SEP, { builds: [build('nginx', { version: '2.0' })] })],
+            'a.json');
+  pressTab(dom, 'diff');
+  /* Умолчание — вся цепочка: 1.0 → 2.0, версия выросла. */
+  assert.strictEqual(cardNumber(dom, 'diff-cards', 'upgraded'), '1',
+                     dom.id('diff-cards').innerHTML);
+  clickNode(dom, 1);
+  clickNode(dom, 2);
+  assert.match(dom.location.hash, /pair=os-9\.2%40[^.]*\.\.os-9\.3/,
+               'диапазон не выбрался, сценарий проверяет не то: '
+               + dom.location.hash);
+  /* На 9.2→9.3 версия та же: выросших не осталось ни одного. */
+  assert.strictEqual(cardNumber(dom, 'diff-cards', 'upgraded'), '0',
+                     dom.id('diff-cards').innerHTML);
+  assert.strictEqual(cardNumber(dom, 'diff-cards', 'unchanged'), '1',
+                     dom.id('diff-cards').innerHTML);
+});
+
 test('порядок кликов не меняет направление перехода', function () {
   var dom = load();
   threeChain(dom);
@@ -456,9 +495,40 @@ test('у двух прогонов одного тега итога тоже н�
                      dom.id('chain').innerHTML);
 });
 
-/* Клик перерисовывает рельс целиком, и нажатая кнопка исчезает вместе с
-   фокусом. Выбор двухшаговый: с клавиатуры второй конец пришлось бы
-   искать табом заново, начав всё сначала. */
+/* Та же сводность, но с положительной стороны и там же, в pairFor. Тег в
+   цепочке двоится, поэтому в кэш предпосчитанного не попадает ни одна пара:
+   диапазон во всю цепочку считается на месте, и «итог» на рельсе ставит
+   именно правило из pairFor, а не приехавший из diff.js признак. */
+test('диапазон во всю цепочку помечен итогом и когда посчитан на месте',
+  function () {
+    var dom = load();
+    store.add([snap('os-9.2', JUL, { builds: [build('nginx', { version: '1.0' })] }),
+               snap('os-9.3', AUG, { builds: [build('nginx', { version: '2.0' })] }),
+               snap('os-9.2', SEP, { builds: [build('nginx', { version: '3.0' })] })],
+              'a.json');
+    pressTab(dom, 'diff');
+    var html = dom.id('diff-rows').innerHTML;
+    /* Открыт самый широкий диапазон, от первого прогона до последнего:
+       1.0 → 3.0. Промежуточного 2.0 в таком сравнении нет. */
+    assert.match(html, /1\.0/, html);
+    assert.match(html, /3\.0/, html);
+    assert.strictEqual(html.indexOf('2.0'), -1, html);
+    assert.match(dom.id('chain').innerHTML, /class="sum">итог/,
+                 dom.id('chain').innerHTML);
+  });
+
+/* Зачем возврат фокуса нужен странице: клик перерисовывает рельс целиком,
+   и в браузере нажатая кнопка исчезает вместе с фокусом. Выбор
+   двухшаговый, и без возврата второй конец пришлось бы искать табом
+   заново, пройдя весь рельс сначала.
+
+   Что из этого проверяет тест: после клика фокус стоит на узле с тем же
+   номером — значит, focusNode() зовут, и свой узел он находит. Отличить
+   «фокус вернули на перерисованный узел» от «фокус никуда и не уходил»
+   тест не может: innerHTML в заглушке — обычная строка, рельс от неё не
+   перерисовывается, и подставная кнопка из clickNode остаётся живым
+   узлом, который focusNode и находит. Само исчезновение узла живёт в
+   браузере, и заглушкой его не изобразить. */
 test('после клика фокус остаётся на том же узле', function () {
   var dom = load();
   threeChain(dom);
@@ -810,6 +880,84 @@ test('выбранный человеком переход переживает 
   await dom.tick();
   assert.match(dom.location.hash, /pair=os-9\.1%40[^.]*\.\.os-9\.2/,
                dom.location.hash);
+});
+
+/* Конец выбранного диапазона выгрузили — выбора больше нет, и дальше снова
+   работает умолчание «вся цепочка».
+
+   Проверить это сразу после выгрузки нечем: снятый выбор и выбор, у
+   которого один конец пропал, дают на рельсе одно и то же — всю цепочку.
+   Расходятся они на следующем файле: снятый уступает место новому
+   умолчанию, а неснятый цепляется за прежние концы и остаётся. */
+test('выгрузка конца диапазона откатывает выбор на всю цепочку',
+     async function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { builds: [build('nginx', { version: '1.0' })] }),
+             snap('os-9.2', AUG, { builds: [build('nginx', { version: '2.0' })] }),
+             snap('os-9.3', SEP, { builds: [build('nginx', { version: '3.0' })] })],
+            'a.json');
+  pressTab(dom, 'diff');
+  clickNode(dom, 0);                                /* явный выбор: 9.1→9.2 */
+  clickNode(dom, 1);
+  await dom.tick();
+  store.remove(1);                                  /* конец 9.2 выгрузили */
+  assert.match(dom.location.hash, /pair=os-9\.1%40[^.]*\.\.os-9\.3/,
+               dom.location.hash);
+  await dom.tick();
+  store.add([snap('os-9.4', '2026-10-01T00:00:00+03:00',
+                  { builds: [build('nginx', { version: '4.0' })] })], 'd.json');
+  assert.match(dom.location.hash, /pair=os-9\.1%40[^.]*\.\.os-9\.4/,
+               'после выгрузки конца страница держится за снятый выбор: '
+               + dom.location.hash);
+});
+
+/* Снапшот выгрузили и подгрузили обратно — тот же файл, то же имя. Выбор к
+   этому моменту уже снят выгрузкой, и возвращение файла его не воскрешает:
+   иначе человек получил бы диапазон, который выбирал до выгрузки и с тех
+   пор успел забыть. */
+test('вернувшийся снапшот не воскрешает снятый выбор', async function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { builds: [build('nginx', { version: '1.0' })] }),
+             snap('os-9.2', AUG, { builds: [build('nginx', { version: '2.0' })] }),
+             snap('os-9.3', SEP, { builds: [build('nginx', { version: '3.0' })] })],
+            'a.json');
+  pressTab(dom, 'diff');
+  clickNode(dom, 0);                                /* явный выбор: 9.1→9.2 */
+  clickNode(dom, 1);
+  await dom.tick();
+  store.remove(1);
+  await dom.tick();
+  store.add([snap('os-9.2', AUG, { builds: [build('nginx', { version: '2.0' })] })],
+            'b.json');
+  assert.match(dom.location.hash, /pair=os-9\.1%40[^.]*\.\.os-9\.3/,
+               'вернувшийся файл воскресил снятый выбор: ' + dom.location.hash);
+});
+
+/* Снапшоты переставляют руками, и порядок цепочки задаёт направление
+   сравнения. Выбранный диапазон перестановку переживает — он назван
+   именами концов, а не номерами, — но «было» и «стало» в нём меняются
+   местами: слева снова тот, кто левее в новой цепочке. */
+test('перестановка цепочки переворачивает направление, а не теряет выбор',
+     function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { builds: [build('nginx', { version: '1.0' })] }),
+             snap('os-9.2', AUG, { builds: [build('nginx', { version: '2.0' })] }),
+             snap('os-9.3', SEP, { builds: [build('nginx', { version: '3.0' })] })],
+            'a.json');
+  pressTab(dom, 'diff');
+  clickNode(dom, 1);                                /* явный выбор: 9.2→9.3 */
+  clickNode(dom, 2);
+  store.move(2, -1);                                /* 9.3 поднялся выше 9.2 */
+  assert.deepStrictEqual(store.list().map(function (i) { return i.tag; }),
+                         ['os-9.1', 'os-9.3', 'os-9.2']);
+  assert.match(dom.location.hash, /pair=os-9\.3%40[^.]*\.\.os-9\.2/,
+               dom.location.hash);
+  var html = dom.id('diff-rows').innerHTML;
+  /* Сравниваются те же два конца, но теперь 3.0 → 2.0: версия упала.
+     Умолчание «вся цепочка» дало бы здесь 1.0 → 2.0. */
+  assert.match(html, /class="main-row downgraded"/, html);
+  assert.match(html, /3\.0/, html);
+  assert.strictEqual(html.indexOf('1.0'), -1, html);
 });
 
 test('выбранный снапшот убрали — снова открывается самый свежий', function () {
@@ -1200,6 +1348,27 @@ test('короткая ссылка при двойниках тега берё�
               dom.location.hash);
   });
 
+/* Двойник тега бывает и справа, и правило договаривает случай до конца:
+   при выбранном левом конце берётся самый свежий из подходящих правых.
+   Иначе ссылка открывала бы сравнение с прогоном, который человек уже
+   считает устаревшим, — и молча, потому что оба конца названы верно. */
+test('короткая ссылка берёт самый свежий правый конец', function () {
+  var dom = load({ hash: '#tab=diff&pair='
+                         + encodeURIComponent('os-9.1..os-9.2') });
+  store.add([snap('os-9.1', JUL, { builds: [build('nginx', { version: '1.0' })] }),
+             snap('os-9.2', AUG, { builds: [build('nginx', { version: '2.0' })] }),
+             snap('os-9.2', SEP, { builds: [build('nginx', { version: '3.0' })] })],
+            'a.json');
+  var html = dom.id('diff-rows').innerHTML;
+  /* os-9.1 против сентябрьского os-9.2, а не августовского: 1.0 → 3.0. */
+  assert.match(html, /1\.0/, html);
+  assert.match(html, /3\.0/, html);
+  assert.strictEqual(html.indexOf('2.0'), -1, html);
+  assert.ok(dom.location.hash.indexOf(
+              encodeURIComponent('os-9.1@' + JUL + '..os-9.2@' + SEP)) !== -1,
+            dom.location.hash);
+});
+
 /* Ссылку писали, когда цепочка стояла иначе: снапшоты переставляют руками,
    и присланный адрес переживает перестановку. Прочитать его задом наперёд
    нельзя — «было» и «стало» поменялись бы местами, — поэтому концы
@@ -1235,3 +1404,88 @@ test('переход между двумя прогонами одного те�
     assert.doesNotMatch(dom.id('diff-rows').innerHTML, /class="empty"/,
                         dom.id('diff-rows').innerHTML);
   });
+
+/* Кэш переходов со страницы не виден: «отдали тот же объект» и «посчитали
+   заново» рисуют одну и ту же таблицу, а дверь в ui.js ради одной проверки
+   была бы хуже пробела. Виден зато сам расчёт — его и считаем, на границе
+   модуля. diffChain внутри diff.js зовёт свою же функцию, а не свойство
+   экспорта, поэтому в счётчик попадают только расчёты по требованию из
+   pairFor: то, что посчитала загрузка, здесь не шумит. */
+function countDiffs(fn) {
+  var n = 0;
+  diffmod.diffSnapshots = function () {
+    n += 1;
+    return realDiffSnapshots.apply(null, arguments);
+  };
+  try { fn(); } finally { diffmod.diffSnapshots = realDiffSnapshots; }
+  return n;
+}
+
+/* Предпосчитанное при загрузке кладёт в кэш seedPairs, и соседний переход
+   обязан приехать оттуда. Иначе каждый клик по рельсу пересчитывал бы то,
+   что уже посчитано, — а страница зовёт pairFor на каждый рендер, и не по
+   одному разу. */
+test('предпосчитанный переход берётся из кэша, а не считается заново',
+  function () {
+    var dom = load();
+    threeChain(dom);
+    var n = countDiffs(function () {
+      clickNode(dom, 0);
+      clickNode(dom, 1);
+    });
+    assert.match(dom.location.hash, /pair=os-9\.1%40[^.]*\.\.os-9\.2/,
+                 'диапазон не выбрался, сценарий проверяет не то: '
+                 + dom.location.hash);
+    assert.strictEqual(n, 0, 'соседний переход посчитан заново, расчётов: ' + n);
+  });
+
+/* Диапазон, которого нет среди предпосчитанных, считается один раз: на
+   второй выбор его отдаёт кэш. Спека просит здесь «тот же объект»; со
+   страницы объекты неразличимы, поэтому проверяем то же условие с другой
+   стороны — что второго расчёта не случилось. */
+test('повторный выбор того же диапазона не считает его заново', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { builds: [build('nginx', { version: '1.0' })] }),
+             snap('os-9.2', AUG, { builds: [build('nginx', { version: '2.0' })] }),
+             snap('os-9.3', SEP, { builds: [build('nginx', { version: '3.0' })] }),
+             snap('os-9.4', OCT, { builds: [build('nginx', { version: '4.0' })] })],
+            'a.json');
+  pressTab(dom, 'diff');
+  var first = countDiffs(function () {
+    clickNode(dom, 1);
+    clickNode(dom, 3);
+  });
+  assert.ok(first > 0,
+            'диапазон 9.2→9.4 оказался предпосчитан, сценарий проверяет не то');
+  clickNode(dom, 0);                     /* уходим на другой диапазон */
+  clickNode(dom, 1);
+  var again = countDiffs(function () {
+    clickNode(dom, 1);
+    clickNode(dom, 3);
+  });
+  assert.strictEqual(again, 0,
+                     'тот же диапазон посчитан во второй раз, расчётов: ' + again);
+});
+
+/* Снапшот с тем же именем — тот же файл, но набор вокруг него другой:
+   диапазон 9.1→9.3 был всей цепочкой, а с приходом четвёртого файла быть
+   ею перестал. Кэш, переживший смену состава, отдал бы прежний блок, и на
+   рельсе осталась бы метка «итог» у диапазона, который итогом уже не
+   является. */
+test('смена состава снапшотов заводит кэш переходов заново', async function () {
+  var dom = load();
+  threeChain(dom);
+  clickNode(dom, 0);
+  clickNode(dom, 2);
+  assert.match(dom.id('chain').innerHTML, /class="sum">итог/,
+               'диапазон во всю цепочку не помечен итогом, сценарий '
+               + 'проверяет не то: ' + dom.id('chain').innerHTML);
+  await dom.tick();
+  store.add([snap('os-9.4', OCT, { builds: [build('nginx', { version: '4.0' })] })],
+            'd.json');
+  assert.match(dom.location.hash, /pair=os-9\.1%40[^.]*\.\.os-9\.3/,
+               'выбор не пережил приход файла, сценарий проверяет не то: '
+               + dom.location.hash);
+  assert.strictEqual(dom.id('chain').innerHTML.indexOf('итог'), -1,
+                     dom.id('chain').innerHTML);
+});
