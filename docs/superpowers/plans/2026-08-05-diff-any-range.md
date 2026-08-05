@@ -25,7 +25,7 @@ v22) на заглушке DOM `tests/js/domstub.js`.
 - Состав `buildPageData` не меняется, `tests/js/fixtures/page-data.golden.json`
   не трогается. Тест сверки с эталоном обязан проходить без правок.
 - Оба набора зелёные: `python3 -m unittest discover -s tests -t . -q`
-  (263) и `node --test tests/js/*.test.js` (200).
+  (263) и `node --test tests/js/*.test.js` (194 до начала работ).
 - Направление перехода задаёт порядок цепочки, а не порядок кликов: «было»
   всегда левее.
 
@@ -63,7 +63,7 @@ key-модель не полна, потому что предпосчитанн
 - Consumes: `KP.diff.diffSnapshots(oldSnap, newSnap, isSummary)` из
   `diff.js`; `store.snapshots()` — сырые снапшоты в порядке цепочки
 - Produces: в `viewmodel` — `pairBlock(pair, snapshots)`; в `ui.js` —
-  `currentEnds() -> [lo, hi] | null`, `pairKeyOf(ends) -> string`,
+  `currentEnds() -> [lo, hi] | null`, `pairKey(ends) -> string`,
   `setPairEnds(lo, hi)`, `pairFor(ends) -> блок пары | null`
 
 - [ ] **Step 1: Тест на переход, которого нет среди предпосчитанных**
@@ -175,7 +175,7 @@ Expected: FAIL — адрес с таким диапазоном сейчас н
     return a < b ? [a, b] : [b, a];
   }
 
-  function pairKeyOf(ends) {
+  function pairKey(ends) {
     if (!ends || !SNAPS[ends[0]] || !SNAPS[ends[1]]) return '';
     return snapKey(SNAPS[ends[0]]) + '..' + snapKey(SNAPS[ends[1]]);
   }
@@ -211,7 +211,7 @@ Expected: FAIL — адрес с таким диапазоном сейчас н
       lo = onlyIndexWithTag(PAIRS[i].old);
       hi = onlyIndexWithTag(PAIRS[i]['new']);
       if (lo === -1 || hi === -1 || lo >= hi) continue;
-      pairCache[pairKeyOf([lo, hi])] = PAIRS[i];
+      pairCache[pairKey([lo, hi])] = PAIRS[i];
     }
   }
 
@@ -220,7 +220,7 @@ Expected: FAIL — адрес с таким диапазоном сейчас н
      страница уже делает на загрузке для каждого соседнего перехода. */
   function pairFor(ends) {
     if (!ends) return null;
-    var key = pairKeyOf(ends);
+    var key = pairKey(ends);
     if (own(pairCache, key)) return pairCache[key];
     var raw = store.snapshots();
     if (!raw[ends[0]] || !raw[ends[1]]) return null;
@@ -248,7 +248,7 @@ Expected: FAIL — адрес с таким диапазоном сейчас н
 |---|---|
 | `pairEnds(st.pair)` в `renderChain` | `currentEnds()` |
 | `pairEnds(i)` в `renderPairSelect` | `[i, i + 1]` при `!p.summary`, иначе `[0, SNAPS.length - 1]` |
-| `pairKey(st.pair)` в `writeHash` и `rowKey` | `pairKeyOf(currentEnds())` |
+| `pairKey(st.pair)` в `writeHash` и `rowKey` | `pairKey(currentEnds())` |
 | `pairKey(ci)`/`pairKey(p)` в `applyData` и `readHash` | см. ниже |
 
 В `renderPairSelect` знание раскладки остаётся до Task 2, где сам селектор
@@ -262,7 +262,7 @@ Expected: FAIL — адрес с таким диапазоном сейчас н
 В `applyData` восстановление выбора:
 
 ```js
-    var wantPair = picked.pair ? pairKeyOf(currentEnds()) : null;
+    var wantPair = picked.pair ? pairKey(currentEnds()) : null;
 ```
 
 и после присваивания `SNAPS`/`PAIRS`:
@@ -341,7 +341,7 @@ Expected: FAIL — адрес с таким диапазоном сейчас н
 - [ ] **Step 4: Прогнать оба набора**
 
 Run: `node --test tests/js/*.test.js && python3 -m unittest discover -s tests -t . -q`
-Expected: PASS 201 (200 прежних + новый), OK 263
+Expected: прежние тесты зелёные, плюс новый; OK 263
 
 **Ни один существующий тест править нельзя.** Это рефакторинг: снаружи
 ничего не изменилось, и если тест покраснел — изменилось поведение, а не
@@ -369,7 +369,7 @@ test('переход между двумя прогонами одного те�
 - [ ] **Step 6: Прогнать**
 
 Run: `node --test tests/js/*.test.js`
-Expected: PASS 202
+Expected: прежние зелёные, плюс два новых
 
 - [ ] **Step 7: Коммит**
 
@@ -388,7 +388,7 @@ git commit -m "Переход выбирается именами снапшот
 - Test: `tests/js/ui.test.js`
 
 **Interfaces:**
-- Consumes: `currentEnds()`, `setPairEnds(lo, hi)`, `pairKeyOf(ends)` из
+- Consumes: `currentEnds()`, `setPairEnds(lo, hi)`, `pairKey(ends)` из
   Task 1
 - Produces: узлы рельса с атрибутом `data-node="<номер>"` на вкладке
   «Изменения»
