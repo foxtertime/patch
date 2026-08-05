@@ -177,9 +177,13 @@ tr.detail-row > td { background: var(--card); padding: .85rem .7rem 1.1rem 2.2re
   border-bottom: 1px solid transparent; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .plist a:hover { border-bottom-color: var(--accent); }
 /* Пришедший и ушедший патч должны читаться и по ссылке тоже: иначе синий
-   цвет ссылки съедает единственный сигнал «что изменилось». */
+   цвет ссылки съедает единственный сигнал «что изменилось». Зачёркивание
+   стоит на самом имени, а не на строке: под именем бывает путь, и вести
+   черту через него значило бы вычеркнуть заодно и его. */
 .plist li.is-added a { color: var(--added); }
-.plist li.is-removed a { color: var(--removed); text-decoration: line-through; }
+.plist li.is-removed a { color: var(--removed); }
+.plist li.is-removed > a, .plist li.is-removed > .mono {
+  text-decoration: line-through; }
 .plist .ppath { color: var(--muted); font-size: .74rem; }
 /* Знак дублирует цвет — на случай, если цвет не различим. */
 .sign { font-weight: 700; margin-right: .15rem; }
@@ -191,18 +195,8 @@ tr.detail-row > td { background: var(--card); padding: .85rem .7rem 1.1rem 2.2re
 .rlist li { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: .78rem; padding: .1rem 0 .1rem .9rem; text-indent: -.9rem;
   overflow-wrap: anywhere; }
-/* Только во вкладке «изменения»: там левая и правая колонки выравниваются
-   по номеру строки, и перенос длинного NVRA сдвинул бы всё, что ниже.
-   Поэтому строка ровно одна, а списку даётся горизонтальная прокрутка —
-   полоса появляется под всеми строками и высоту строк не трогает. */
-.rlist.fixed { overflow-x: auto; }
-.rlist.fixed li { white-space: nowrap; overflow-wrap: normal;
-  padding-left: 0; text-indent: 0; }
 .rlist li.is-added { color: var(--added); }
 .rlist li.is-removed { color: var(--removed); text-decoration: line-through; }
-/* Пустая ячейка напротив пришедшего или ушедшего пакета: строка обязана
-   занять место, иначе соседняя колонка уедет вверх. */
-.rlist li.rgap { color: var(--muted); opacity: .45; }
 /* Ветка, сменившаяся между тегами, красится тем же цветом, что и уехавший
    или приехавший патч: «эта сторона потеряла» / «эта сторона получила». */
 .is-added { color: var(--added); }

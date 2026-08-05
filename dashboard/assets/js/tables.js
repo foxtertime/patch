@@ -13,7 +13,7 @@
   function (text, labels, markup) {
   'use strict';
 
-  const esc = text.esc, hl = text.hl, own = text.own, setFrom = text.setFrom;
+  const esc = text.esc, hl = text.hl, own = text.own;
   const kv = markup.kv;
 
   /* Стрелка раскрытия: одна и та же в обеих таблицах, и состояние на ней
@@ -90,7 +90,7 @@
       + `${markup.rpmsHtml(row.rpms, q)}</div>`
 
       + `<div class="block">${blockHead('патчи', row.patches.length)}`
-      + `${markup.patchesHtml(row.patches, q, null, '')}</div>`;
+      + `${markup.patchesHtml(row.patches, q)}</div>`;
 
     if (row.problems.length) {
       const items = row.problems.map((p) => `<li>${hl(p, q)}</li>`).join('');
@@ -134,47 +134,38 @@
 
   /* ---------- вкладка «Изменения» ---------- */
 
-  /* Одна сторона «было/стало» разбита на четыре куска, и в разметку они
-     уходят парами: сперва обе шапки, потом обе сводки, потом оба списка
-     патчей, потом оба списка пакетов.
+  /* Сторона «было/стало» разбита на четыре куска, и в разметку они уходят
+     парами: сперва обе шапки, потом обе сводки, потом оба списка патчей,
+     потом оба списка пакетов. Пары встают в одну строку сетки и получают
+     общую высоту — иначе списки начинались бы на разной, из-за списков
+     патчей над ними.
 
-     Это не украшение. Пакеты приходят из diff.js спаренными, чтобы один и
-     тот же подпакет стоял слева и справа на одной высоте, — а пока каждая
-     сторона шла сплошным блоком, списки начинались на разной высоте:
-     патчей слева три, справа пять, и вся пара уезжала вниз на два ряда.
-     Выравнивание считалось и пропадало впустую. Парами куски встают в одну
-     строку сетки, и высота у них общая.
-
-     Параметры стороны собраны в объект: их тринадцать, и позиционным
-     списком такой вызов читался бы как шифровка. */
-  function sideHead(s) {
-    return `<div class="bl side-head">${esc(s.title)} · `
-      + `<b>${esc(s.tag)}</b></div>`;
+     Дифф живёт только в «стало». «Было» — это состояние, а не половина
+     сравнения: там ничего не происходило, и вычеркнутая строка утверждала
+     бы, будто происходило. Что ушло и что пришло, целиком видно справа. */
+  function sideHead(title, tag) {
+    return `<div class="bl side-head">${esc(title)} · <b>${esc(tag)}</b></div>`;
   }
 
-  function sideFacts(s, q) {
+  /* Сводка стороны. markCls пуст у «было» и назван у «стало»: смена тега
+     или ветки — тоже переход, и подсвечивается он там же, где остальные. */
+  function sideFacts(s, q, markCls) {
     const tagCell = markup.taggedText(s.taggedIn, s.inherited, q);
     return '<div class="side">'
       + kv('версия', s.evr ? `<span class="mono">${hl(s.evr, q)}</span>`
                            : '<span class="none">—</span>')
-      + kv('тег', s.tagChanged
-            ? `<span class="${s.markCls}">${tagCell}</span>` : tagCell)
+      + kv('тег', markCls && s.tagChanged
+            ? `<span class="${markCls}">${tagCell}</span>` : tagCell)
       + kv('ветка', s.branch
-            ? `<span class="mono${s.branchChanged ? ` ${s.markCls}` : ''}">`
+            ? `<span class="mono${markCls && s.branchChanged
+                                    ? ` ${markCls}` : ''}">`
               + `${hl(s.branch, q)}</span>`
             : '<span class="none">—</span>')
       + '</div>';
   }
 
-  function sidePatches(s, q) {
-    return `<div class="side">${blockHead('патчи', s.patches.length)}`
-      + `${markup.patchesHtml(s.patches, q, s.mark, s.markCls)}</div>`;
-  }
-
-  function sideRpms(s, q) {
-    const count = markup.rpmSideCount(s.rpmRows, s.at);
-    return `<div class="side">${blockHead('RPM', count)}`
-      + `${markup.rpmSideHtml(s.rpmRows, s.at, q, s.markCls)}</div>`;
+  function sideBlock(title, count, body) {
+    return `<div class="side">${blockHead(title, count)}${body}</div>`;
   }
 
   /* Имена концов приходят доводами: какая пара сейчас выбрана, знает
@@ -182,23 +173,23 @@
   function diffDetail(row, q, oldTag, newTag) {
     const branchChanged = row.marks.indexOf('branch-changed') !== -1;
     const tagChanged = row.marks.indexOf('tag-changed') !== -1;
-    const common = { branch: null, rpmRows: row.rpm_rows,
-                     branchChanged, tagChanged };
-    const was = Object.assign({}, common,
-      { title: 'было', tag: oldTag, evr: row.old_evr,
-        branch: row.old_branch, taggedIn: row.old_tagged_in,
-        inherited: row.old_inherited, patches: row.old_patches,
-        at: 0, mark: setFrom(row.patches_removed), markCls: 'is-removed' });
-    const now = Object.assign({}, common,
-      { title: 'стало', tag: newTag, evr: row.new_evr,
-        branch: row.new_branch, taggedIn: row.new_tagged_in,
-        inherited: row.new_inherited, patches: row.new_patches,
-        at: 1, mark: setFrom(row.patches_added), markCls: 'is-added' });
+    const was = { evr: row.old_evr, branch: row.old_branch,
+                  taggedIn: row.old_tagged_in, inherited: row.old_inherited,
+                  branchChanged, tagChanged };
+    const now = { evr: row.new_evr, branch: row.new_branch,
+                  taggedIn: row.new_tagged_in, inherited: row.new_inherited,
+                  branchChanged, tagChanged };
+    const oldRpms = markup.rpmSideList(row.rpm_rows, 0);
+    const newRpms = markup.rpmSideList(row.rpm_rows, 1);
     return '<div class="sides">'
-      + sideHead(was) + sideHead(now)
-      + sideFacts(was, q) + sideFacts(now, q)
-      + sidePatches(was, q) + sidePatches(now, q)
-      + sideRpms(was, q) + sideRpms(now, q)
+      + sideHead('было', oldTag) + sideHead('стало', newTag)
+      + sideFacts(was, q, '') + sideFacts(now, q, 'is-added')
+      + sideBlock('патчи', row.old_patches.length,
+                  markup.patchesHtml(row.old_patches, q))
+      + sideBlock('патчи', row.new_patches.length,
+                  markup.patchesChangeHtml(row.old_patches, row.new_patches, q))
+      + sideBlock('RPM', oldRpms.length, markup.rpmsHtml(oldRpms, q))
+      + sideBlock('RPM', newRpms.length, markup.rpmsChangeHtml(row.rpm_rows, q))
       + '</div>';
   }
 
