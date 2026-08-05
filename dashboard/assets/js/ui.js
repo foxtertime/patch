@@ -7,16 +7,17 @@
                              require('./diff.js'), require('./text.js'),
                              require('./labels.js'), require('./markup.js'),
                              require('./tables.js'), require('./cards.js'),
-                             require('./page.js'));
+                             require('./page.js'), require('./hash.js'));
   } else {
     root.KP = root.KP || {};
     root.KP.ui = factory(root.KP.viewmodel, root.KP.store, root.KP.diff,
                          root.KP.text, root.KP.labels, root.KP.markup,
-                         root.KP.tables, root.KP.cards, root.KP.page);
+                         root.KP.tables, root.KP.cards, root.KP.page,
+                         root.KP.hash);
   }
 }(typeof globalThis !== 'undefined' ? globalThis : this,
   function (viewmodel, store, diffmod, text, labels, markup, tables, cards,
-            pagemod) {
+            pagemod, hash) {
   'use strict';
 
   /* Состояние страницы живёт в page.js: там же и всё, что из него
@@ -25,12 +26,12 @@
      всего. */
   var page = pagemod.create({ viewmodel: viewmodel, diffmod: diffmod,
                               store: store, labels: labels, text: text });
-  var st = page.st, picked = page.picked;
+  var st = page.st;
   var curSnap = page.curSnap, curPair = page.curPair;
   var visibleRows = page.visibleRows, sortRows = page.sortRows;
   var rowKey = page.rowKey, openOf = page.openOf;
-  var currentEnds = page.currentEnds, pairKey = page.pairKey;
-  var snapKey = page.snapKey, activeFilters = page.activeFilters;
+  var currentEnds = page.currentEnds, activeFilters = page.activeFilters;
+  var totalRows = page.totalRows, snapshots = page.snapshots;
 
   var stateSection = document.getElementById('tab-state');
   var diffSection = document.getElementById('tab-diff');
@@ -65,8 +66,7 @@
      зовут отсюда: тела оставшихся функций читаются лучше, когда в них стоит
      esc(), а не text.esc(). */
   var esc = text.esc, own = text.own, keys = text.keys, plural = text.plural,
-      setFrom = text.setFrom, stampOf = text.stampOf, gapLabel = text.gapLabel;
-  var totalRows = page.totalRows, snapshots = page.snapshots;
+      stampOf = text.stampOf, gapLabel = text.gapLabel;
 
   /* Фильтр ставит и снимает page — он один знает правило про «версия та же»
      и «что-то изменилось». Перерисовка остаётся здесь: страницу рисует
@@ -237,25 +237,7 @@
   /* ---------- состояние в адресной строке ---------- */
 
   function writeHash() {
-    var parts = ['tab=' + st.tab];
-    /* Снапшот храним именем, а не номером: набор снапшотов на странице
-       меняется, и присланная ссылка «tag=1» показала бы другой снапшот,
-       ничем не выдав подмены. Имя полное, с временем сбора, — иначе два
-       прогона одного тега на такую ссылку отвечали бы одинаково. */
-    var snaps = snapshots();
-    if (snaps.length) parts.push('tag=' + encodeURIComponent(snapKey(snaps[st.tag])));
-    if (snaps.length > 1) {
-      parts.push('pair=' + encodeURIComponent(pairKey(currentEnds())));
-    }
-    /* f= пишем всегда, в том числе пустой: у вкладки «Изменения» фильтр по
-       умолчанию непустой, и без явного «фильтров нет» ссылка на таблицу со
-       снятым фильтром при открытии снова показывала бы только изменившиеся. */
-    var f = keys(activeFilters()).sort();
-    parts.push('f=' + encodeURIComponent(f.join(',')));
-    if (st.q) parts.push('q=' + encodeURIComponent(st.q));
-    var cfg = st.sort[st.tab];
-    parts.push('sort=' + cfg.key + (cfg.asc ? '' : ':desc'));
-    var next = '#' + parts.join('&');
+    var next = hash.format(page.hashParts());
     hashIsOurs = true;
     if (location.hash === next) return;
     hashLock = true;
@@ -268,60 +250,10 @@
     setTimeout(function () { hashLock = false; }, 0);
   }
 
-  /* Хеш правят руками и присылают в переписке, поэтому «100%», «%zz» и обрезанная
-     многобайтовая последовательность в нём — норма, а не исключение.
-     decodeURIComponent на таком бросает URIError; без этой обёртки он унёс бы
-     разбор целиком, а вместе с ним и первый рендер страницы. */
-  function dec(s) {
-    try { return decodeURIComponent(s); } catch (e) { return null; }
-  }
-
-
   function readHash() {
     var raw = location.hash.replace(/^#/, '');
     if (!raw) return false;
-    var parts = raw.split('&'), i, kvp, key, val;
-    var tab = null, filters = null, sort = null, dropped = false;
-    for (i = 0; i < parts.length; i++) {
-      kvp = parts[i].split('=');
-      key = kvp[0];
-      val = dec(kvp.slice(1).join('=') || '');
-      if (val === null) continue;   /* битый кусок пропускаем, остальные читаем */
-      if (key === 'tab') {
-        /* Сравнивать нечего — вкладки «Изменения» на странице тоже нет. */
-        tab = (val === 'diff' && snapshots().length > 1) ? 'diff' : 'state';
-        if (val === 'diff' && snapshots().length < 2) dropped = true;
-      } else if (key === 'tag') {
-        /* Ссылку правят руками, и «tag=os-9.2» без времени сбора — её
-           законная форма. Два прогона одного тега она не различает: берём
-           последний по цепочке, самый свежий. Сама страница пишет всегда
-           полное имя, поэтому её ссылки однозначны. */
-        for (var j = 0; j < snapshots().length; j++) {
-          /* Ссылка — такой же выбор человека, как клик по кнопке: он должен
-             пережить приход следующего файла. */
-          if (page.snapNamed(j, val)) page.selectSnapshot(j);
-        }
-      } else if (key === 'pair') {
-        /* Не разобрали — остаёмся на переходе по умолчанию. Ссылка — такой
-           же выбор человека, как клик по кнопке: он должен пережить приход
-           следующего файла. */
-        var ends = page.endsFromName(val);
-        if (ends) page.setPairEnds(ends[0], ends[1]);
-      } else if (key === 'f') filters = val ? val.split(',') : [];
-      else if (key === 'q') st.q = val.trim().toLowerCase();
-      else if (key === 'sort') sort = val.split(':');
-    }
-    if (tab) st.tab = tab;
-    /* Ссылка вела на «Изменения», но сравнивать в этом прогоне нечего. Фильтры
-       из неё — диффовые; на вкладке состояния они дали бы пустую таблицу без
-       единого намёка почему. */
-    if (dropped) filters = null;
-    /* Что из этого живое, решает dropDeadFilters() — его зовут оба, кто
-       читает хеш, и оба по той же причине, что и после смены данных. */
-    if (filters) st.filters[st.tab] = setFrom(filters);
-    if (sort && sort[0]) {
-      st.sort[st.tab] = { key: sort[0], asc: sort[1] !== 'desc' };
-    }
+    page.restore(hash.parse(raw));
     search.value = st.q;
     /* Запрос мог приехать из ссылки — крестик обязан появиться вместе
        с ним, а не ждать первого касания клавиатуры. */
