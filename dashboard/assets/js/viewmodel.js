@@ -114,7 +114,7 @@
   }
 
   /* Порядок меток состояния после классов патчей. Он же порядок в колонке
-     «теги»: сперва откуда билд, потом что не так с патчами, потом ошибки. */
+     «метки»: сперва откуда билд, потом что не так с патчами, потом ошибки. */
   var STATE_TAG_ORDER = ['inherited', 'no-source', 'from-commit', 'no-patch',
                          'gitlab-error', 'internal-error'];
 
@@ -139,30 +139,30 @@
 
   /* Метки строки, всегда в одном и том же порядке.
 
-     Порядок здесь позиционный: колонку «теги» читают по месту, а порядок
+     Порядок здесь позиционный: колонку «метки» читают по месту, а порядок
      файлов в каталоге PATCH задаёт GitLab и он разный от репозитория к
      репозиторию. Без сортировки у одной строки первым стоял бы cve, у
      соседней sast, и колонка перестала бы читаться. */
-  function buildTags(build, tag, classOrder) {
+  function buildMarks(build, tag, classOrder) {
     classOrder = classOrder || [];
-    var tags = [], patches = build.patches || [], problems = build.problems || [];
+    var marks = [], patches = build.patches || [], problems = build.problems || [];
     var i, key, gitlabError = false, internalError = false;
     for (i = 0; i < patches.length; i++) {
       key = slug(patches[i]['class']);
-      if (tags.indexOf(key) === -1) tags.push(key);
+      if (marks.indexOf(key) === -1) marks.push(key);
     }
-    if (inheritedIn(build, tag)) tags.push('inherited');
-    if (!build.source) tags.push('no-source');
-    else if (build.source.ref_kind === 'commit') tags.push('from-commit');
-    if (build.patch_dir_present === false) tags.push('no-patch');
+    if (inheritedIn(build, tag)) marks.push('inherited');
+    if (!build.source) marks.push('no-source');
+    else if (build.source.ref_kind === 'commit') marks.push('from-commit');
+    if (build.patch_dir_present === false) marks.push('no-patch');
     for (i = 0; i < problems.length; i++) {
       if (problems[i].indexOf('gitlab:') === 0
           || problems[i].indexOf('bad source') === 0) gitlabError = true;
       if (problems[i].indexOf('internal error') === 0) internalError = true;
     }
-    if (gitlabError) tags.push('gitlab-error');
-    if (internalError) tags.push('internal-error');
-    return tags.sort(function (a, b) {
+    if (gitlabError) marks.push('gitlab-error');
+    if (internalError) marks.push('internal-error');
+    return marks.sort(function (a, b) {
       return compareKeys(tagSortKey(a, classOrder), tagSortKey(b, classOrder));
     });
   }
@@ -194,8 +194,9 @@
       koji_url: kojiUrl(kojiWeb, build.nvr),
       completed: toMsk(build.completed), owner: orNull(build.owner),
       build_id: orNull(build.build_id), task_id: orNull(build.task_id),
-      // koji_tags, а не tags: ключ tags в строке занят вычисляемыми
-      // метками дашборда, и путать их нельзя
+      // koji_tags — это теги koji, а marks рядом — метки строки,
+      // которые страница считает сама; путать их нельзя, оттого и разные
+      // имена
       tagged_in: orNull(build.tag_name), inherited: inheritedIn(build, tag),
       koji_tags: (build.tags || []).slice(),
       patches: patchDicts(patches),
@@ -204,7 +205,7 @@
       patch_counts: counts, rpms: rpmsmod.sortRpms(build.rpms || []),
       patch_dir_present: orNull(build.patch_dir_present),
       problems: (build.problems || []).slice(),
-      tags: buildTags(build, tag, classOrder)
+      marks: buildMarks(build, tag, classOrder)
     };
   }
 
@@ -240,14 +241,14 @@
              patch_files: files, by_class: byClass };
   }
 
-  function diffTags(component) {
-    var tags = [component.status];
-    if (component.repackaged) tags.push('repackaged');
-    if (component.patches_added.length) tags.push('patches+');
-    if (component.patches_removed.length) tags.push('patches-');
-    if (component.branch_changed) tags.push('branch-changed');
-    if (component.tag_changed) tags.push('tag-changed');
-    return tags;
+  function diffMarks(component) {
+    var marks = [component.status];
+    if (component.repackaged) marks.push('repackaged');
+    if (component.patches_added.length) marks.push('patches+');
+    if (component.patches_removed.length) marks.push('patches-');
+    if (component.branch_changed) marks.push('branch-changed');
+    if (component.tag_changed) marks.push('tag-changed');
+    return marks;
   }
 
   function diffRow(component, kojiWeb, oldTag, newTag) {
@@ -276,7 +277,7 @@
       rpm_rows: diff.alignRpms(old, fresh),
       koji_url: shown ? kojiUrl(kojiWeb, shown.nvr) : null,
       source_url: (shown && shown.source) ? orNull(shown.source.web_url) : null,
-      tags: diffTags(component)
+      marks: diffMarks(component)
     };
   }
 
