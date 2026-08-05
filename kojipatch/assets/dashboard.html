@@ -86,20 +86,33 @@ h1 .dot { color: var(--muted); font-weight: 400; }
   font-size: .78rem; margin-right: auto; }
 .chain .l { color: var(--muted); font-size: .64rem; text-transform: uppercase;
   letter-spacing: .09em; margin-right: .75rem; }
-/* Переходов здесь нет намеренно: рельс перерисовывается целиком, и узел
-   рождается уже в конечном виде — анимировать нечего. */
+/* Появление узла не анимируется намеренно: рельс перерисовывается целиком,
+   и узел рождается уже в конечном виде. Плавность наведения на «Изменениях»
+   достаётся ему от общего правила button — там узел и правда кнопка.
+   Остального вида кнопки ему не надо: рельс рисуют узлы и отрезки, а не
+   пилюли, поэтому рамка, фон и радиус сбрасываются, а font: inherit
+   возвращает размер шрифта самого рельса. */
 .stop { display: inline-flex; align-items: center; gap: .4rem;
-  color: var(--muted); padding: .1rem 0; }
+  color: var(--muted); padding: .1rem .2rem; border: 0; background: none;
+  box-shadow: none; border-radius: var(--r-1); font: inherit; }
 .stop .node { width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto;
   border: 1px solid currentColor; background: var(--bg); }
 .stop.on { color: var(--fg); }
 .stop.on .node { background: var(--fg); transform: scale(1.25); }
+/* Узел, отмеченный первым кликом: обведён, но не залит — залитый значит
+   «выбрано», а выбор ещё не сделан. */
+.stop.anchor .node { box-shadow: 0 0 0 3px var(--card), 0 0 0 4px var(--fg); }
+button.stop { cursor: pointer; }
+button.stop:hover { background: var(--card); color: var(--fg); }
+/* Метка сводного диапазона стоит в конце рельса — там, где кончается
+   отрезок, который она подписывает. */
+.chain .sum { margin-left: .5rem; }
 .rl { flex: 0 0 auto; width: 26px; height: 1px; margin: 0 .5rem;
   background: var(--line); }
 .rl.on { background: var(--fg); height: 2px; }
 /* Дата стоит только у тегов-двойников и читается как уточнение к тегу, а не
    как ещё одно звено цепочки или отдельная кнопка. */
-.chain .when, .pick .when { color: var(--muted); font-size: .8em; }
+.chain .when { color: var(--muted); font-size: .8em; }
 .sourcelist { list-style: none; margin: 0 0 1rem; padding: 0; }
 .sourcelist li { display: flex; flex-wrap: wrap; align-items: baseline;
   gap: .1rem .5rem; padding: .35rem .6rem; margin-bottom: .3rem;
@@ -171,9 +184,10 @@ h1 .dot { color: var(--muted); font-weight: 400; }
    класс патча, «сейчас смотрим сюда» честнее показать плотностью. */
 .pick[aria-pressed=true] { background: var(--fg); border-color: var(--fg);
   color: var(--bg); }
-.pick[aria-pressed=true] .sub,
-.pick[aria-pressed=true] .when { color: var(--bg); opacity: .7; }
-.pick .sum { font-size: .68rem; text-transform: uppercase; letter-spacing: .05em;
+.pick[aria-pressed=true] .sub { color: var(--bg); opacity: .7; }
+/* «Итог» — метка диапазона во всю цепочку. Живёт на рельсе: селектор пар,
+   где она стояла раньше, ушёл вместе с готовым списком переходов. */
+.sum { font-size: .68rem; text-transform: uppercase; letter-spacing: .05em;
   color: var(--major); }
 
 .cards { display: grid; gap: .6rem; }
@@ -572,7 +586,6 @@ tr.detail-row > td { background: var(--card); padding: .85rem .7rem 1.1rem 2.2re
     </table></div>
   </section>
   <section id="tab-diff" hidden>
-    <div class="selector" id="pair-select"></div>
     <div class="cards diff" id="diff-cards"></div>
     <div class="tablewrap"><table id="diff-table">
       <thead><tr>

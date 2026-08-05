@@ -107,7 +107,6 @@ test('второй снапшот включает «Изменения» и с�
   assert.strictEqual(diffTab.hidden, false);
   var chain = dom.id('chain').innerHTML;
   assert.ok(chain.indexOf('os-9.1') < chain.indexOf('os-9.2'), chain);
-  assert.ok(dom.id('pair-select').innerHTML.indexOf('os-9.1') !== -1);
 });
 
 test('стрелка в списке источников разворачивает сравнение', function () {
@@ -119,8 +118,9 @@ test('стрелка в списке источников разворачива
                          ['os-9.2', 'os-9.1']);
   var chain = dom.id('chain').innerHTML;
   assert.ok(chain.indexOf('os-9.2') < chain.indexOf('os-9.1'), chain);
-  assert.ok(dom.id('pair-select').innerHTML.indexOf('os-9.2 → os-9.1') !== -1,
-            dom.id('pair-select').innerHTML);
+  /* Направление сравнения задаёт порядок цепочки: «было» — тот, кто левее. */
+  assert.match(dom.location.hash, /pair=os-9\.2%40[^.]*\.\.os-9\.1/,
+               dom.location.hash);
 });
 
 test('✕ убирает снапшот, и «Изменения» снова нечего показывать', function () {
@@ -182,17 +182,22 @@ function pressPick(dom, host, name, value) {
   dom.fire(node, 'click', {});
 }
 
-function pressedPair(html) {
-  var m = /data-pair="(\d+)" aria-pressed="true"/.exec(html);
-  return m ? m[1] : null;
-}
-
 /* Два прогона одного тега — самый частый способ сравнения: «тот же тег
    месяц назад против сегодняшнего». Различать их дашборд обязан не глазами
    человека, а сам: по тегу и времени сбора. */
 var JUL = '2026-07-01T00:00:00+03:00';
 var AUG = '2026-08-01T00:00:00+03:00';
 var SEP = '2026-09-01T00:00:00+03:00';
+
+/* Узлы рельса скрипт рисует через innerHTML, а заглушка разметку из строк
+   не разбирает. Ставим такой же узел настоящим узлом: проверяется
+   делегированный обработчик, а не то, как браузер его отрисует. */
+function clickNode(dom, at) {
+  var node = dom.document.createElement('button');
+  node.setAttribute('data-node', String(at));
+  dom.id('chain').appendChild(node);
+  dom.fire(node, 'click', {});
+}
 
 test('выбор снапшота держится тегом и временем сбора', function () {
   var dom = load();
@@ -257,31 +262,17 @@ test('у разных тегов даты в подписи нет — она т
             dom.id('tag-select').innerHTML);
 });
 
-test('в селекторе пар одинаковые теги тоже подписаны датой', function () {
-  var dom = load();
-  store.add([snap('os-9.2', JUL)], 'b.json');
-  store.add([snap('os-9.2', AUG)], 'c.json');
-  var picks = dom.id('pair-select').innerHTML;
-  assert.ok(/class="when">2026-07-01</.test(picks), picks);
-  assert.ok(/class="when">2026-08-01</.test(picks), picks);
-});
-
-test('у разных тегов в селекторе пар даты нет', function () {
-  var dom = load();
-  store.add([snap('os-9.1', JUL)], 'a.json');
-  store.add([snap('os-9.2', AUG)], 'b.json');
-  assert.strictEqual(dom.id('pair-select').innerHTML.indexOf('class="when"'), -1,
-                     dom.id('pair-select').innerHTML);
-});
-
 test('пары одинаковых тегов различимы в адресе', function () {
   var dom = load();
   store.add([snap('os-9.2', JUL)], 'b.json');
   store.add([snap('os-9.2', AUG)], 'c.json');
   store.add([snap('os-9.2', SEP)], 'd.json');
-  pressPick(dom, 'pair-select', 'data-pair', '0');
+  pressTab(dom, 'diff');
+  clickNode(dom, 0);
+  clickNode(dom, 1);
   var first = dom.location.hash;
-  pressPick(dom, 'pair-select', 'data-pair', '1');
+  clickNode(dom, 1);
+  clickNode(dom, 2);
   assert.notStrictEqual(first, dom.location.hash,
                         'у двух разных переходов один и тот же адрес: ' + first);
 });
@@ -291,14 +282,122 @@ test('ссылка на пару открывает тот же переход',
   store.add([snap('os-9.2', JUL)], 'b.json');
   store.add([snap('os-9.2', AUG)], 'c.json');
   store.add([snap('os-9.2', SEP)], 'd.json');
-  pressPick(dom, 'pair-select', 'data-pair', '0');
+  pressTab(dom, 'diff');
+  clickNode(dom, 0);
+  clickNode(dom, 1);
   var link = dom.location.hash;
-  pressPick(dom, 'pair-select', 'data-pair', '2');
+  clickNode(dom, 0);
+  clickNode(dom, 2);
   await dom.tick();
   dom.location.hash = link;
   dom.fireWindow('hashchange');
-  assert.strictEqual(pressedPair(dom.id('pair-select').innerHTML), '0',
-                     dom.id('pair-select').innerHTML);
+  /* Адрес называет диапазон целиком: страница перезаписывает его своей же
+     записью, и совпадение значит, что открылся тот самый переход. */
+  assert.strictEqual(dom.location.hash, link, dom.location.hash);
+});
+
+function threeChain(dom) {
+  store.add([snap('os-9.1', JUL, { builds: [build('nginx', { version: '1.0' })] }),
+             snap('os-9.2', AUG, { builds: [build('nginx', { version: '2.0' })] }),
+             snap('os-9.3', SEP, { builds: [build('nginx', { version: '3.0' })] })],
+            'a.json');
+  pressTab(dom, 'diff');
+}
+
+test('два клика по узлам задают диапазон', function () {
+  var dom = load();
+  threeChain(dom);
+  clickNode(dom, 0);
+  clickNode(dom, 1);
+  assert.match(dom.location.hash, /pair=os-9\.1%40[^.]*\.\.os-9\.2/,
+               dom.location.hash);
+});
+
+test('порядок кликов не меняет направление перехода', function () {
+  var dom = load();
+  threeChain(dom);
+  clickNode(dom, 2);
+  clickNode(dom, 0);
+  /* Кликнули справа налево, а «было» всё равно слева: направление задаёт
+     цепочка. Иначе «появился» и «исчез» поменялись бы местами. */
+  assert.match(dom.location.hash, /pair=os-9\.1%40[^.]*\.\.os-9\.3/,
+               dom.location.hash);
+});
+
+test('первый клик только отмечает узел и таблицу не трогает', function () {
+  var dom = load();
+  threeChain(dom);
+  var before = dom.id('diff-rows').innerHTML;
+  clickNode(dom, 0);
+  assert.strictEqual(dom.id('diff-rows').innerHTML, before);
+  /* Между «stop» и «anchor» может стоять «on»: отмеченный узел бывает и
+     концом того диапазона, который выбран сейчас. */
+  assert.match(dom.id('chain').innerHTML, /class="stop[^"]*anchor"/,
+               dom.id('chain').innerHTML);
+});
+
+test('повторный клик по отмеченному узлу снимает отметку', function () {
+  var dom = load();
+  threeChain(dom);
+  clickNode(dom, 0);
+  clickNode(dom, 0);
+  assert.strictEqual(dom.id('chain').innerHTML.indexOf('anchor'), -1,
+                     dom.id('chain').innerHTML);
+});
+
+/* Отметка — шаг выбора, а не состояние страницы: пережив уход с вкладки,
+   она встретила бы человека обведённым узлом, о котором он уже забыл. */
+test('уход на другую вкладку снимает отметку', function () {
+  var dom = load();
+  threeChain(dom);
+  clickNode(dom, 0);
+  pressTab(dom, 'state');
+  pressTab(dom, 'diff');
+  assert.strictEqual(dom.id('chain').innerHTML.indexOf('anchor'), -1,
+                     dom.id('chain').innerHTML);
+});
+
+/* Отметка названа номером в цепочке, а после прихода файла тот же номер
+   стоит у другого снапшота: сравнение вышло бы не то, что человек начал. */
+test('приход снапшота снимает отметку', async function () {
+  var dom = load();
+  threeChain(dom);
+  clickNode(dom, 0);
+  await dom.tick();
+  store.add([snap('os-9.4', '2026-10-01T00:00:00+03:00',
+                  { builds: [build('nginx', { version: '4.0' })] })], 'd.json');
+  assert.strictEqual(dom.id('chain').innerHTML.indexOf('anchor'), -1,
+                     dom.id('chain').innerHTML);
+});
+
+test('пока отметка стоит, рельс просит выбрать второй конец', function () {
+  var dom = load();
+  threeChain(dom);
+  clickNode(dom, 1);
+  assert.match(dom.id('chain').innerHTML, /выберите второй конец/,
+               dom.id('chain').innerHTML);
+});
+
+test('диапазон во всю цепочку помечен итогом, а соседний — нет',
+  function () {
+    var dom = load();
+    threeChain(dom);
+    clickNode(dom, 0);
+    clickNode(dom, 2);
+    assert.match(dom.id('chain').innerHTML, /class="sum">итог/,
+                 dom.id('chain').innerHTML);
+    clickNode(dom, 0);
+    clickNode(dom, 1);
+    assert.strictEqual(dom.id('chain').innerHTML.indexOf('итог'), -1,
+                       dom.id('chain').innerHTML);
+  });
+
+test('на вкладке «Состояние» узлы рельса не нажимаются', function () {
+  var dom = load();
+  threeChain(dom);
+  pressTab(dom, 'state');
+  assert.strictEqual(dom.id('chain').innerHTML.indexOf('data-node'), -1,
+                     dom.id('chain').innerHTML);
 });
 
 test('файл роняют на страницу — снапшот загружается', async function () {
@@ -570,9 +669,9 @@ test('снапшоты приехали по одному — открыт са�
   await dom.tick();
   assert.strictEqual(pressedTag(dom.id('tag-select').innerHTML), 'os-9.3',
                      dom.id('tag-select').innerHTML);
-  /* Пар три: os-9.1→os-9.2, os-9.2→os-9.3 и сводная os-9.1→os-9.3. */
-  assert.strictEqual(pressedPair(dom.id('pair-select').innerHTML), '2',
-                     dom.id('pair-select').innerHTML);
+  /* Самый широкий переход — вся цепочка, от os-9.1 до os-9.3. */
+  assert.match(dom.location.hash, /pair=os-9\.1%40[^.]*\.\.os-9\.3/,
+               dom.location.hash);
 });
 
 /* Тот же вид обязан открываться и с одного файла на три снапшота: applyData
@@ -586,8 +685,8 @@ test('три снапшота одним файлом — тот же свежи
   await dom.tick();
   assert.strictEqual(pressedTag(dom.id('tag-select').innerHTML), 'os-9.3',
                      dom.id('tag-select').innerHTML);
-  assert.strictEqual(pressedPair(dom.id('pair-select').innerHTML), '2',
-                     dom.id('pair-select').innerHTML);
+  assert.match(dom.location.hash, /pair=os-9\.1%40[^.]*\.\.os-9\.3/,
+               dom.location.hash);
 });
 
 test('свежий снапшот выбирается и когда файл пришёл вторым', function () {
@@ -619,13 +718,15 @@ test('выбранный человеком переход переживает 
   store.add([snap('os-9.1', JUL, { builds: [build('nginx')] })], 'a.json');
   store.add([snap('os-9.2', AUG, { builds: [build('nginx')] })], 'b.json');
   store.add([snap('os-9.3', SEP, { builds: [build('nginx')] })], 'c.json');
-  pressPick(dom, 'pair-select', 'data-pair', '0');  /* явный выбор: 9.1→9.2 */
+  pressTab(dom, 'diff');
+  clickNode(dom, 0);                                /* явный выбор: 9.1→9.2 */
+  clickNode(dom, 1);
   await dom.tick();
   store.add([snap('os-9.4', '2026-10-01T00:00:00+03:00',
                   { builds: [build('nginx')] })], 'd.json');
   await dom.tick();
-  assert.strictEqual(pressedPair(dom.id('pair-select').innerHTML), '0',
-                     dom.id('pair-select').innerHTML);
+  assert.match(dom.location.hash, /pair=os-9\.1%40[^.]*\.\.os-9\.2/,
+               dom.location.hash);
 });
 
 test('выбранный снапшот убрали — снова открывается самый свежий', function () {

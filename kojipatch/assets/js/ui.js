@@ -27,6 +27,10 @@
      смену состава: снапшот с тем же именем — тот же файл, но набор вокруг
      него другой, и сводность диапазона могла измениться. */
   var pairCache = {};
+  /* Отмеченный первым кликом узел, пока второй не выбран. Живёт только до
+     следующего клика, смены вкладки или смены состава снапшотов: это шаг
+     выбора, а не состояние страницы. */
+  var anchor = null;
 
   /* Единственная дверь для данных: сюда приходит то, что посчитал
      viewmodel.js, отсюда перерисовывается страница. Зовётся при каждом
@@ -79,6 +83,10 @@
       }
     }
     if (!foundPair) { pairSel.from = null; pairSel.to = null; }
+    /* Отметку первого конца состав снапшотов не переживает: она названа
+       номером в цепочке, а после прихода или ухода файла тот же номер стоит
+       у другого снапшота. */
+    anchor = null;
     /* Выбранного больше нет на странице — значит, нет и выбора: дальше снова
        работает умолчание. Иначе следующий файл открылся бы «прежним
        выбором», которого человек не делал. */
@@ -1036,49 +1044,6 @@
     box.innerHTML = out || '<span class="none">снимков нет</span>';
   }
 
-  /* Подпись конца пары: тег, а у тегов-двойников — ещё и дата, иначе переход
-     читался бы как «os-9.2 → os-9.2». Дату берём у того снапшота, который
-     пара сравнивает, и только если тег на нём тот же: приписать тегу чужое
-     время сбора значило бы соврать. */
-  function endHtml(when, at, tag) {
-    var mine = SNAPS[at] && SNAPS[at].tag === tag ? when[at] : '';
-    return esc(tag) + (mine ? ' <span class="when">' + esc(mine) + '</span>' : '');
-  }
-
-  /* Концы перехода, который называет кнопка селектора. Раскладку diffChain
-     — сперва соседи по цепочке в её порядке, затем сводная пара «первый
-     против последнего» — знает только эта функция; звать её есть кому
-     дважды, из рендера кнопок и из обработчика клика по ним. Живёт рядом с
-     селектором и уходит вместе с ним: выбор кликом по рельсу номеров пар
-     не знает вовсе. */
-  function selectorEnds(at) {
-    var p = PAIRS[at];
-    if (!p) return null;
-    return p.summary ? [0, SNAPS.length - 1] : [at, at + 1];
-  }
-
-  function renderPairSelect() {
-    var box = document.getElementById('pair-select'), out = '', i;
-    var when = whenLabels(SNAPS), here = currentEnds(), ends, on;
-    for (i = 0; i < PAIRS.length; i++) {
-      var p = PAIRS[i];
-      /* Нажата та кнопка, чьи концы совпали с выбранным переходом: номер
-         пары больше ничего не выбирает. */
-      ends = selectorEnds(i);
-      on = Boolean(here && here[0] === ends[0] && here[1] === ends[1]);
-      out += '<button type="button" class="pick" data-pair="' + i + '" aria-pressed="'
-          + (on ? 'true' : 'false')
-          + '" data-tip="' + (p.summary
-              ? 'Сводная пара: первый тег прогона против последнего.'
-              : 'Соседние теги прогона.')
-          + ' Изменилось компонентов: ' + p.counts.changed + ' из ' + p.rows.length + '.">'
-          + endHtml(when, ends[0], p.old) + ' → ' + endHtml(when, ends[1], p['new'])
-          + (p.summary ? '<span class="sum">итог</span>' : '')
-          + '<span class="sub">' + p.counts.changed + ' изм.</span></button>';
-    }
-    box.innerHTML = out || '<span class="none">сравнивать нечего</span>';
-  }
-
   function renderStateCards() {
     var snap = curSnap();
     var big = document.getElementById('state-cards');
@@ -1234,11 +1199,11 @@
     writeHash();
   }
 
-  /* Карточки и селекторы перерисовываются только при смене вкладки, тега или
-     пары: иначе клик по карточке уничтожал бы её же вместе с фокусом. */
+  /* Карточки и селектор тегов перерисовываются только при смене вкладки,
+     тега или пары: иначе клик по карточке уничтожал бы её же вместе с
+     фокусом. */
   function rebuild() {
     renderTagSelect();
-    renderPairSelect();
     renderStateCards();
     renderDiffCards();
     render();
@@ -1256,6 +1221,10 @@
   }
 
   function showTab(name) {
+    /* Начатый выбор диапазона со сменой вкладки теряет смысл: на «Состоянии»
+       узлы не нажимаются, и отметка ждала бы второго клика, которого там
+       некому сделать. */
+    anchor = null;
     if (name === 'diff' && SNAPS.length < 2) name = 'state';
     st.tab = name;
     for (var i = 0; i < tabBtns.length; i++) {
@@ -1267,9 +1236,11 @@
     /* Панель поиска одна на страницу и переезжает к активной таблице:
        два одинаковых поля с разными id путали бы и пользователя, и hash. */
     var host = name === 'diff' ? diffSection : stateSection;
-    var anchor = host.querySelector('.tablewrap');
-    host.insertBefore(controls, anchor);
-    host.insertBefore(chipsBox, anchor);
+    /* Не anchor: так зовётся отмеченный узел рельса, и локальная переменная
+       с тем же именем забирала бы себе его сброс строкой выше. */
+    var wrap = host.querySelector('.tablewrap');
+    host.insertBefore(controls, wrap);
+    host.insertBefore(chipsBox, wrap);
     search.placeholder = name === 'diff'
       ? 'Компонент, версия, тег, ветка, патч, CVE, RPM…'
       : 'Компонент, тег, ветка, патч, CVE, RPM…';
@@ -1562,13 +1533,9 @@
           renderTagSelect(); renderStateCards(); render();
           return;
         }
-        var pair = node.getAttribute('data-pair');
-        if (pair !== null && pair !== undefined) {
-          /* Кнопка селектора по-прежнему названа номером пары, но выбор
-             из неё уезжает именами: номер живёт ровно до этой строки. */
-          var chosen = selectorEnds(parseInt(pair, 10));
-          if (chosen) setPairEnds(chosen[0], chosen[1]);
-          renderPairSelect(); renderDiffCards(); render();
+        var at = node.getAttribute('data-node');
+        if (at !== null && at !== undefined) {
+          pickNode(parseInt(at, 10));
           return;
         }
         var tab = node.getAttribute('data-tab');
@@ -1686,12 +1653,12 @@
     tip.textContent = el.getAttribute('data-tip');
     tip.style.visibility = 'hidden';
     tip.style.display = 'block';
-    var anchor = el.getBoundingClientRect();
+    var host = el.getBoundingClientRect();
     var box = tip.getBoundingClientRect();
-    var left = Math.min(Math.max(8, anchor.left + (anchor.width - box.width) / 2),
+    var left = Math.min(Math.max(8, host.left + (host.width - box.width) / 2),
                         window.innerWidth - box.width - 8);
-    var top = anchor.bottom + 8;
-    if (top + box.height > window.innerHeight - 8) top = anchor.top - box.height - 8;
+    var top = host.bottom + 8;
+    if (top + box.height > window.innerHeight - 8) top = host.top - box.height - 8;
     tip.style.left = Math.round(left) + 'px';
     tip.style.top = Math.round(Math.max(8, top)) + 'px';
     tip.style.visibility = 'visible';
@@ -1786,10 +1753,14 @@
      где я сейчас нахожусь.
 
      В подписи у тегов-двойников стоит дата: «os-9.2 → os-9.2» не сказало
-     бы человеку, что с чем сравнивается. */
+     бы человеку, что с чем сравнивается.
+
+     На «Изменениях» рельс ещё и выбирает: узлы там нажимаются, и два клика
+     задают любой диапазон цепочки. */
   function renderChain() {
     var items = store.list(), when = whenLabels(items), out = '', i, here;
-    var ends = st.tab === 'diff' ? currentEnds() : null;
+    var live = st.tab === 'diff';
+    var ends = live ? currentEnds() : null;
     if (!items.length) { chainBox.innerHTML = ''; return; }
     for (i = 0; i < items.length; i++) {
       if (i) {
@@ -1797,12 +1768,45 @@
             + (ends && i > ends[0] && i <= ends[1] ? ' on' : '') + '"></span>';
       }
       here = ends ? (i === ends[0] || i === ends[1]) : i === st.tag;
-      out += '<span class="stop' + (here ? ' on' : '') + '">'
-          + '<span class="node"></span><span class="nm">' + esc(items[i].tag)
-          + (when[i] ? ' <span class="when">' + esc(when[i]) + '</span>' : '')
-          + '</span></span>';
+      out += stopHtml(i, items[i].tag, when[i], here, live);
     }
-    chainBox.innerHTML = '<span class="l">цепочка</span>' + out;
+    /* Подпись рельса договаривает начатый выбор: отметка стоит, а что с ней
+       делать дальше, из одного обведённого узла не видно. */
+    var label = anchor === null ? 'цепочка' : 'выберите второй конец';
+    /* Итогом помечен диапазон во всю цепочку — тот, что раньше стоял
+       отдельной кнопкой «сводная пара». */
+    var sum = live && ends && ends[0] === 0 && ends[1] === items.length - 1
+      && items.length > 2 ? '<span class="sum">итог</span>' : '';
+    chainBox.innerHTML = '<span class="l">' + esc(label) + '</span>' + out + sum;
+  }
+
+  /* Узел рельса. На «Состоянии» он только подпись, на «Изменениях» — кнопка:
+     нажимается лишь то, что и правда что-то делает. */
+  function stopHtml(at, tag, when, here, live) {
+    var cls = 'stop' + (here ? ' on' : '') + (anchor === at ? ' anchor' : '');
+    var body = '<span class="node"></span><span class="nm">' + esc(tag)
+      + (when ? ' <span class="when">' + esc(when) + '</span>' : '')
+      + '</span>';
+    if (!live) return '<span class="' + cls + '">' + body + '</span>';
+    var tip = anchor === null ? 'Отметить началом сравнения'
+      : (anchor === at ? 'Снять отметку' : 'Сравнить с отмеченным');
+    return '<button type="button" class="' + cls + '" data-node="' + at
+      + '" data-tip="' + esc(tip) + '">' + body + '</button>';
+  }
+
+  /* Диапазон выбирается двумя кликами: первый отмечает конец, второй
+     задаёт пару. Клик по отмеченному узлу снимает отметку — иначе из
+     начатого выбора нельзя было бы выйти, не выбрав чего-нибудь. */
+  function pickNode(at) {
+    if (anchor === null) { anchor = at; renderChain(); return; }
+    if (anchor === at) { anchor = null; renderChain(); return; }
+    /* Порядок концов задаёт цепочка, а не порядок кликов: «было» всегда
+       левее. Иначе «появился» и «исчез» молча менялись бы местами. */
+    var lo = Math.min(anchor, at), hi = Math.max(anchor, at);
+    anchor = null;
+    setPairEnds(lo, hi);
+    renderDiffCards();
+    render();
   }
 
   function renderSources() {
