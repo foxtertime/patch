@@ -168,6 +168,7 @@
   "generated": "2026-07-01T00:00:00+03:00",
   "koji_hub": "https://hub/kojihub",
   "koji_web": "https://hub/koji",
+  "kojipatch": "1.1.0",
   "patch_classes": [
    "AUTOGEN",
    "CVE",

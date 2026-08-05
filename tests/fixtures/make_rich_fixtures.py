@@ -15,6 +15,14 @@ from kojipatch.model import (Build, Patch, Snapshot, Source,  # noqa: E402
 
 CLASSES = ["AUTOGEN", "CVE", "SAST", "DAST", "COVERAGE", "SPEC",
            "CHANGELOG", "FILES", "other"]
+# У четвёртого снапшота список свой: DISTSUFFIX появился позже первых трёх,
+# и дописывать его в них нельзя — rich-old.json и rich-new.json порождают
+# эталон page-data.golden.json, который пересобрать уже нечем. Страница
+# складывает списки всех загруженных снапшотов, поэтому новый класс доедет
+# до карточек и фильтров и так — хвостом, за перечисленными.
+CLASSES_WITH_DISTSUFFIX = ["AUTOGEN", "CVE", "SAST", "DAST", "COVERAGE",
+                           "DISTSUFFIX", "SPEC", "CHANGELOG", "FILES",
+                           "other"]
 
 
 def src(project, ref, kind="branch"):
@@ -216,12 +224,117 @@ def newer_snapshot():
         ])
 
 
+def newest_snapshot():
+    """Четвёртый тег цепочки. Он тоже для глаз, и показывает то, чего не
+    показывают три.
+
+    Первое — класс DISTSUFFIX: он появился позже первых трёх снапшотов, и
+    ни одного такого патча в них нет. Здесь их два, и один нарочно назван
+    kernel.spec.distsuffix.patch — файл со «спековым» именем, который всё
+    равно уходит в DISTSUFFIX, потому что класс отвечает на вопрос «зачем
+    патч».
+
+    Второе — диапазон, который не сводный и не соседний. На трёх узлах
+    такого нет вовсе: os-9.1 → os-9.3 и есть вся цепочка. Здесь curl,
+    появившийся в os-9.2 и исчезнувший в os-9.3, возвращается тем же
+    билдом: диапазон os-9.2 → os-9.4 скажет про него «не изменилось»,
+    сводный os-9.1 → os-9.4 — «появился», а соседние — «исчез» и снова
+    «появился».
+
+    Третье — время. Собран снапшот через восемь часов после os-9.3, а не
+    через месяц: на рельсе видно, что расстояние между узлами меряется той
+    единицей, которая ему подходит.
+    """
+    return Snapshot(
+        tag="os-9.4", generated="2026-09-01T08:15:00+03:00",
+        koji_hub="https://hub/kojihub", koji_web="https://hub/koji",
+        patch_classes=list(CLASSES_WITH_DISTSUFFIX),
+        builds=[
+            # выросла одна релизная часть, и пришёл патч суффикса сборки
+            Build(nvr="nginx-1.26.2-2.el9", name="nginx", version="1.26.2",
+                  release="2.el9", build_id=131, task_id=231, owner="builder",
+                  completed="2026-09-01 06:20:00", tag_name="os-9.4",
+                  tags=["os-9.4"], source=src("web/nginx", "os-9.4"),
+                  patch_dir_present=True,
+                  patches=[patch("CVE-2024-7347.patch", "CVE",
+                                 ["CVE-2024-7347"]),
+                           patch("CVE-2025-1111.patch", "CVE",
+                                 ["CVE-2025-1111"]),
+                           patch("changelog.yaml", "CHANGELOG"),
+                           patch("nginx.spec.patch", "SPEC"),
+                           patch("nginx-distsuffix.patch", "DISTSUFFIX")],
+                  rpms=["nginx-1.26.2-2.el9.x86_64",
+                        "nginx-core-1.26.2-2.el9.x86_64",
+                        "nginx-1.26.2-2.el9.src",
+                        "nginx-mod-http-1.26.2-2.el9.aarch64"]),
+            # не менялся с os-9.2: тот же билд, унаследован
+            Build(nvr="httpd-2.4.62-1.el9", name="httpd", version="2.4.62",
+                  release="1.el9", epoch=1, build_id=102, task_id=202,
+                  owner="apache", completed="2026-04-01 10:00:00",
+                  tag_name="os-9.2", tags=["os-9.2", "os-9.4"],
+                  source=src("web/httpd", "abc123", kind="commit"),
+                  patch_dir_present=False, patches=[],
+                  rpms=["httpd-2.4.62-1.el9.x86_64"],
+                  problems=["gitlab: 404 на дереве ветки"]),
+            # не менялся с os-9.3
+            Build(nvr="zlib-1.3-2.el9", name="zlib", version="1.3",
+                  release="2.el9", build_id=104, owner="builder",
+                  completed="никогда", tag_name="os-9.4", tags=["os-9.4"],
+                  source=src("core/zlib", "os-9.1"), patch_dir_present=True,
+                  patches=[patch("sast-zlib.patch", "SAST"),
+                           patch("weird.diff", "other")],
+                  rpms=["zlib-1.3-2.el9.x86_64", "zlib-1.3-2.el9.src"]),
+            # не менялся с os-9.3
+            Build(nvr="vim-9.0-1.el9", name="vim", version="9.0",
+                  release="1.el9", build_id=103, owner="editor",
+                  completed="2026-05-14", tag_name=None, tags=[],
+                  source=None, patch_dir_present=None,
+                  patches=[patch("coverage-vim.patch", "COVERAGE")],
+                  rpms=["vim-9.0-1.el9.x86_64"]),
+            # стек патчей поредел: две CVE закрыты и ушли, зато пришёл
+            # патч суффикса сборки — и назван он по-спековому, а класс у
+            # него всё равно DISTSUFFIX
+            Build(nvr="kernel-5.14.0-620.el9", name="kernel",
+                  version="5.14.0", release="620.el9", build_id=140,
+                  task_id=240, owner="kernel",
+                  completed="2026-09-01 05:05:00", tag_name="os-9.4",
+                  tags=["os-9.4"], source=src("core/kernel", "os-9.4"),
+                  patch_dir_present=True,
+                  patches=[patch("autogen-cve-patches.inc.new", "AUTOGEN"),
+                           patch("CVE-2025-2003.patch", "CVE",
+                                 ["CVE-2025-2003"]),
+                           patch("sast-kernel-net.patch", "SAST"),
+                           patch("sast-kernel-fs.patch", "SAST"),
+                           patch("dast-kernel-fuzz.patch", "DAST"),
+                           patch("coverage-kernel.patch", "COVERAGE"),
+                           patch("kernel.spec.distsuffix.patch", "DISTSUFFIX"),
+                           patch("kernel.spec.patch", "SPEC"),
+                           patch("linux-5.14.0.tar.gz", "FILES")],
+                  rpms=["kernel-5.14.0-620.el9.src",
+                        "kernel-doc-5.14.0-620.el9.noarch",
+                        "kernel-5.14.0-620.el9.x86_64",
+                        "kernel-core-5.14.0-620.el9.x86_64",
+                        "kernel-modules-5.14.0-620.el9.x86_64",
+                        "kernel-5.14.0-620.el9.aarch64"]),
+            # вернулся тем же билдом, каким был в os-9.2
+            Build(nvr="curl-8.0-1.el9", name="curl", version="8.0",
+                  release="1.el9", build_id=115, owner="net",
+                  completed="2026-07-31 00:10:00", tag_name="os-9.4",
+                  tags=["os-9.4"], source=src("core/curl", "os-9.2"),
+                  patch_dir_present=True,
+                  patches=[patch("source.tar.gz", "FILES")],
+                  rpms=["curl-8.0-1.el9.x86_64"]),
+        ])
+
+
 def main():
     here = os.path.dirname(os.path.abspath(__file__))
     dump_snapshots([old_snapshot()], os.path.join(here, "rich-old.json"))
     dump_snapshots([new_snapshot()], os.path.join(here, "rich-new.json"))
     dump_snapshots([newer_snapshot()], os.path.join(here, "rich-newer.json"))
-    print("написаны rich-old.json, rich-new.json и rich-newer.json")
+    dump_snapshots([newest_snapshot()], os.path.join(here, "rich-newest.json"))
+    print("написаны rich-old.json, rich-new.json, rich-newer.json "
+          "и rich-newest.json")
 
 
 if __name__ == "__main__":
