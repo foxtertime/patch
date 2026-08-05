@@ -11,22 +11,24 @@
   function (text, labels) {
   'use strict';
 
-  var esc = text.esc, plural = text.plural;
+  const esc = text.esc, plural = text.plural;
 
   function cardHtml(filter, big, number, unit, sub, label, tip, labelCls) {
-    var cls = 'card' + (big ? ' big' : '') + (filter ? ' clickable' : '');
-    var open = filter
-      ? '<button type="button" class="' + cls + '" data-filter="' + esc(filter)
-        + '" aria-pressed="false"'
-      : '<div class="' + cls + '"';
-    return open + ' data-tip="' + esc(tip) + '">'
-      + (big ? '<div class="l' + (labelCls ? ' ' + labelCls : '') + '">'
-               + esc(label) + '</div>' : '')
-      + '<div class="n">' + esc(number)
-      + (unit ? ' <span class="unit">' + esc(unit) + '</span>' : '') + '</div>'
-      + '<div class="rpm">' + esc(sub || '') + '</div>'
-      + (big ? '' : '<div class="l' + (labelCls ? ' ' + labelCls : '') + '">'
-               + esc(label) + '</div>')
+    const cls = `card${big ? ' big' : ''}${filter ? ' clickable' : ''}`;
+    const open = filter
+      ? `<button type="button" class="${cls}" data-filter="${esc(filter)}"`
+        + ' aria-pressed="false"'
+      : `<div class="${cls}"`;
+    /* У большой карточки подпись стоит над числом, у мелкой — под ним:
+       большие читают сверху вниз как заголовки, мелкие — как ряд значков. */
+    const title = `<div class="l${labelCls ? ` ${labelCls}` : ''}">`
+      + `${esc(label)}</div>`;
+    return `${open} data-tip="${esc(tip)}">`
+      + (big ? title : '')
+      + `<div class="n">${esc(number)}`
+      + (unit ? ` <span class="unit">${esc(unit)}</span>` : '') + '</div>'
+      + `<div class="rpm">${esc(sub || '')}</div>`
+      + (big ? '' : title)
       + (filter ? '</button>' : '</div>');
   }
 
@@ -35,49 +37,50 @@
      снапшоту, а кладут их в два разных узла. */
   function stateCards(snap) {
     if (!snap) return { big: '', classes: '' };
-    var c = snap.counts, rpms = 0, i;
-    for (i = 0; i < snap.builds.length; i++) rpms += snap.builds[i].rpms.length;
+    const c = snap.counts;
+    let rpms = 0;
+    for (const b of snap.builds) rpms += b.rpms.length;
 
-    var big =
+    const big =
         cardHtml('all', true, c.builds, plural(c.builds, 'сборка', 'сборки', 'сборок'),
-          rpms + ' RPM', 'в теге',
-          'Все последние сборки тега ' + snap.tag + ' и собранные из них бинарные '
+          `${rpms} RPM`, 'в теге',
+          `Все последние сборки тега ${snap.tag} и собранные из них бинарные `
           + 'пакеты. Клик снимает все фильтры.')
       + cardHtml('has-patch', true, c.with_patches,
           plural(c.with_patches, 'сборка', 'сборки', 'сборок'),
-          c.patch_files + ' ' + plural(c.patch_files, 'файл', 'файла', 'файлов')
-          + ' патчей', 'с патчами',
+          `${c.patch_files} `
+          + `${plural(c.patch_files, 'файл', 'файла', 'файлов')} патчей`,
+          'с патчами',
           'Сборки, у которых в каталоге PATCH ветки лежит хотя бы один файл. '
           + 'Клик оставит в таблице только их.')
       + cardHtml('inherited', true, c.inherited,
           plural(c.inherited, 'сборка', 'сборки', 'сборок'),
-          c.direct + ' затегованы прямо', 'унаследованы',
-          'Сборки, которые висят не в теге ' + snap.tag + ', а в одном из его '
+          `${c.direct} затегованы прямо`, 'унаследованы',
+          `Сборки, которые висят не в теге ${snap.tag}, а в одном из его `
           + 'родителей, и попали сюда наследованием. В колонке «тег» видно, '
           + 'из какого именно. Клик оставит в таблице только их.')
       + cardHtml('problem', true, c.problems,
           plural(c.problems, 'сборка', 'сборки', 'сборок'),
-          c.without_patches + ' без каталога PATCH', 'с проблемами',
+          `${c.without_patches} без каталога PATCH`, 'с проблемами',
           'Сборки, при сборе данных по которым что-то пошло не так: нет исходника, '
           + 'GitLab ответил ошибкой, ветка исчезла. Клик оставит только их.');
 
-    var order = labels.classOrder(c.by_class), out = '';
-    for (i = 0; i < order.length; i++) {
-      var name = order[i], b = c.by_class[name];
-      out += cardHtml(text.slug(name), false, b.builds,
+    const classes = labels.classOrder(c.by_class).map((name) => {
+      const b = c.by_class[name];
+      return cardHtml(text.slug(name), false, b.builds,
         plural(b.builds, 'сборка', 'сборки', 'сборок'),
-        b.files + ' ' + plural(b.files, 'файл', 'файла', 'файлов'),
-        name, 'Сборки, где есть хотя бы один патч класса ' + name + ', и сколько '
+        `${b.files} ${plural(b.files, 'файл', 'файла', 'файлов')}`,
+        name, `Сборки, где есть хотя бы один патч класса ${name}, и сколько `
         + 'таких файлов всего. Клик оставит в таблице только их.',
         labels.classCls(name));
-    }
-    return { big: big, classes: out };
+    }).join('');
+    return { big, classes };
   }
 
   function diffCards(pair) {
     if (!pair) return '';
-    var c = pair.counts;
-    var spec = [
+    const c = pair.counts;
+    const spec = [
       ['changed', c.changed, 'изменились',
        'Компоненты, у которых изменилось хоть что-нибудь: версия, набор патчей, '
        + 'состав RPM или ветка.'],
@@ -103,23 +106,19 @@
        + 'попадает: сравнивается сам тег билда, а не то, каким он выглядит '
        + 'из выбранного.']
     ];
-    var out = '';
-    for (var i = 0; i < spec.length; i++) {
-      out += cardHtml(spec[i][0], false, spec[i][1], 'из ' + pair.rows.length, '',
-                      spec[i][2], spec[i][3] + ' Клик — фильтр.');
-    }
-    return out;
+    return spec.map(([key, count, label, tip]) =>
+      cardHtml(key, false, count, `из ${pair.rows.length}`, '',
+               label, `${tip} Клик — фильтр.`)).join('');
   }
 
   /* Чипы поставленных фильтров. Набор приходит доводом: какая вкладка
      открыта, знает страница. */
   function chips(set) {
-    var list = text.keys(set).sort(), out = '';
-    for (var i = 0; i < list.length; i++) {
-      out += '<button type="button" class="chip" data-chip="' + esc(list[i]) + '"'
-          + ' data-tip="Снять фильтр">' + esc(list[i]) + ' · '
-          + esc(labels.label(list[i])) + ' ✕</button>';
-    }
+    const list = text.keys(set).sort();
+    let out = list.map((key) =>
+      `<button type="button" class="chip" data-chip="${esc(key)}"`
+      + ` data-tip="Снять фильтр">${esc(key)} · `
+      + `${esc(labels.label(key))} ✕</button>`).join('');
     if (list.length > 1) {
       out += '<button type="button" class="chip clear" data-chip="all"'
           + ' data-tip="Снять все фильтры">сбросить всё</button>';
@@ -127,5 +126,5 @@
     return out;
   }
 
-  return { stateCards: stateCards, diffCards: diffCards, chips: chips };
+  return { stateCards, diffCards, chips };
 }));
