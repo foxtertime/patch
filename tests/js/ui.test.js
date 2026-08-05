@@ -994,6 +994,49 @@ test('короткая ссылка на переход читается в то
               dom.location.hash);
   });
 
+/* У двойников тега подходящих диапазонов несколько, и выбирается из них
+   последний в написанном порядке: самый свежий левый конец, у которого
+   правый ещё есть справа. Свежий прогон человек имеет в виду чаще, а
+   порядок концов при этом остаётся тем, что он написал. */
+test('короткая ссылка при двойниках тега берёт последний такой диапазон',
+  function () {
+    var dom = load({ hash: '#tab=diff&pair='
+                           + encodeURIComponent('os-9.2..os-9.3') });
+    store.add([snap('os-9.2', JUL, { builds: [build('nginx', { version: '1.0' })] }),
+               snap('os-9.2', AUG, { builds: [build('nginx', { version: '2.0' })] }),
+               snap('os-9.3', SEP, { builds: [build('nginx', { version: '3.0' })] })],
+              'a.json');
+    var html = dom.id('diff-rows').innerHTML;
+    /* Августовский os-9.2 против os-9.3, а не июльский: 2.0 → 3.0. */
+    assert.match(html, /2\.0/, html);
+    assert.match(html, /3\.0/, html);
+    assert.strictEqual(html.indexOf('1.0'), -1, html);
+    assert.ok(dom.location.hash.indexOf(
+                encodeURIComponent('os-9.2@' + AUG + '..os-9.3@' + SEP)) !== -1,
+              dom.location.hash);
+  });
+
+/* Ссылку писали, когда цепочка стояла иначе: снапшоты переставляют руками,
+   и присланный адрес переживает перестановку. Прочитать его задом наперёд
+   нельзя — «было» и «стало» поменялись бы местами, — поэтому концы
+   разворачиваются по цепочке. Это запасной ход: он работает только там,
+   где в написанном порядке диапазон не читается вовсе. */
+test('ссылка, написанная против цепочки, разворачивается по ней',
+  function () {
+    var dom = load({ hash: '#tab=diff&pair='
+                           + encodeURIComponent('os-9.2@' + AUG + '..os-9.1@' + JUL) });
+    store.add([snap('os-9.1', JUL, { builds: [build('nginx', { version: '1.0' })] }),
+               snap('os-9.2', AUG, { builds: [build('nginx', { version: '2.0' })] }),
+               snap('os-9.3', SEP, { builds: [build('nginx', { version: '3.0' })] })],
+              'a.json');
+    var html = dom.id('diff-rows').innerHTML;
+    /* Названы концы 9.1 и 9.2, значит сравниваются они: 1.0 → 2.0.
+       Умолчание «вся цепочка» дало бы 1.0 → 3.0. */
+    assert.match(html, /1\.0/, html);
+    assert.match(html, /2\.0/, html);
+    assert.strictEqual(html.indexOf('3.0'), -1, html);
+  });
+
 /* Предпосчитанные переходы названы тегами, а два прогона одного тега —
    законный случай. Опознать такую пару по имени нельзя, и в кэш она не
    попадёт: её обязан посчитать расчёт по требованию, иначе вкладка
