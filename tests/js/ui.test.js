@@ -150,9 +150,10 @@ test('последний снапшот убрали — страница сно
   assert.strictEqual(dom.id('tab-empty').hidden, false);
   assert.strictEqual(dom.id('tab-state').hidden, true);
   assert.strictEqual(dom.document.querySelector('.tabs').hidden, true);
-  /* Шапка от ушедшего снапшота — три прочерка над зоной загрузки: так
-     выглядит сломанная страница, а не пустая. */
-  assert.strictEqual(dom.id('meta').innerHTML, '');
+  /* Рельс от ушедшего снапшота — узел над зоной загрузки: так выглядит
+     сломанная страница, а не пустая. */
+  assert.strictEqual(dom.id('chain').innerHTML, '');
+  assert.strictEqual(dom.id('sources').hidden, true);
 });
 
 /* Какой снапшот открыт, страница говорит нажатым узлом рельса — тем же

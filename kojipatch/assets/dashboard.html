@@ -65,11 +65,8 @@ body {
 /* Заголовок набран как имя тега, потому что имя тега — и есть тема
    страницы. Разрядка отрицательная: моноширинный и без того просторен. */
 h1 { font-size: 1.35rem; font-weight: 600; letter-spacing: -.02em;
-  margin: 0 0 .6rem; }
+  margin: 0 0 1.6rem; }
 h1 .dot { color: var(--muted); font-weight: 400; }
-.meta { color: var(--muted); font-size: .875rem; margin-bottom: 1.25rem; }
-.meta div { overflow-wrap: anywhere; }
-.meta b { color: var(--fg); font-weight: 600; }
 /* Класс остался ради смысла: он помечает строку как данные, даже когда
    вся страница и так набрана моноширинным. */
 .mono { font-family: var(--mono); }
@@ -585,7 +582,6 @@ tr.detail-row > td { background: var(--card); padding: .85rem .7rem 1.1rem 2.2re
 <body>
 <div class="wrap">
   <h1>kojipatch</h1>
-  <div class="meta" id="meta"></div>
   <div class="sources" id="sources" hidden>
     <div class="srchead">
       <span class="l">снапшоты</span>
