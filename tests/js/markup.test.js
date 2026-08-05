@@ -72,12 +72,88 @@ test('патчи группируются по классам и считают�
   assert.match(out, /other <span class="n">1<\/span>/);
 });
 
-test('пришедший патч помечен знаком', function () {
+/* Путь второй строкой — только когда он что-то добавляет. Почти всегда он
+   «PATCH/<имя>», то есть имя, повторённое с приставкой: список патчей из-за
+   этого был вдвое длиннее, а нового в нём ноль. */
+test('путь, повторяющий имя, второй строкой не печатается', function () {
   labels.setClasses(['CVE']);
-  var out = markup.patchesHtml([patch('a.patch', 'CVE')], '',
-                               { 'PATCH/a.patch': 1 }, 'is-added');
-  assert.match(out, /<li class="is-added">/);
-  assert.match(out, /<span class="sign">\+<\/span>/);
+  var out = markup.patchesHtml([patch('a.patch', 'CVE')], '', null, '');
+  assert.doesNotMatch(out, /ppath/, out);
+});
+
+test('патч из подкаталога путь показывает', function () {
+  labels.setClasses(['CVE']);
+  var p = patch('a.patch', 'CVE');
+  p.path = 'PATCH/sub/a.patch';
+  var out = markup.patchesHtml([p], '', null, '');
+  assert.match(out, /class="ppath">PATCH\/sub\/a\.patch</, out);
+});
+
+test('путь показывается, если поиск попал в него, а не в имя', function () {
+  labels.setClasses(['CVE']);
+  var out = markup.patchesHtml([patch('a.patch', 'CVE')], 'patch/a', null, '');
+  assert.match(out, /ppath/, out);
+});
+
+test('поиск по имени лишней строки не добавляет', function () {
+  labels.setClasses(['CVE']);
+  var out = markup.patchesHtml([patch('a.patch', 'CVE')], 'a.pat', null, '');
+  assert.doesNotMatch(out, /ppath/, out);
+});
+
+test('путь, устроенный не как «каталог/имя», печатается целиком',
+  function () {
+    labels.setClasses(['CVE']);
+    var p = patch('a.patch', 'CVE');
+    p.path = 'совсем-другое';
+    assert.match(markup.patchesHtml([p], '', null, ''), /ppath/);
+  });
+
+/* Дифф патчей живёт только в стороне «стало»: там и новое состояние, и
+   весь переход к нему. В «было» пометок нет вовсе — то состояние не
+   менялось. */
+test('в «стало» пришедший патч помечен знаком и стоит внизу группы',
+  function () {
+    labels.setClasses(['CVE']);
+    var was = [patch('a.patch', 'CVE')];
+    var now = [patch('a.patch', 'CVE'), patch('b.patch', 'CVE')];
+    var out = markup.patchesChangeHtml(was, now, '');
+    assert.match(out, /<li class="is-added"><span class="sign">\+<\/span>/);
+    assert.ok(out.indexOf('a.patch') < out.indexOf('b.patch'),
+              'пришедший должен стоять ниже уцелевшего: ' + out);
+  });
+
+test('в «стало» ушедший патч зачёркнут на своём месте', function () {
+  labels.setClasses(['CVE']);
+  var was = [patch('a.patch', 'CVE'), patch('b.patch', 'CVE')];
+  var now = [patch('b.patch', 'CVE')];
+  var out = markup.patchesChangeHtml(was, now, '');
+  assert.match(out, /<li class="is-removed"><span class="sign">−<\/span>/);
+  assert.ok(out.indexOf('a.patch') < out.indexOf('b.patch'),
+            'ушедший должен остаться на своём прежнем месте: ' + out);
+});
+
+test('счётчик группы считает новое состояние, не считая зачёркнутых',
+  function () {
+    labels.setClasses(['CVE']);
+    var was = [patch('a.patch', 'CVE'), patch('b.patch', 'CVE')];
+    var out = markup.patchesChangeHtml(was, [patch('b.patch', 'CVE')], '');
+    assert.match(out, /CVE <span class="n">1<\/span>/, out);
+  });
+
+test('класс, ушедший целиком, остаётся с нулём и зачёркнутой строкой',
+  function () {
+    labels.setClasses(['CVE', 'SAST']);
+    var was = [patch('a.patch', 'CVE'), patch('s.patch', 'SAST')];
+    var out = markup.patchesChangeHtml(was, [patch('a.patch', 'CVE')], '');
+    assert.match(out, /SAST <span class="n">0<\/span>/, out);
+    assert.match(out, /is-removed/, out);
+  });
+
+test('в «было» пометок нет ни одной', function () {
+  labels.setClasses(['CVE']);
+  var out = markup.patchesHtml([patch('a.patch', 'CVE')], '');
+  assert.doesNotMatch(out, /is-added|is-removed|class="sign"/, out);
 });
 
 test('пакеты режутся на блоки по смене архитектуры', function () {
@@ -86,16 +162,36 @@ test('пакеты режутся на блоки по смене архитек
   assert.match(out, /x86_64 <span class="n">2<\/span>/);
 });
 
-test('у стороны считается только своя половина пары', function () {
+test('сторона достаётся из пар готовым списком', function () {
   var rows = [['p-1-1.x86_64', 'p-1-2.x86_64'], [null, 'q-1-1.x86_64']];
-  assert.strictEqual(markup.rpmSideCount(rows, 0), 1);
-  assert.strictEqual(markup.rpmSideCount(rows, 1), 2);
+  assert.deepStrictEqual(markup.rpmSideList(rows, 0), ['p-1-1.x86_64']);
+  assert.deepStrictEqual(markup.rpmSideList(rows, 1),
+                         ['p-1-2.x86_64', 'q-1-1.x86_64']);
 });
 
-test('пустая ячейка напротив соседа читается прочерком', function () {
-  var out = markup.rpmSideHtml([[null, 'q-1-1.x86_64']], 0, '', 'is-removed');
-  assert.match(out, /<li class="rgap">·<\/li>/);
-  assert.match(out, /x86_64 <span class="n">0<\/span>/);
+test('в «стало» ушедший пакет зачёркнут, пришедший помечен плюсом',
+  function () {
+    var out = markup.rpmsChangeHtml(
+      [['p-1-1.x86_64', 'p-1-2.x86_64'],
+       ['gone-1-1.x86_64', null],
+       [null, 'fresh-1-1.x86_64']], '');
+    assert.match(out, /<li class="is-removed"><span class="sign">−<\/span>gone/);
+    assert.match(out, /<li class="is-added"><span class="sign">\+<\/span>fresh/);
+    assert.match(out, /<li>p-1-2\.x86_64<\/li>/, out);
+  });
+
+test('счётчик архитектуры считает новое состояние', function () {
+  /* Из архитектуры ушёл последний пакет: блок остаётся с нулём и одной
+     зачёркнутой строкой — «была и кончилась» тоже ответ. */
+  var out = markup.rpmsChangeHtml([['gone-1-1.noarch', null]], '');
+  assert.match(out, /noarch <span class="n">0<\/span>/, out);
+});
+
+test('в «было» пакеты идут без пометок', function () {
+  var rows = [['p-1-1.x86_64', null]];
+  var out = markup.rpmsHtml(markup.rpmSideList(rows, 0), '');
+  assert.doesNotMatch(out, /is-removed|is-added|class="sign"/, out);
+  assert.match(out, /x86_64 <span class="n">1<\/span>/, out);
 });
 
 test('дельта без изменений — прочерк, а не «+0 −0»', function () {

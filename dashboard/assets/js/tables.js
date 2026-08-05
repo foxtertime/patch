@@ -13,14 +13,25 @@
   function (text, labels, markup) {
   'use strict';
 
-  const esc = text.esc, hl = text.hl, own = text.own, setFrom = text.setFrom;
+  const esc = text.esc, hl = text.hl, own = text.own;
   const kv = markup.kv;
 
   /* Стрелка раскрытия: одна и та же в обеих таблицах, и состояние на ней
-     дублируется для тех, кто читает страницу не глазами. */
+     дублируется для тех, кто читает страницу не глазами.
+
+     Глиф один, а раскрытость показывает поворот: подмена «▸» на «▾» меняла
+     ширину знака и дёргала имя компонента вправо-влево на каждом клике. */
   function chevron(open) {
     return `<span class="chev" role="button" tabindex="0"`
-         + ` aria-expanded="${open ? 'true' : 'false'}">${open ? '▾' : '▸'}</span>`;
+         + ` aria-expanded="${open ? 'true' : 'false'}">▸</span>`;
+  }
+
+  /* Подпись блока в развёрнутой строке: имя и, если есть что считать,
+     счётчик сразу за ним. */
+  function blockHead(title, count) {
+    return `<div class="bl">${esc(title)}`
+      + (count === undefined ? '' : `<span class="n">· ${count}</span>`)
+      + '</div>';
   }
 
   function linksCell(row) {
@@ -28,8 +39,12 @@
          + `${markup.linkHtml(row.source_url, 'git')}</td>`;
   }
 
-  function detailRow(cols, body) {
-    return `<tr class="detail-row"><td colspan="${cols}">${body}</td></tr>`;
+  /* Раскрытая строка — не отдельная карточка, а продолжение своей строки:
+     полоса слева идёт через обе и делает из них один предмет. У сборки с
+     проблемой полоса красная — та же, что метит саму строку. */
+  function detailRow(cols, body, bad) {
+    return `<tr class="detail-row${bad ? ' bad' : ''}">`
+      + `<td colspan="${cols}">${body}</td></tr>`;
   }
 
   /* ---------- вкладка «Состояние» ---------- */
@@ -43,7 +58,7 @@
               : (row.patch_dir_present === false ? 'нет' : 'не проверялся');
 
     let out = '<div class="detail">'
-      + '<div class="block"><div class="bl">koji</div>'
+      + `<div class="block">${blockHead('koji')}`
       + kv('NVR', `<span class="mono">${hl(row.nvr, q)}</span>`)
       + kv('основной тег', markup.mainTagHtml(row, q))
       + kv('другие теги', markup.otherTagsHtml(row, q))
@@ -56,7 +71,7 @@
       + kv('task id', esc(row.task_id === null ? '—' : row.task_id))
       + '</div>'
 
-      + '<div class="block"><div class="bl">gitlab</div>'
+      + `<div class="block">${blockHead('gitlab')}`
       + kv('проект', row.project
             ? `<span class="mono">${hl(row.project, q)}</span>`
             : '<span class="none">—</span>')
@@ -71,15 +86,16 @@
          предыдущей парой, и каждый оказывается под своим источником. RPM
          приезжают из koji, патчи лежат в GitLab, поэтому RPM идут первыми
          и встают под koji, а патчи — под gitlab. */
-      + `<div class="block"><div class="bl">RPM · ${row.rpms.length}</div>`
+      + `<div class="block">${blockHead('RPM', row.rpms.length)}`
       + `${markup.rpmsHtml(row.rpms, q)}</div>`
 
-      + `<div class="block"><div class="bl">патчи · ${row.patches.length}</div>`
-      + `${markup.patchesHtml(row.patches, q, null, '')}</div>`;
+      + `<div class="block">${blockHead('патчи', row.patches.length)}`
+      + `${markup.patchesHtml(row.patches, q)}</div>`;
 
     if (row.problems.length) {
       const items = row.problems.map((p) => `<li>${hl(p, q)}</li>`).join('');
-      out += '<div class="block wide"><div class="bl">проблемы</div>'
+      out += `<div class="block wide">`
+           + `${blockHead('проблемы', row.problems.length)}`
            + `<ul class="problems">${items}</ul></div>`;
     }
     return `${out}</div>`;
@@ -97,7 +113,8 @@
       const patches = row.patches.length
         ? `<span class="patcell">${row.patches.length}${markup.meterHtml(row)}</span>`
         : '<span class="zero">0</span>';
-      const main = `<tr class="main-row${bad ? ' bad' : ''}" data-row="${esc(key)}">`
+      const main = `<tr class="main-row${open ? ' open' : ''}`
+        + `${bad ? ' bad' : ''}" data-row="${esc(key)}">`
         + `<td class="src">${chevron(open)} ${hl(row.name, q)}</td>`
         /* Версии может не быть: снапшот приходит из файла, который выбрал
            человек, и прочерк здесь честнее пустой ячейки. */
@@ -111,31 +128,44 @@
         + `<td class="built">${markup.builtHtml(row.completed, q)}</td>`
         + `<td class="marks">${markup.marksHtml(row.marks)}</td>`
         + `${linksCell(row)}</tr>`;
-      return open ? main + detailRow(opt.cols, stateDetail(row, q)) : main;
+      return open ? main + detailRow(opt.cols, stateDetail(row, q), bad) : main;
     }).join('');
   }
 
   /* ---------- вкладка «Изменения» ---------- */
 
-  /* Одна сторона «было/стало». Параметры собраны в объект: их тринадцать, и
-     позиционным списком такой вызов читался бы как шифровка. */
-  function side(s, q) {
+  /* Сторона «было/стало» разбита на четыре куска, и в разметку они уходят
+     парами: сперва обе шапки, потом обе сводки, потом оба списка патчей,
+     потом оба списка пакетов. Пары встают в одну строку сетки и получают
+     общую высоту — иначе списки начинались бы на разной, из-за списков
+     патчей над ними.
+
+     Дифф живёт только в «стало». «Было» — это состояние, а не половина
+     сравнения: там ничего не происходило, и вычеркнутая строка утверждала
+     бы, будто происходило. Что ушло и что пришло, целиком видно справа. */
+  function sideHead(title, tag) {
+    return `<div class="bl side-head">${esc(title)} · <b>${esc(tag)}</b></div>`;
+  }
+
+  /* Сводка стороны. markCls пуст у «было» и назван у «стало»: смена тега
+     или ветки — тоже переход, и подсвечивается он там же, где остальные. */
+  function sideFacts(s, q, markCls) {
     const tagCell = markup.taggedText(s.taggedIn, s.inherited, q);
-    return `<div class="side"><div class="bl">${esc(s.title)} · `
-      + `<b>${esc(s.tag)}</b></div>`
+    return '<div class="side">'
       + kv('версия', s.evr ? `<span class="mono">${hl(s.evr, q)}</span>`
                            : '<span class="none">—</span>')
-      + kv('тег', s.tagChanged
-            ? `<span class="${s.markCls}">${tagCell}</span>` : tagCell)
+      + kv('тег', markCls && s.tagChanged
+            ? `<span class="${markCls}">${tagCell}</span>` : tagCell)
       + kv('ветка', s.branch
-            ? `<span class="mono${s.branchChanged ? ` ${s.markCls}` : ''}">`
+            ? `<span class="mono${markCls && s.branchChanged
+                                    ? ` ${markCls}` : ''}">`
               + `${hl(s.branch, q)}</span>`
             : '<span class="none">—</span>')
-      + `<div class="bl" style="margin-top:.7rem">патчи · ${s.patches.length}`
-      + `</div>${markup.patchesHtml(s.patches, q, s.mark, s.markCls)}`
-      + '<div class="bl" style="margin-top:.7rem">RPM · '
-      + `${markup.rpmSideCount(s.rpmRows, s.at)}</div>`
-      + `${markup.rpmSideHtml(s.rpmRows, s.at, q, s.markCls)}</div>`;
+      + '</div>';
+  }
+
+  function sideBlock(title, count, body) {
+    return `<div class="side">${blockHead(title, count)}${body}</div>`;
   }
 
   /* Имена концов приходят доводами: какая пара сейчас выбрана, знает
@@ -143,21 +173,23 @@
   function diffDetail(row, q, oldTag, newTag) {
     const branchChanged = row.marks.indexOf('branch-changed') !== -1;
     const tagChanged = row.marks.indexOf('tag-changed') !== -1;
-    const common = { branch: null, rpmRows: row.rpm_rows,
-                     branchChanged, tagChanged };
+    const was = { evr: row.old_evr, branch: row.old_branch,
+                  taggedIn: row.old_tagged_in, inherited: row.old_inherited,
+                  branchChanged, tagChanged };
+    const now = { evr: row.new_evr, branch: row.new_branch,
+                  taggedIn: row.new_tagged_in, inherited: row.new_inherited,
+                  branchChanged, tagChanged };
+    const oldRpms = markup.rpmSideList(row.rpm_rows, 0);
+    const newRpms = markup.rpmSideList(row.rpm_rows, 1);
     return '<div class="sides">'
-      + side(Object.assign({}, common,
-             { title: 'было', tag: oldTag, evr: row.old_evr,
-               branch: row.old_branch, taggedIn: row.old_tagged_in,
-               inherited: row.old_inherited, patches: row.old_patches,
-               at: 0, mark: setFrom(row.patches_removed),
-               markCls: 'is-removed' }), q)
-      + side(Object.assign({}, common,
-             { title: 'стало', tag: newTag, evr: row.new_evr,
-               branch: row.new_branch, taggedIn: row.new_tagged_in,
-               inherited: row.new_inherited, patches: row.new_patches,
-               at: 1, mark: setFrom(row.patches_added),
-               markCls: 'is-added' }), q)
+      + sideHead('было', oldTag) + sideHead('стало', newTag)
+      + sideFacts(was, q, '') + sideFacts(now, q, 'is-added')
+      + sideBlock('патчи', row.old_patches.length,
+                  markup.patchesHtml(row.old_patches, q))
+      + sideBlock('патчи', row.new_patches.length,
+                  markup.patchesChangeHtml(row.old_patches, row.new_patches, q))
+      + sideBlock('RPM', oldRpms.length, markup.rpmsHtml(oldRpms, q))
+      + sideBlock('RPM', newRpms.length, markup.rpmsChangeHtml(row.rpm_rows, q))
       + '</div>';
   }
 
@@ -167,7 +199,8 @@
       const row = item.row;
       const key = opt.keyOf(row);
       const open = opt.openOf(key, item.open);
-      const main = `<tr class="main-row ${esc(row.status)}" data-row="${esc(key)}">`
+      const main = `<tr class="main-row ${esc(row.status)}`
+        + `${open ? ' open' : ''}" data-row="${esc(key)}">`
         + `<td class="src">${chevron(open)} ${hl(row.name, q)}</td>`
         + `<td class="ver">${row.old_evr ? hl(row.old_evr, q) : '—'}</td>`
         + `<td class="dir">${own(labels.ARROW, row.status) || ''}</td>`

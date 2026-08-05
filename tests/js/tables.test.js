@@ -107,6 +107,65 @@ test('незнакомый статус не рисует стрелки', funct
   assert.match(out, /<td class="dir"><\/td>/);
 });
 
+/* Раскрытая строка и её детали — один предмет: полоса слева идёт через
+   обе, и рисует её CSS по классам, которые ставит разметка. */
+test('раскрытая строка помечена, свёрнутая — нет', function () {
+  var open = tables.stateRows([{ row: stateRow(), open: true }],
+                              opts({ open: true }));
+  var shut = tables.stateRows([{ row: stateRow(), open: false }], opts());
+  assert.match(open, /class="main-row open"/, open);
+  assert.doesNotMatch(shut, /main-row open/, shut);
+});
+
+test('детали проблемной сборки наследуют её тревожную полосу', function () {
+  var out = tables.stateRows(
+    [{ row: stateRow({ problems: ['нет источника'] }), open: true }],
+    opts({ open: true }));
+  assert.match(out, /class="detail-row bad"/, out);
+});
+
+test('детали обычной сборки тревожной полосы не наследуют', function () {
+  var out = tables.stateRows([{ row: stateRow(), open: true }],
+                             opts({ open: true }));
+  assert.match(out, /class="detail-row"/, out);
+});
+
+test('строка диффа тоже помечена раскрытой', function () {
+  var out = tables.diffRows([{ row: diffRow(), open: true }],
+                            opts({ open: true }));
+  assert.match(out, /class="main-row upgraded open"/, out);
+});
+
+test('стрелка раскрытия — один глиф, состояние на aria', function () {
+  var open = tables.stateRows([{ row: stateRow(), open: true }],
+                              opts({ open: true }));
+  var shut = tables.stateRows([{ row: stateRow(), open: false }], opts());
+  assert.match(open, /aria-expanded="true">▸/, open);
+  assert.match(shut, /aria-expanded="false">▸/, shut);
+});
+
+test('подпись блока несёт счётчик', function () {
+  var out = tables.stateDetail(stateRow(), '');
+  assert.match(out, /RPM<span class="n">· 1<\/span>/, out);
+  assert.match(out, /патчи<span class="n">· 0<\/span>/, out);
+});
+
+/* Пакеты приходят спаренными, чтобы один и тот же подпакет стоял слева и
+   справа на одной высоте. Держится это на том, что куски сторон уходят в
+   разметку парами и встают в одну строку сетки: пойди они подряд — сперва
+   вся левая сторона, потом вся правая, — списки начинались бы на разной
+   высоте из-за списков патчей над ними, и выравнивание пропало бы. */
+test('куски сторон идут парами: шапка, сводка, патчи, пакеты', function () {
+  var out = tables.diffDetail(diffRow(), '', 'os-9.1', 'os-9.4');
+  var order = (out.match(/side-head|class="side"/g) || []);
+  assert.deepStrictEqual(order, ['side-head', 'side-head',
+                                 'class="side"', 'class="side"',
+                                 'class="side"', 'class="side"',
+                                 'class="side"', 'class="side"'], out);
+  assert.ok(out.indexOf('было') < out.indexOf('стало'),
+            'левая сторона должна идти первой');
+});
+
 test('имена концов в детали диффа приходят доводами', function () {
   var out = tables.diffDetail(diffRow(), '', 'os-9.1', 'os-9.4');
   assert.match(out, /было · <b>os-9\.1<\/b>/);
