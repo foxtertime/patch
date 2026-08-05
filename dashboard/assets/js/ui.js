@@ -105,7 +105,7 @@
     rebuild();
   }
 
-  /* Подписи фильтров: ключ приходит из данных (теги строк, статусы диффа),
+  /* Подписи фильтров: ключ приходит из данных (метки строк, статусы диффа),
      а по-русски он должен читаться и в чипе, и в подсказке. */
   var LABELS = {
     "all": "все",
@@ -129,10 +129,10 @@
   var KNOWN_CLASS = { "autogen": 1, "cve": 1, "sast": 1, "dast": 1,
                       "coverage": 1, "distsuffix": 1, "spec": 1,
                       "changelog": 1, "files": 1, "other": 1 };
-  var CALM_TAGS = { "from-commit": "warn", "no-patch": "calm",
+  var CALM_MARKS = { "from-commit": "warn", "no-patch": "calm",
                     "no-source": "bad", "gitlab-error": "bad",
                     "internal-error": "bad", "inherited": "calm" };
-  var STATUS_TAGS = { "added": 1, "removed": 1, "unchanged": 1, "upgraded": 1,
+  var STATUS_MARKS = { "added": 1, "removed": 1, "unchanged": 1, "upgraded": 1,
                       "downgraded": 1, "repackaged": 1 };
 
   var stateSection = document.getElementById('tab-state');
@@ -324,7 +324,7 @@
       if (!set.hasOwnProperty(key)) continue;
       if (key === 'has-patch') { if (!row.patches.length) return false; }
       else if (key === 'problem') { if (!row.problems.length) return false; }
-      else if (row.tags.indexOf(key) === -1) return false;
+      else if (row.marks.indexOf(key) === -1) return false;
     }
     return true;
   }
@@ -334,7 +334,7 @@
     for (key in set) {
       if (!set.hasOwnProperty(key)) continue;
       if (key === 'changed') { if (!row.changed) return false; }
-      else if (row.tags.indexOf(key) === -1) return false;
+      else if (row.marks.indexOf(key) === -1) return false;
     }
     return true;
   }
@@ -595,13 +595,13 @@
     return table.querySelectorAll('th').length;
   }
 
-  function tagHtml(key) {
-    var cls = 'tag';
+  function markHtml(key) {
+    var cls = 'mark';
     if (key === 'patches+') cls += ' added';
     else if (key === 'patches-') cls += ' removed';
     else if (key === 'branch-changed' || key === 'tag-changed') cls += ' warn';
-    else if (own(CALM_TAGS, key)) cls += ' ' + CALM_TAGS[key];
-    else if (own(STATUS_TAGS, key)) cls += ' ' + key;
+    else if (own(CALM_MARKS, key)) cls += ' ' + CALM_MARKS[key];
+    else if (own(STATUS_MARKS, key)) cls += ' ' + key;
     else cls += ' ' + classCls(key);   /* остаётся класс патчей */
     return '<span class="' + cls + '" data-filter="' + esc(key) + '" role="button"'
          + ' tabindex="0" data-tip="' + esc(label(key)) + '. Клик — фильтр.">'
@@ -664,9 +664,9 @@
          + inheritedNote(inherited);
   }
 
-  function tagsHtml(tags) {
+  function marksHtml(marks) {
     var out = '';
-    for (var i = 0; i < tags.length; i++) out += tagHtml(tags[i]);
+    for (var i = 0; i < marks.length; i++) out += markHtml(marks[i]);
     return out || '<span class="none">—</span>';
   }
 
@@ -839,7 +839,7 @@
 
     var branch = row.branch
       ? '<span class="mono">' + hl(row.branch, q) + '</span>'
-        + (row.ref_kind === 'commit' ? ' ' + tagHtml('from-commit') : '')
+        + (row.ref_kind === 'commit' ? ' ' + markHtml('from-commit') : '')
       : '<span class="none">источник неизвестен</span>';
     var dir = row.patch_dir_present === true ? 'есть'
             : (row.patch_dir_present === false ? 'нет' : 'не проверялся');
@@ -880,7 +880,7 @@
       var row = items[i].row;
       var key = rowKey(row);
       var open = openOf(key, items[i].open);
-      var bad = row.problems.length || row.tags.indexOf('no-source') !== -1;
+      var bad = row.problems.length || row.marks.indexOf('no-source') !== -1;
       /* Число и полоска разведены по краям ячейки, а не стоят подряд:
          подробности — у .patcell в стилях. */
       var patches = row.patches.length
@@ -900,7 +900,7 @@
            + '<td class="pat">' + patches + '</td>'
            + '<td class="num">' + row.rpms.length + '</td>'
            + '<td class="built">' + builtHtml(row.completed, q) + '</td>'
-           + '<td class="tags">' + tagsHtml(row.tags) + '</td>'
+           + '<td class="marks">' + marksHtml(row.marks) + '</td>'
            + '<td class="links">' + linkHtml(row.koji_url, 'koji')
            + linkHtml(row.source_url, 'git') + '</td></tr>';
       if (open) {
@@ -940,8 +940,8 @@
   function diffDetail(row, q) {
     var pair = curPair();
     var oldTag = pair ? pair.old : 'было', newTag = pair ? pair.new : 'стало';
-    var branchChanged = row.tags.indexOf('branch-changed') !== -1;
-    var tagChanged = row.tags.indexOf('tag-changed') !== -1;
+    var branchChanged = row.marks.indexOf('branch-changed') !== -1;
+    var tagChanged = row.marks.indexOf('tag-changed') !== -1;
     return '<div class="sides">'
       + side({ title: 'было', tag: oldTag, evr: row.old_evr,
                branch: row.old_branch, taggedIn: row.old_tagged_in,
@@ -983,7 +983,7 @@
                                         row.patches_removed.length) + '</td>'
            + '<td class="pat">' + delta(row.rpms_added.length,
                                         row.rpms_removed.length) + '</td>'
-           + '<td class="tags">' + tagsHtml(row.tags) + '</td>'
+           + '<td class="marks">' + marksHtml(row.marks) + '</td>'
            + '<td class="links">' + linkHtml(row.koji_url, 'koji')
            + linkHtml(row.source_url, 'git') + '</td></tr>';
       if (open) {
@@ -1273,7 +1273,7 @@
     var host = tab === 'diff' ? curPair() : curSnap();
     var rows = host ? (tab === 'diff' ? host.rows : host.builds) : [];
     for (i = 0; i < rows.length; i++) {
-      if (rows[i].tags.indexOf(key) !== -1) return true;
+      if (rows[i].marks.indexOf(key) !== -1) return true;
     }
     return false;
   }

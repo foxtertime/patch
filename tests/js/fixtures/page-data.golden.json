@@ -52,7 +52,7 @@
      "rpms_removed": [],
      "source_url": "https://gl/core/curl/-/tree/os-9.2",
      "status": "added",
-     "tags": [
+     "marks": [
       "added"
      ]
     },
@@ -82,7 +82,7 @@
      "rpms_removed": [],
      "source_url": "https://gl/web/httpd/-/tree/abc123",
      "status": "unchanged",
-     "tags": [
+     "marks": [
       "unchanged",
       "tag-changed"
      ]
@@ -187,7 +187,7 @@
      ],
      "source_url": "https://gl/web/nginx/-/tree/os-9.2",
      "status": "upgraded",
-     "tags": [
+     "marks": [
       "upgraded",
       "repackaged",
       "patches+",
@@ -229,7 +229,7 @@
      "rpms_removed": [],
      "source_url": null,
      "status": "removed",
-     "tags": [
+     "marks": [
       "removed"
      ]
     },
@@ -293,7 +293,7 @@
      "rpms_removed": [],
      "source_url": "https://gl/core/zlib/-/tree/os-9.1",
      "status": "downgraded",
-     "tags": [
+     "marks": [
       "downgraded"
      ]
     }
@@ -343,7 +343,7 @@
      ],
      "source_url": "https://gl/web/httpd/-/tree/abc123",
      "tagged_in": "os-9.0",
-     "tags": [
+     "marks": [
       "inherited",
       "from-commit",
       "no-patch",
@@ -408,7 +408,7 @@
      ],
      "source_url": "https://gl/web/nginx/-/tree/os-9.1",
      "tagged_in": "os-9.1",
-     "tags": [
+     "marks": [
       "autogen",
       "cve",
       "spec"
@@ -451,7 +451,7 @@
      ],
      "source_url": null,
      "tagged_in": null,
-     "tags": [
+     "marks": [
       "coverage",
       "no-source",
       "internal-error"
@@ -503,7 +503,7 @@
      ],
      "source_url": "https://gl/core/zlib/-/tree/os-9.1",
      "tagged_in": "os-9.1",
-     "tags": [
+     "marks": [
       "sast",
       "other"
      ],
@@ -599,7 +599,7 @@
      ],
      "source_url": "https://gl/core/curl/-/tree/os-9.2",
      "tagged_in": "os-9.2",
-     "tags": [
+     "marks": [
       "files"
      ],
      "task_id": null,
@@ -632,7 +632,7 @@
      ],
      "source_url": "https://gl/web/httpd/-/tree/abc123",
      "tagged_in": "os-9.2",
-     "tags": [
+     "marks": [
       "from-commit",
       "no-patch",
       "gitlab-error"
@@ -696,7 +696,7 @@
      ],
      "source_url": "https://gl/web/nginx/-/tree/os-9.2",
      "tagged_in": "os-9.2",
-     "tags": [
+     "marks": [
       "cve",
       "dast",
       "changelog"
@@ -748,7 +748,7 @@
      ],
      "source_url": "https://gl/core/zlib/-/tree/os-9.1",
      "tagged_in": "os-9.2",
-     "tags": [
+     "marks": [
       "sast",
       "other"
      ],

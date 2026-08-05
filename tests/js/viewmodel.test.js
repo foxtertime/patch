@@ -112,7 +112,7 @@ test('несколько патчей одного класса считаютс
   assert.deepStrictEqual(block.counts.by_class.CVE, { builds: 1, files: 2 });
   assert.strictEqual(block.counts.patch_files, 3);
   // метка класса одна на билд, сколько бы файлов в нём ни было
-  assert.deepStrictEqual(block.builds[0].tags, ['cve', 'sast']);
+  assert.deepStrictEqual(block.builds[0].marks, ['cve', 'sast']);
 });
 
 test('порядок меток не зависит от порядка файлов в каталоге', function () {
@@ -122,8 +122,8 @@ test('порядок меток не зависит от порядка файл
   var backward = build('b', { patches: [patch('SAST-x.patch', 'SAST'),
                                         patch('cve-2024-7347.patch', 'CVE')] });
   var rows = byName(data([snap('t', [forward, backward])]).snapshots[0].builds);
-  assert.deepStrictEqual(rows.a.tags, ['cve', 'sast']);
-  assert.deepStrictEqual(rows.b.tags, ['cve', 'sast']);
+  assert.deepStrictEqual(rows.a.marks, ['cve', 'sast']);
+  assert.deepStrictEqual(rows.b.marks, ['cve', 'sast']);
 });
 
 test('классы идут в порядке списка, а не по алфавиту', function () {
@@ -132,7 +132,7 @@ test('классы идут в порядке списка, а не по алф�
     patch('dast-x.patch', 'DAST'),
     patch('sast-x.patch', 'SAST'),
     patch('CVE-2024-7347.patch', 'CVE')] })])]).snapshots[0].builds[0];
-  assert.deepStrictEqual(row.tags, ['cve', 'sast', 'dast']);
+  assert.deepStrictEqual(row.marks, ['cve', 'sast', 'dast']);
 });
 
 test('метки состояния идут в постоянном порядке', function () {
@@ -141,7 +141,7 @@ test('метки состояния идут в постоянном поряд�
     tag_name: 'parent', present: false,
     problems: ['gitlab: 404', 'internal error: boom'],
     patches: [patch('CVE-2024-7347.patch', 'CVE')] })])]).snapshots[0].builds[0];
-  assert.deepStrictEqual(row.tags, ['cve', 'inherited', 'no-patch',
+  assert.deepStrictEqual(row.marks, ['cve', 'inherited', 'no-patch',
                                     'gitlab-error', 'internal-error']);
 });
 
@@ -155,12 +155,12 @@ test('прямые и унаследованные билды различают
   assert.strictEqual(rows.nginx.inherited, false);
   assert.strictEqual(rows.curl.tagged_in, 'os-9-base');
   assert.strictEqual(rows.curl.inherited, true);
-  assert.ok(rows.curl.tags.indexOf('inherited') !== -1);
-  assert.strictEqual(rows.nginx.tags.indexOf('inherited'), -1);
+  assert.ok(rows.curl.marks.indexOf('inherited') !== -1);
+  assert.strictEqual(rows.nginx.marks.indexOf('inherited'), -1);
   // неизвестно — это не «прямой»: ни поля, ни метки
   assert.strictEqual(rows.vim.tagged_in, null);
   assert.strictEqual(rows.vim.inherited, null);
-  assert.strictEqual(rows.vim.tags.indexOf('inherited'), -1);
+  assert.strictEqual(rows.vim.marks.indexOf('inherited'), -1);
 });
 
 test('строка несёт остальные теги koji', function () {
@@ -200,7 +200,7 @@ test('метки пары идут в постоянном порядке', func
     patches: [patch('new.patch', 'other')],
     rpms: ['nginx-1.0-1.el9.aarch64'] })]);
   var row = data([old, fresh]).pairs[0].rows[0];
-  assert.deepStrictEqual(row.tags, ['unchanged', 'repackaged', 'patches+',
+  assert.deepStrictEqual(row.marks, ['unchanged', 'repackaged', 'patches+',
                                     'patches-', 'branch-changed',
                                     'tag-changed']);
 });
@@ -214,7 +214,7 @@ test('строки пары несут оба тега', function () {
   assert.strictEqual(row.new_tagged_in, 'os-9.2');
   assert.strictEqual(row.old_inherited, true);
   assert.strictEqual(row.new_inherited, false);
-  assert.ok(row.tags.indexOf('tag-changed') !== -1);
+  assert.ok(row.marks.indexOf('tag-changed') !== -1);
 });
 
 test('rpm билда сгруппированы по архитектуре', function () {
@@ -298,16 +298,16 @@ test('в паре версии сторон тоже не выдумываютс
 test('метки строки по классам патчей', function () {
   // tests/test_render.py: test_row_tags_for_patch_classes
   var rows = byName(data().snapshots[0].builds);
-  assert.deepStrictEqual(rows.nginx.tags.slice().sort(), ['cve', 'sast']);
-  assert.ok(rows.curl.tags.indexOf('no-patch') !== -1);
-  assert.ok(rows.vim.tags.indexOf('no-source') !== -1);
+  assert.deepStrictEqual(rows.nginx.marks.slice().sort(), ['cve', 'sast']);
+  assert.ok(rows.curl.marks.indexOf('no-patch') !== -1);
+  assert.ok(rows.vim.marks.indexOf('no-source') !== -1);
 });
 
 test('метка класса считается правилом slug из дашборда', function () {
   // tests/test_render.py: test_class_tag_uses_the_dashboard_slug_rule
   var rows = data([snap('t', [build('x', { patches: [patch('a.cpp', 'C++')] })],
                        ['C++', 'other'])]).snapshots[0].builds;
-  assert.ok(rows[0].tags.indexOf('c-') !== -1, rows[0].tags.join(','));
+  assert.ok(rows[0].marks.indexOf('c-') !== -1, rows[0].marks.join(','));
 });
 
 test('слаг совпадает с правилом дашборда', function () {
@@ -323,14 +323,14 @@ test('метка ошибки gitlab', function () {
   var broken = build('bad', { problems: ['gitlab: 403 Forbidden'],
                               present: null });
   var rows = data([snap('t', [broken])]).snapshots[0].builds;
-  assert.ok(rows[0].tags.indexOf('gitlab-error') !== -1);
+  assert.ok(rows[0].marks.indexOf('gitlab-error') !== -1);
 });
 
 test('метка сборки с коммита', function () {
   // tests/test_render.py: test_from_commit_tag
   var commit = build('c', { ref: 'a1b2c3d', ref_kind: 'commit' });
   var rows = data([snap('t', [commit])]).snapshots[0].builds;
-  assert.ok(rows[0].tags.indexOf('from-commit') !== -1);
+  assert.ok(rows[0].marks.indexOf('from-commit') !== -1);
 });
 
 test('метка внутренней ошибки', function () {
@@ -338,7 +338,7 @@ test('метка внутренней ошибки', function () {
   var broken = build('bad', { problems: ['internal error: boom'],
                               present: null });
   var rows = data([snap('t', [broken])]).snapshots[0].builds;
-  assert.ok(rows[0].tags.indexOf('internal-error') !== -1);
+  assert.ok(rows[0].marks.indexOf('internal-error') !== -1);
 });
 
 test('ошибка gitlab не означает внутреннюю ошибку', function () {
@@ -346,7 +346,7 @@ test('ошибка gitlab не означает внутреннюю ошибк�
   var broken = build('bad', { problems: ['gitlab: 403 Forbidden'],
                               present: null });
   var rows = data([snap('t', [broken])]).snapshots[0].builds;
-  assert.strictEqual(rows[0].tags.indexOf('internal-error'), -1);
+  assert.strictEqual(rows[0].marks.indexOf('internal-error'), -1);
 });
 
 test('пары попадают в данные страницы', function () {
@@ -360,7 +360,7 @@ test('пары попадают в данные страницы', function () {
   var rows = byName(pair.rows);
   assert.strictEqual(rows.nginx.old_evr, '1.0-1.el9');
   assert.strictEqual(rows.nginx.new_evr, '1.1-1.el9');
-  assert.ok(rows.nginx.tags.indexOf('upgraded') !== -1);
+  assert.ok(rows.nginx.marks.indexOf('upgraded') !== -1);
   assert.strictEqual(rows.gone.status, 'removed');
   assert.strictEqual(pair.counts.added, 1);
 });
