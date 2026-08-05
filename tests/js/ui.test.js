@@ -942,3 +942,45 @@ test('на «Изменениях» рельс отмечает отрезок �
     assert.strictEqual(chain.split('class="stop on"').length - 1, 2,
                        'оба конца пары: ' + chain);
   });
+
+/* Предпосчитаны только соседние переходы и сводный. Любой другой диапазон
+   должен считаться на месте, иначе «выбрать любой диапазон» означало бы
+   «увидеть пустую таблицу». Заходим через адрес: другого пути к такому
+   диапазону в этой задаче ещё нет. */
+var OCT = '2026-10-01T00:00:00+03:00';
+
+test('переход, которого нет в предпосчитанных, считается по требованию',
+  function () {
+    var want = 'os-9.2@' + AUG + '..os-9.4@' + OCT;
+    var dom = load({ hash: '#tab=diff&pair=' + encodeURIComponent(want) });
+    store.add([snap('os-9.1', JUL, { builds: [build('a', { version: '1.0' })] }),
+               snap('os-9.2', AUG, { builds: [build('a', { version: '2.0' })] }),
+               snap('os-9.3', SEP, { builds: [build('a', { version: '3.0' })] }),
+               snap('os-9.4', OCT, { builds: [build('a', { version: '4.0' })] })],
+              'a.json');
+    /* Соседние переходы это 9.1→9.2, 9.2→9.3, 9.3→9.4, сводный — 9.1→9.4.
+       Запрошенный 9.2→9.4 не совпадает ни с одним. */
+    assert.doesNotMatch(dom.id('diff-rows').innerHTML, /class="empty"/,
+                        dom.id('diff-rows').innerHTML);
+    /* Версия выросла с 2.0 до 4.0 — значит сравнили именно эти концы, а не
+       откатились на умолчание «вся цепочка», где было бы 1.0 → 4.0. */
+    assert.match(dom.id('diff-rows').innerHTML, /2\.0/,
+                 dom.id('diff-rows').innerHTML);
+    assert.strictEqual(dom.id('diff-rows').innerHTML.indexOf('1.0'), -1,
+                       dom.id('diff-rows').innerHTML);
+  });
+
+/* Предпосчитанные переходы названы тегами, а два прогона одного тега —
+   законный случай. Опознать такую пару по имени нельзя, и в кэш она не
+   попадёт: её обязан посчитать расчёт по требованию, иначе вкладка
+   «Изменения» на таких цепочках опустела бы. */
+test('переход между двумя прогонами одного тега считается и не пуст',
+  function () {
+    var dom = load();
+    store.add([snap('os-9.2', JUL, { builds: [build('nginx', { version: '1.0' })] }),
+               snap('os-9.2', AUG, { builds: [build('nginx', { version: '2.0' })] })],
+              'a.json');
+    dom.fire(dom.document.querySelectorAll('.tab')[1], 'click', {});
+    assert.doesNotMatch(dom.id('diff-rows').innerHTML, /class="empty"/,
+                        dom.id('diff-rows').innerHTML);
+  });

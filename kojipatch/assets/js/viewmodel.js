@@ -391,5 +391,5 @@
   }
 
   return { buildPageData: buildPageData, slug: slug, toMsk: toMsk,
-           patchClassesOf: patchClassesOf };
+           patchClassesOf: patchClassesOf, pairBlock: pairBlock };
 }));

@@ -4,19 +4,29 @@
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
     module.exports = factory(require('./viewmodel.js'), require('./store.js'),
-                             require('./rpms.js'));
+                             require('./rpms.js'), require('./diff.js'));
   } else {
     root.KP = root.KP || {};
-    root.KP.ui = factory(root.KP.viewmodel, root.KP.store, root.KP.rpms);
+    root.KP.ui = factory(root.KP.viewmodel, root.KP.store, root.KP.rpms,
+                         root.KP.diff);
   }
 }(typeof globalThis !== 'undefined' ? globalThis : this,
-  function (viewmodel, store, rpmsmod) {
+  function (viewmodel, store, rpmsmod, diffmod) {
   'use strict';
 
   /* Данные страницы считаются здесь же, из снапшотов, которые человек
      подгружает в дашборд сам. */
   var DATA = { generated: '', patch_classes: [], snapshots: [], pairs: [] };
   var SNAPS = [], PAIRS = [], CLASSES = [];
+  /* Выбранный переход — имена снапшотов, а не номер в массиве. Номер
+     значил что-то, только пока переходы приходили готовым списком в
+     известном порядке; с произвольными диапазонами он не значит ничего, а
+     имя переживает и перестановку цепочки, и выгрузку соседа. */
+  var pairSel = { from: null, to: null };
+  /* Посчитанные переходы по имени диапазона. Заводится заново на каждую
+     смену состава: снапшот с тем же именем — тот же файл, но набор вокруг
+     него другой, и сводность диапазона могла измениться. */
+  var pairCache = {};
 
   /* Единственная дверь для данных: сюда приходит то, что посчитал
      viewmodel.js, отсюда перерисовывается страница. Зовётся при каждом
@@ -33,7 +43,7 @@
        шаге: после первого же файла умолчание «свежий снапшот и самый
        широкий переход» не срабатывало бы больше никогда. */
     var wantTag = picked.tag && SNAPS[st.tag] ? snapKey(SNAPS[st.tag]) : null;
-    var wantPair = picked.pair && PAIRS[st.pair] ? pairKey(st.pair) : null;
+    var wantPair = picked.pair ? pairKey(currentEnds()) : null;
     var foundTag = false, foundPair = false;
     var ci;
     DATA = pageData;
@@ -54,13 +64,21 @@
        это обещает README, и обещание не должно зависеть от того, одним
        файлом человек подгрузил снапшоты или пятью. */
     st.tag = SNAPS.length ? SNAPS.length - 1 : 0;
-    st.pair = PAIRS.length ? PAIRS.length - 1 : 0;
     for (ci = 0; wantTag !== null && ci < SNAPS.length; ci++) {
       if (snapKey(SNAPS[ci]) === wantTag) { st.tag = ci; foundTag = true; }
     }
-    for (ci = 0; wantPair !== null && ci < PAIRS.length; ci++) {
-      if (pairKey(ci) === wantPair) { st.pair = ci; foundPair = true; }
+    seedPairs();
+    /* Умолчание: вся цепочка. Выбор восстанавливаем, только если оба его
+       конца ещё на странице; иначе снова работает умолчание. */
+    if (wantPair) {
+      var parts = wantPair.split('..');
+      if (snapIndexByKey(parts[0]) !== -1 && snapIndexByKey(parts[1]) !== -1) {
+        pairSel.from = parts[0];
+        pairSel.to = parts[1];
+        foundPair = true;
+      }
     }
+    if (!foundPair) { pairSel.from = null; pairSel.to = null; }
     /* Выбранного больше нет на странице — значит, нет и выбора: дальше снова
        работает умолчание. Иначе следующий файл открылся бы «прежним
        выбором», которого человек не делал. */
@@ -143,10 +161,10 @@
      location.hash и оттуда же восстанавливается при перезагрузке. */
   var st = {
     tab: 'state',
-    /* Свежий тег и самую широкую пару выбирает applyData: до прихода
-       данных выбирать не из чего. */
+    /* Свежий тег выбирает applyData: до прихода данных выбирать не из чего.
+       Переход здесь не хранится вовсе — его концы названы именами
+       снапшотов и лежат в pairSel. */
     tag: 0,
-    pair: 0,
     q: '',
     /* «Изменения» открываются на изменившихся компонентах: неизменившиеся
        строки в этой таблице — шум, из-за которого не видно изменившихся.
@@ -388,7 +406,7 @@
   /* ---------- какие строки видны ---------- */
 
   function curSnap() { return SNAPS[st.tag] || null; }
-  function curPair() { return PAIRS[st.pair] || null; }
+  function curPair() { return pairFor(currentEnds()); }
 
   /* Имя снапшота — тег и время сбора. Одного тега мало: один и тот же тег
      законно приходит из разных прогонов («тот же тег месяц назад против
@@ -400,24 +418,87 @@
     return snap ? snap.tag + '@' + (snap.generated || '') : '';
   }
 
-  /* Номера снапшотов, которые сравнивает пара. Их задаёт diffChain: сперва
-     соседи по цепочке в её порядке, затем — сводная пара «первый против
-     последнего». Порядок пар здесь и порядок снапшотов — один и тот же,
-     других пар в цепочке не бывает. */
-  function pairEnds(index) {
-    var pair = PAIRS[index];
-    if (!pair) return null;
-    if (pair.summary) return [0, SNAPS.length - 1];
-    return [index, index + 1];
+  function snapIndexByKey(key) {
+    for (var i = 0; i < SNAPS.length; i++) {
+      if (snapKey(SNAPS[i]) === key) return i;
+    }
+    return -1;
+  }
+
+  /* Концы выбранного перехода в порядке цепочки. Направление задаёт
+     цепочка, а не порядок кликов: «было» — то, что левее. Обратный порядок
+     поменял бы местами «появился» и «исчез», причём молча.
+
+     Ничего не выбрано или конец выгрузили — умолчание «вся цепочка»: то же
+     самое, что дашборд показывал и раньше, просто названное иначе. */
+  function currentEnds() {
+    if (SNAPS.length < 2) return null;
+    var a = snapIndexByKey(pairSel.from), b = snapIndexByKey(pairSel.to);
+    if (a === -1 || b === -1 || a === b) return [0, SNAPS.length - 1];
+    return a < b ? [a, b] : [b, a];
   }
 
   /* Имя перехода для адресной строки: имена обоих снапшотов, а не их тегов.
      У трёх прогонов одного тега все переходы назывались бы
      «os-9.2..os-9.2», и ссылка на любой из них открывала бы последний. */
-  function pairKey(index) {
-    var ends = pairEnds(index);
+  function pairKey(ends) {
     if (!ends || !SNAPS[ends[0]] || !SNAPS[ends[1]]) return '';
     return snapKey(SNAPS[ends[0]]) + '..' + snapKey(SNAPS[ends[1]]);
+  }
+
+  function setPairEnds(lo, hi) {
+    pairSel.from = snapKey(SNAPS[lo]);
+    pairSel.to = snapKey(SNAPS[hi]);
+    picked.pair = true;
+  }
+
+  /* Единственный тег в цепочке с таким именем, иначе -1. Предпосчитанные
+     переходы названы тегами, а один тег законно приходит из двух прогонов;
+     такую пару по имени не опознать, и в кэш она не попадёт — её посчитают
+     по требованию. */
+  function onlyIndexWithTag(tag) {
+    var found = -1, i;
+    for (i = 0; i < SNAPS.length; i++) {
+      if (SNAPS[i].tag !== tag) continue;
+      if (found !== -1) return -1;
+      found = i;
+    }
+    return found;
+  }
+
+  /* Кэш наполняем тем, что уже посчитано при загрузке. Сопоставляем по
+     именам концов, а не по раскладке diffChain: знать, что она кладёт
+     сперва соседей, а потом сводную пару, здесь незачем — она может
+     измениться, и молчаливый переезд был бы худшим из исходов. */
+  function seedPairs() {
+    pairCache = {};
+    var i, lo, hi;
+    for (i = 0; i < PAIRS.length; i++) {
+      lo = onlyIndexWithTag(PAIRS[i].old);
+      hi = onlyIndexWithTag(PAIRS[i]['new']);
+      if (lo === -1 || hi === -1 || lo >= hi) continue;
+      pairCache[pairKey([lo, hi])] = PAIRS[i];
+    }
+  }
+
+  /* Переход для этих концов: из кэша, а если его там нет — считаем и
+     кладём. Расчёт синхронный: это один дифф, столько же работы, сколько
+     страница уже делает на загрузке для каждого соседнего перехода. */
+  function pairFor(ends) {
+    if (!ends) return null;
+    var key = pairKey(ends);
+    if (own(pairCache, key)) return pairCache[key];
+    var raw = store.snapshots();
+    if (!raw[ends[0]] || !raw[ends[1]]) return null;
+    /* Сводным считается диапазон во всю цепочку, и только когда снапшотов
+       больше двух: на двух единственный переход и есть вся цепочка, и
+       подписывать его итогом значит сообщать очевидное. */
+    var summary = ends[0] === 0 && ends[1] === SNAPS.length - 1
+      && SNAPS.length > 2;
+    var block = viewmodel.pairBlock(
+      diffmod.diffSnapshots(raw[ends[0]], raw[ends[1]], summary), raw);
+    pairCache[key] = block;
+    return block;
   }
 
   function visibleRows() {
@@ -456,7 +537,7 @@
      причине, что и в адресе: у двух прогонов одного тега иначе было бы одно
      состояние раскрытия на двоих. */
   function rowKey(row) {
-    if (st.tab === 'diff') return 'diff:' + pairKey(st.pair) + ':' + row.name;
+    if (st.tab === 'diff') return 'diff:' + pairKey(currentEnds()) + ':' + row.name;
     return 'state:' + snapKey(curSnap()) + ':' + row.name;
   }
 
@@ -964,12 +1045,18 @@
 
   function renderPairSelect() {
     var box = document.getElementById('pair-select'), out = '', i;
-    var when = whenLabels(SNAPS), ends;
+    var when = whenLabels(SNAPS), here = currentEnds(), ends, on;
     for (i = 0; i < PAIRS.length; i++) {
       var p = PAIRS[i];
-      ends = pairEnds(i);
+      /* Раскладку diffChain — сперва соседи по цепочке, затем сводная пара
+         «первый против последнего» — знает только этот цикл: сам селектор
+         уходит следующей задачей, и тащить её в общие функции незачем.
+         Нажата та кнопка, чьи концы совпали с выбранным переходом: номер
+         пары больше ничего не выбирает. */
+      ends = p.summary ? [0, SNAPS.length - 1] : [i, i + 1];
+      on = Boolean(here && here[0] === ends[0] && here[1] === ends[1]);
       out += '<button type="button" class="pick" data-pair="' + i + '" aria-pressed="'
-          + (i === st.pair ? 'true' : 'false')
+          + (on ? 'true' : 'false')
           + '" data-tip="' + (p.summary
               ? 'Сводная пара: первый тег прогона против последнего.'
               : 'Соседние теги прогона.')
@@ -1146,17 +1233,19 @@
     render();
   }
 
-  /* Сравнивать нечего — вкладки «Изменения» на странице нет вовсе. */
+  /* Сравнивать нечего — вкладки «Изменения» на странице нет вовсе. Считаем
+     по числу снапшотов, а не по длине предпосчитанного списка пар: переход
+     есть у любых двух снапшотов, и предпосчитанные — лишь часть из них. */
   function syncTabs() {
     for (var t = 0; t < tabBtns.length; t++) {
       if (tabBtns[t].getAttribute('data-tab') === 'diff') {
-        tabBtns[t].hidden = !PAIRS.length;
+        tabBtns[t].hidden = SNAPS.length < 2;
       }
     }
   }
 
   function showTab(name) {
-    if (name === 'diff' && !PAIRS.length) name = 'state';
+    if (name === 'diff' && SNAPS.length < 2) name = 'state';
     st.tab = name;
     for (var i = 0; i < tabBtns.length; i++) {
       var on = tabBtns[i].getAttribute('data-tab') === name;
@@ -1184,7 +1273,9 @@
        ничем не выдав подмены. Имя полное, с временем сбора, — иначе два
        прогона одного тега на такую ссылку отвечали бы одинаково. */
     if (SNAPS.length) parts.push('tag=' + encodeURIComponent(snapKey(SNAPS[st.tag])));
-    if (PAIRS.length) parts.push('pair=' + encodeURIComponent(pairKey(st.pair)));
+    if (SNAPS.length > 1) {
+      parts.push('pair=' + encodeURIComponent(pairKey(currentEnds())));
+    }
     /* f= пишем всегда, в том числе пустой: у вкладки «Изменения» фильтр по
        умолчанию непустой, и без явного «фильтров нет» ссылка на таблицу со
        снятым фильтром при открытии снова показывала бы только изменившиеся. */
@@ -1253,6 +1344,24 @@
     }
   }
 
+  /* Имя диапазона из адреса. Полная форма называет прогоны
+     («os-9.2@2026-08-01T00:00:00+03:00»), короткая — теги; короткую
+     оставляем читаемой, потому что её пишут руками и присылают в
+     переписке. У двойников тега она выбирает последний подходящий — так
+     было и раньше. */
+  function endsFromHash(value) {
+    var at = String(value).indexOf('..');
+    if (at === -1) return null;
+    var left = value.slice(0, at), right = value.slice(at + 2);
+    var lo = snapIndexByKey(left), hi = snapIndexByKey(right), i;
+    if (lo === -1) { for (i = 0; i < SNAPS.length; i++) {
+      if (SNAPS[i].tag === left) lo = i; } }
+    if (hi === -1) { for (i = 0; i < SNAPS.length; i++) {
+      if (SNAPS[i].tag === right) hi = i; } }
+    if (lo === -1 || hi === -1 || lo === hi) return null;
+    return lo < hi ? [lo, hi] : [hi, lo];
+  }
+
   function readHash() {
     var raw = location.hash.replace(/^#/, '');
     if (!raw) return false;
@@ -1264,9 +1373,9 @@
       val = dec(kvp.slice(1).join('=') || '');
       if (val === null) continue;   /* битый кусок пропускаем, остальные читаем */
       if (key === 'tab') {
-        /* Пар нет — вкладки «Изменения» на странице тоже нет. */
-        tab = (val === 'diff' && PAIRS.length) ? 'diff' : 'state';
-        if (val === 'diff' && !PAIRS.length) dropped = true;
+        /* Сравнивать нечего — вкладки «Изменения» на странице тоже нет. */
+        tab = (val === 'diff' && SNAPS.length > 1) ? 'diff' : 'state';
+        if (val === 'diff' && SNAPS.length < 2) dropped = true;
       } else if (key === 'tag') {
         /* Ссылку правят руками, и «tag=os-9.2» без времени сбора — её
            законная форма. Два прогона одного тега она не различает: берём
@@ -1281,16 +1390,12 @@
           }
         }
       } else if (key === 'pair') {
-        /* Не нашли такого перехода — остаёмся на паре по умолчанию.
-           Форма «os-9.1..os-9.2» из одних тегов тоже принимается и по тому
-           же правилу: при двойниках выигрывает последний переход. */
-        for (var p = 0; p < PAIRS.length; p++) {
-          if (pairKey(p) === val
-              || PAIRS[p].old + '..' + PAIRS[p]['new'] === val) {
-            st.pair = p;
-            picked.pair = true;
-          }
-        }
+        /* Не разобрали — остаёмся на переходе по умолчанию. Ссылка — такой
+           же выбор человека, как клик по кнопке: он должен пережить приход
+           следующего файла. */
+        var ends = endsFromHash(val);
+        if (ends) { pairSel.from = snapKey(SNAPS[ends[0]]);
+                    pairSel.to = snapKey(SNAPS[ends[1]]); picked.pair = true; }
       } else if (key === 'f') filters = val ? val.split(',') : [];
       else if (key === 'q') st.q = val.trim().toLowerCase();
       else if (key === 'sort') sort = val.split(':');
@@ -1423,8 +1528,13 @@
         }
         var pair = node.getAttribute('data-pair');
         if (pair !== null && pair !== undefined) {
-          st.pair = parseInt(pair, 10);
-          picked.pair = true;
+          /* Кнопка селектора по-прежнему названа номером пары, но выбор
+             из неё уезжает именами: номер живёт ровно до этой строки. */
+          var pairAt = parseInt(pair, 10), p = PAIRS[pairAt];
+          if (p) {
+            setPairEnds.apply(null, p.summary ? [0, SNAPS.length - 1]
+                                              : [pairAt, pairAt + 1]);
+          }
           renderPairSelect(); renderDiffCards(); render();
           return;
         }
@@ -1646,7 +1756,7 @@
      бы человеку, что с чем сравнивается. */
   function renderChain() {
     var items = store.list(), when = whenLabels(items), out = '', i, here;
-    var ends = st.tab === 'diff' ? pairEnds(st.pair) : null;
+    var ends = st.tab === 'diff' ? currentEnds() : null;
     if (!items.length) { chainBox.innerHTML = ''; return; }
     for (i = 0; i < items.length; i++) {
       if (i) {
