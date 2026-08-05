@@ -234,19 +234,53 @@ test('ссылка со временем сбора открывает тот ж
             dom.id('state-rows').innerHTML);
 });
 
-test('одинаковые теги видно по датам в цепочке', function () {
-  var dom = load();
-  store.add([snap('os-9.2', JUL)], 'b.json');
-  store.add([snap('os-9.2', AUG)], 'c.json');
-  assert.ok(/class="when">2026-07-01</.test(chain(dom)), chain(dom));
-  assert.ok(/class="when">2026-08-01</.test(chain(dom)), chain(dom));
-});
-
-test('у разных тегов даты в подписи нет — она там шум', function () {
+/* Снапшот — это тег в определённый момент, и время сбора стоит у каждого
+   узла, а не только у двойников: цепочка из одних тегов отвечает, что с чем
+   сравнивается, но не отвечает, за какой срок. */
+test('под каждым узлом стоит время сбора', function () {
   var dom = load();
   store.add([snap('os-9.1', JUL)], 'a.json');
   store.add([snap('os-9.2', AUG)], 'b.json');
-  assert.strictEqual(chain(dom).indexOf('class="when"'), -1, chain(dom));
+  assert.match(chain(dom), /class="when">2026-07-01 00:00</, chain(dom));
+  assert.match(chain(dom), /class="when">2026-08-01 00:00</, chain(dom));
+});
+
+test('одинаковые теги различает время сбора', function () {
+  var dom = load();
+  store.add([snap('os-9.2', JUL)], 'b.json');
+  store.add([snap('os-9.2', AUG)], 'c.json');
+  assert.match(chain(dom), /class="when">2026-07-01 00:00</, chain(dom));
+  assert.match(chain(dom), /class="when">2026-08-01 00:00</, chain(dom));
+});
+
+/* Над отрезком стоит расстояние во времени между его концами: рельс не
+   только расставляет снапшоты по порядку, он показывает, какой кусок жизни
+   тега лежит между ними. Единица крупная — под узлами и так полные даты. */
+test('отрезок подписан расстоянием во времени', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL)], 'a.json');
+  store.add([snap('os-9.2', AUG)], 'b.json');
+  assert.match(chain(dom), /class="gap">31 дн</, chain(dom));
+});
+
+test('часы и месяцы считаются своими единицами', function () {
+  var dom = load();
+  store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
+  store.add([snap('os-9.2', '2026-07-01T07:00:00+03:00')], 'b.json');
+  store.add([snap('os-9.3', '2026-12-01T07:00:00+03:00')], 'c.json');
+  assert.match(chain(dom), /class="gap">7 ч</, chain(dom));
+  assert.match(chain(dom), /class="gap">5 мес</, chain(dom));
+});
+
+/* Перестановка цепочки руками ставит поздний снапшот раньше раннего.
+   Расстояние от этого не становится отрицательным: отрезок измеряет
+   промежуток, а не разность в порядке кликов. */
+test('расстояние не зависит от порядка снапшотов', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL)], 'a.json');
+  store.add([snap('os-9.2', AUG)], 'b.json');
+  store.move(1, -1);
+  assert.match(chain(dom), /class="gap">31 дн</, chain(dom));
 });
 
 /* Рельс — единственный способ переключить снапшот: селектор-пилюли, стоявший

@@ -249,43 +249,33 @@
     return many;
   }
 
-  /* Время сбора для подписи: обычно хватает даты, но два прогона одного тега
-     случаются и в один день — тогда к дате добавляется время. Строку режем,
-     а не разбираем: «неизвестно» из неё выдумывать нечего, а формат задан
-     самим kojipatch. */
-  function stampOf(value, withTime) {
+  /* Время сбора для подписи узла: дата и время до минуты. Строку режем, а не
+     разбираем: «неизвестно» из неё выдумывать нечего, формат задан самим
+     kojipatch, а разбор увёл бы подпись в часовой пояс читателя — снапшот
+     же собран там, где стоит хаб. */
+  function stampOf(value) {
     var text = String(value === null || value === undefined ? '' : value);
-    return withTime ? text.slice(0, 16).replace('T', ' ') : text.slice(0, 10);
+    return text.slice(0, 16).replace('T', ' ');
   }
 
-  /* Подписи «когда собран» для списка снапшотов — по одной на элемент,
-     пустая там, где дата не нужна. Дату получают только теги-двойники: у
-     тега, который на странице один, она ничего не различает и мешает
-     читать цепочку. */
-  function whenLabels(items) {
-    var byTag = {}, out = [], tag, group, seen, withTime, i, day;
-    for (i = 0; i < items.length; i++) {
-      out.push('');
-      tag = items[i].tag;
-      if (!byTag.hasOwnProperty(tag)) byTag[tag] = [];
-      byTag[tag].push(i);
-    }
-    for (tag in byTag) {
-      if (!byTag.hasOwnProperty(tag)) continue;
-      group = byTag[tag];
-      if (group.length < 2) continue;
-      seen = {};
-      withTime = false;
-      for (i = 0; i < group.length; i++) {
-        day = stampOf(items[group[i]].generated, false);
-        if (seen.hasOwnProperty(day)) withTime = true;
-        seen[day] = 1;
-      }
-      for (i = 0; i < group.length; i++) {
-        out[group[i]] = stampOf(items[group[i]].generated, withTime);
-      }
-    }
-    return out;
+  var MINUTE = 60000, HOUR = 60 * MINUTE, DAY = 24 * HOUR;
+
+  /* Расстояние между соседними снапшотами — над отрезком рельса. Единица
+     берётся крупная: под узлами и так стоят полные даты, а от подписи нужен
+     порядок величины — «месяц», а не «31 день 4 часа». Меньше минуты не
+     подписываем вовсе: «0 мин» занял бы место, ничего не сообщив.
+
+     Порядок концов не важен, берётся модуль: цепочку переставляют руками, и
+     у переставленной пары расстояние то же самое. */
+  function gapLabel(from, to) {
+    var a = Date.parse(from), b = Date.parse(to), ms;
+    if (isNaN(a) || isNaN(b)) return '';
+    ms = Math.abs(b - a);
+    if (ms < MINUTE) return '';
+    if (ms < HOUR) return Math.round(ms / MINUTE) + ' мин';
+    if (ms < 2 * DAY) return Math.round(ms / HOUR) + ' ч';
+    if (ms < 60 * DAY) return Math.round(ms / DAY) + ' дн';
+    return Math.round(ms / (30 * DAY)) + ' мес';
   }
 
   function keys(obj) {
@@ -1726,26 +1716,28 @@
      сразу на три вопроса: что загружено, в каком порядке сравнивается и
      где я сейчас нахожусь.
 
-     В подписи у тегов-двойников стоит дата: «os-9.2 → os-9.2» не сказало
-     бы человеку, что с чем сравнивается.
+     Под тегом у каждого узла стоит время сбора: снапшот — это тег в
+     определённый момент, и два прогона одного тега различает только оно.
+     Раньше дату получали одни двойники, теперь её видно у всех: цепочка
+     из тегов без дат отвечает, что сравнивается, но не отвечает, за какой
+     срок.
 
      Рельс ещё и выбирает — он на странице единственный, кто это делает:
      на «Состоянии» один клик открывает снапшот, на «Изменениях» два
-     задают любой диапазон цепочки. Число сборок и полное время сбора
-     стоят в списке источников, а не на узлах: рельс отвечает на вопрос
-     «где я», а не пересказывает каждый снапшот. */
+     задают любой диапазон цепочки. */
   function renderChain() {
-    var items = store.list(), when = whenLabels(items), out = '', i, here;
+    var items = store.list(), out = '', i, here;
     var live = st.tab === 'diff';
     var ends = live ? currentEnds() : null;
     if (!items.length) { chainBox.innerHTML = ''; return; }
     for (i = 0; i < items.length; i++) {
       if (i) {
-        out += '<span class="rl'
-            + (ends && i > ends[0] && i <= ends[1] ? ' on' : '') + '"></span>';
+        out += railHtml(items[i - 1], items[i],
+                        ends && i > ends[0] && i <= ends[1]);
       }
       here = ends ? (i === ends[0] || i === ends[1]) : i === st.tag;
-      out += stopHtml(i, items[i].tag, when[i], here, live, items.length > 1);
+      out += stopHtml(i, items[i].tag, stampOf(items[i].generated), here,
+                      live, items.length > 1);
     }
     /* Сводность спрашиваем у самого перехода, а не считаем заново: правило
        «вся цепочка, и только когда снапшотов больше двух» уже сказано —
@@ -1755,6 +1747,13 @@
     var pair = ends ? pairFor(ends) : null;
     var sum = pair && pair.summary ? '<span class="sum">итог</span>' : '';
     chainBox.innerHTML = '<span class="l">снапшоты</span>' + out + sum;
+  }
+
+  /* Отрезок между соседними узлами, с расстоянием во времени над ним. */
+  function railHtml(from, to, on) {
+    var gap = gapLabel(from.generated, to.generated);
+    return '<span class="rl' + (on ? ' on' : '') + '">'
+      + (gap ? '<span class="gap">' + esc(gap) + '</span>' : '') + '</span>';
   }
 
   /* Узел рельса. Кнопка, пока снапшот на странице не один: на единственном
@@ -1767,8 +1766,7 @@
   function stopHtml(at, tag, when, here, live, hot) {
     var cls = 'stop' + (here ? ' on' : '') + (anchor === at ? ' anchor' : '');
     var body = '<span class="node"></span><span class="nm">' + esc(tag)
-      + (when ? ' <span class="when">' + esc(when) + '</span>' : '')
-      + '</span>';
+      + '</span><span class="when">' + esc(when) + '</span>';
     if (!hot) return '<span class="' + cls + '">' + body + '</span>';
     var open = '<button type="button" class="' + cls + '" data-node="' + at + '"';
     if (!live) {
