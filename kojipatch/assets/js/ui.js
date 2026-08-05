@@ -881,8 +881,10 @@
       var key = rowKey(row);
       var open = openOf(key, items[i].open);
       var bad = row.problems.length || row.tags.indexOf('no-source') !== -1;
+      /* Число и полоска разведены по краям ячейки, а не стоят подряд:
+         подробности — у .patcell в стилях. */
       var patches = row.patches.length
-        ? row.patches.length + meterHtml(row)
+        ? '<span class="patcell">' + row.patches.length + meterHtml(row) + '</span>'
         : '<span class="zero">0</span>';
       html += '<tr class="main-row' + (bad ? ' bad' : '') + '" data-row="' + esc(key) + '">'
            + '<td class="src"><span class="chev" role="button" tabindex="0"'
