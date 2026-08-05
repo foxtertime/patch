@@ -6,7 +6,7 @@
 <title>Koji patch dashboard</title>
 <!-- Версию подставляет build.py: страницу присылают друг другу файлом, и
      по ней должно быть видно, чем она собрана. -->
-<meta name="generator" content="kojipatch __KOJIPATCH_VERSION__">
+<meta name="generator" content="dashboard __DASHBOARD_VERSION__">
 <style>
 :root {
   /* Тема одна — тёмная, и это выбор, а не умолчание. color-scheme говорит
@@ -641,7 +641,7 @@ tr.detail-row > td { background: var(--card); padding: .85rem .7rem 1.1rem 2.2re
 </head>
 <body>
 <div class="wrap">
-  <h1>kojipatch <span class="ver">__KOJIPATCH_VERSION__</span></h1>
+  <h1>dashboard <span class="ver">__DASHBOARD_VERSION__</span></h1>
   <div class="sources" id="sources" hidden>
     <div class="srchead">
       <span class="l">снапшоты</span>
@@ -657,7 +657,7 @@ tr.detail-row > td { background: var(--card); padding: .85rem .7rem 1.1rem 2.2re
     <div class="drop" id="drop">
       <p class="dropmain">Перетащите снапшоты сюда</p>
       <p class="dropsub">или <button type="button" class="linkish" id="pick">выберите файлы</button>.
-        Это JSON, который делает <span class="mono">kojipatch collect</span>.</p>
+        Это JSON, который делает <span class="mono">dashboard collect</span>.</p>
     </div>
   </section>
   <input type="file" id="file-input" accept=".json,application/json" multiple hidden>

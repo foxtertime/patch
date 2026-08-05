@@ -7,7 +7,7 @@
 import logging
 import sys
 
-ROOT = "kojipatch"
+ROOT = "dashboard"
 DEFAULT_LEVEL = "info"
 LEVELS = {
     "error": logging.ERROR,
@@ -24,7 +24,7 @@ _DEBUG_FORMAT = ("%(asctime)s %(levelname)-7s [%(threadName)s] "
 
 
 class _ShortName(logging.Filter):
-    """kojipatch.gitlabclient → gitlab, kojipatch.collect → collect."""
+    """dashboard.gitlabclient → gitlab, dashboard.collect → collect."""
 
     def filter(self, record) -> bool:
         name = record.name.split(".")[-1]

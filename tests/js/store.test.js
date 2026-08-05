@@ -1,7 +1,7 @@
 'use strict';
 var test = require('node:test');
 var assert = require('node:assert');
-var store = require('../../kojipatch/assets/js/store.js');
+var store = require('../../dashboard/assets/js/store.js');
 
 function snap(tag, generated) {
   return { schema: 1, tag: tag, generated: generated,

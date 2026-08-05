@@ -6,14 +6,14 @@
 var test = require('node:test');
 var assert = require('node:assert');
 var domstub = require('./domstub.js');
-var store = require('../../kojipatch/assets/js/store.js');
+var store = require('../../dashboard/assets/js/store.js');
 /* Модуль диффа тесты подменяют, чтобы считать расчёты переходов по
    требованию. Зачем это нужно и почему считается именно здесь — у
    countDiffs, рядом с тестами кэша. */
-var diffmod = require('../../kojipatch/assets/js/diff.js');
+var diffmod = require('../../dashboard/assets/js/diff.js');
 var realDiffSnapshots = diffmod.diffSnapshots;
 
-var UI = require.resolve('../../kojipatch/assets/js/ui.js');
+var UI = require.resolve('../../dashboard/assets/js/ui.js');
 
 function patch(name, cls) {
   return { path: 'PATCH/' + name, name: name, 'class': cls, cves: [],

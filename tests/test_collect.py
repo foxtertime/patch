@@ -1,11 +1,11 @@
 import unittest
 
-from kojipatch.classify import Classifier
-from kojipatch.collect import _completed, collect_tag, problem_summary
-from kojipatch.config import Config, GitlabHost
-from kojipatch.gitlabclient import GitlabClient
-from kojipatch.kojiclient import KojiClient
-from kojipatch.model import Build, Snapshot
+from dashboard.classify import Classifier
+from dashboard.collect import _completed, collect_tag, problem_summary
+from dashboard.config import Config, GitlabHost
+from dashboard.gitlabclient import GitlabClient
+from dashboard.kojiclient import KojiClient
+from dashboard.model import Build, Snapshot
 from tests.fakes import FakeKojiSession, FakeTransport, Response
 
 HOST = "gitlab.example.com"
@@ -345,19 +345,19 @@ class LoggingTest(unittest.TestCase):
                            now="2026-08-03T13:20:00+03:00")
 
     def test_progress_reaches_the_total(self):
-        with self.assertLogs("kojipatch.collect", level="INFO") as caught:
+        with self.assertLogs("dashboard.collect", level="INFO") as caught:
             self.collect()
         self.assertTrue(any("3/3" in line for line in caught.output),
                         caught.output)
 
     def test_progress_reaches_the_total_under_concurrency(self):
-        with self.assertLogs("kojipatch.collect", level="INFO") as caught:
+        with self.assertLogs("dashboard.collect", level="INFO") as caught:
             self.collect(jobs=4)
         self.assertTrue(any("3/3" in line for line in caught.output),
                         caught.output)
 
     def test_tag_size_is_logged(self):
-        with self.assertLogs("kojipatch.collect", level="INFO") as caught:
+        with self.assertLogs("dashboard.collect", level="INFO") as caught:
             self.collect()
         self.assertTrue(any("os-9.2" in line and "3" in line
                             for line in caught.output), caught.output)
@@ -374,7 +374,7 @@ class LoggingTest(unittest.TestCase):
         gitlab = GitlabClient(HOSTS, token=None,
                               transport=FakeTransport(self.routes),
                               sleeper=lambda _s: None)
-        with self.assertLogs("kojipatch.collect", level="INFO") as caught:
+        with self.assertLogs("dashboard.collect", level="INFO") as caught:
             collect_tag("os-9.2", config(), KojiClient(session), gitlab,
                         jobs=1, now="n")
         opening = [line for line in caught.output
@@ -386,22 +386,22 @@ class LoggingTest(unittest.TestCase):
     def test_koji_batch_phase_is_announced_at_info(self):
         # на 800 билдах между размером тега и первой строкой прогресса
         # шестнадцать мультиколлов: без этой строки прогон выглядит зависшим
-        with self.assertLogs("kojipatch.collect", level="INFO") as caught:
+        with self.assertLogs("dashboard.collect", level="INFO") as caught:
             self.collect()
         # сверяемся с текстом записи, а не со строкой вывода: имя логгера
-        # kojipatch.collect само содержит «koji» и делало бы проверку слепой
+        # dashboard.collect само содержит «koji» и делало бы проверку слепой
         self.assertTrue(any("спрашиваю у koji" in record.getMessage()
                             for record in caught.records), caught.output)
 
     def test_build_problem_is_logged_as_warning_with_the_component(self):
-        with self.assertLogs("kojipatch.collect", level="WARNING") as caught:
+        with self.assertLogs("dashboard.collect", level="WARNING") as caught:
             self.collect()
         line = "\n".join(caught.output)
         self.assertIn("curl", line)
         self.assertIn("no source url", line)
 
     def test_clean_build_is_not_warned_about(self):
-        with self.assertLogs("kojipatch.collect", level="WARNING") as caught:
+        with self.assertLogs("dashboard.collect", level="WARNING") as caught:
             self.collect()
         self.assertNotIn("nginx", "\n".join(caught.output))
 
@@ -417,7 +417,7 @@ class LoggingTest(unittest.TestCase):
                                   rpms={i: [] for i in range(40)})
         gitlab = GitlabClient(HOSTS, token=None, transport=FakeTransport({}),
                               sleeper=lambda _s: None)
-        with self.assertLogs("kojipatch.collect", level="INFO") as caught:
+        with self.assertLogs("dashboard.collect", level="INFO") as caught:
             collect_tag("os-big", config(), KojiClient(session), gitlab,
                         jobs=1, now="n")
         progress_lines = [line for line in caught.output if "/40" in line]

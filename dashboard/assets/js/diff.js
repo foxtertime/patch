@@ -1,4 +1,4 @@
-/* Сравнение снапшотов тегов. Порт kojipatch/diff.py. */
+/* Сравнение снапшотов тегов. Порт dashboard/diff.py. */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
     module.exports = factory(require('./vercmp.js'), require('./rpms.js'));

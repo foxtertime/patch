@@ -3,7 +3,7 @@ var test = require('node:test');
 var assert = require('node:assert');
 var fs = require('node:fs');
 var path = require('node:path');
-var vm = require('../../kojipatch/assets/js/viewmodel.js');
+var vm = require('../../dashboard/assets/js/viewmodel.js');
 
 var CLASSES = ['CVE', 'SAST', 'DAST', 'other'];
 
@@ -245,7 +245,7 @@ test('поля строки билда', function () {
 
 test('ссылка на koji экранируется как urllib.parse.quote', function () {
   // эталон этого не ловит: в фикстурах NVR из букв, цифр, точек и дефисов.
-  // Значение снято с kojipatch.render._koji_url на том же NVR
+  // Значение снято с dashboard.render._koji_url на том же NVR
   var row = data([snap('t', [build('weird+name!~(x)*')])]).snapshots[0].builds[0];
   assert.strictEqual(row.koji_url,
     'https://hub/koji/search?match=exact&type=build&terms='

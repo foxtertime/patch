@@ -1,7 +1,7 @@
 import unittest
 
-from kojipatch.classify import Classifier, find_cves
-from kojipatch.config import Config
+from dashboard.classify import Classifier, find_cves
+from dashboard.config import Config
 
 RULES = [
     ("CVE", r"CVE-\d{4}-\d{4,}"),

@@ -1,6 +1,6 @@
 """Версия инструмента: одна на всех и названная там, где её ищут.
 
-Номер живёт в одном месте, `kojipatch/__init__.py`, и оттуда расходится по
+Номер живёт в одном месте, `dashboard/__init__.py`, и оттуда расходится по
 CLI, снапшоту и собранной странице. Тесты здесь сторожат сам номер и два
 его выхода наружу — флаг и CHANGELOG; про снапшот сказано в test_model, про
 страницу — в test_build.
@@ -12,9 +12,9 @@ import tempfile
 import unittest
 from contextlib import redirect_stdout
 
-from kojipatch import __version__
-from kojipatch.build import VERSION_TOKEN, BuildError, build_html
-from kojipatch.cli import main
+from dashboard import __version__
+from dashboard.build import VERSION_TOKEN, BuildError, build_html
+from dashboard.cli import main
 
 ROOT = os.path.join(os.path.dirname(__file__), "..")
 CHANGELOG = os.path.join(ROOT, "CHANGELOG.md")
@@ -33,7 +33,7 @@ class VersionTest(unittest.TestCase):
         with self.assertRaises(SystemExit) as caught, redirect_stdout(out):
             main(["--version"])
         self.assertEqual(caught.exception.code, 0)
-        self.assertEqual(out.getvalue().strip(), "kojipatch " + __version__)
+        self.assertEqual(out.getvalue().strip(), "dashboard " + __version__)
 
     def test_changelog_names_the_current_version(self):
         # Версия без записи о том, что в ней изменилось, — номер, за которым

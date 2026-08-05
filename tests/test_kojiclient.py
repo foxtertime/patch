@@ -1,7 +1,7 @@
 import logging
 import unittest
 
-from kojipatch.kojiclient import KojiClient, KojiError
+from dashboard.kojiclient import KojiClient, KojiError
 from tests.fakes import FakeKojiSession
 
 TAGGED = {"os-9.2": [{"build_id": 1, "name": "nginx", "nvr": "nginx-1.24.0-3.el9"},
@@ -130,14 +130,14 @@ class LoggingTest(unittest.TestCase):
         self.client = KojiClient(self.session, batch=10)
 
     def test_tagged_builds_is_logged_at_debug(self):
-        with self.assertLogs("kojipatch.kojiclient", level="DEBUG") as caught:
+        with self.assertLogs("dashboard.kojiclient", level="DEBUG") as caught:
             self.client.tagged_builds("os-9.2")
         line = "\n".join(caught.output)
         self.assertIn("listTagged", line)
         self.assertIn("os-9.2", line)
 
     def test_batch_call_is_logged_with_its_size(self):
-        with self.assertLogs("kojipatch.kojiclient", level="DEBUG") as caught:
+        with self.assertLogs("dashboard.kojiclient", level="DEBUG") as caught:
             self.client.build_details([1, 2])
         line = "\n".join(caught.output)
         self.assertIn("getBuild", line)
@@ -147,7 +147,7 @@ class LoggingTest(unittest.TestCase):
         session = FakeKojiSession(tagged=TAGGED, builds=BUILDS, rpms=RPMS,
                                   supports_multicall=False)
         client = KojiClient(session, batch=10)
-        with self.assertLogs("kojipatch.kojiclient", level="WARNING") as caught:
+        with self.assertLogs("dashboard.kojiclient", level="WARNING") as caught:
             client.build_details([1, 2])
         self.assertIn("multicall", "\n".join(caught.output))
 
@@ -157,7 +157,7 @@ class LoggingTest(unittest.TestCase):
         session = FakeKojiSession(tagged=TAGGED, builds=BUILDS, rpms=RPMS,
                                   supports_multicall=False)
         client = KojiClient(session, batch=1)
-        with self.assertLogs("kojipatch.kojiclient", level="DEBUG") as caught:
+        with self.assertLogs("dashboard.kojiclient", level="DEBUG") as caught:
             client.build_details([1, 2])
             client.rpms_for([1, 2])
         warnings = [r for r in caught.records if r.levelno == logging.WARNING]

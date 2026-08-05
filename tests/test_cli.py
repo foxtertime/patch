@@ -6,11 +6,11 @@ import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
 
-from kojipatch import cli, kojiclient
-from kojipatch.cli import main
-from kojipatch.gitlabclient import GitlabClient
-from kojipatch.kojiclient import KojiClient
-from kojipatch.model import (Build, Patch, Snapshot, Source, dump_snapshots,
+from dashboard import cli, kojiclient
+from dashboard.cli import main
+from dashboard.gitlabclient import GitlabClient
+from dashboard.kojiclient import KojiClient
+from dashboard.model import (Build, Patch, Snapshot, Source, dump_snapshots,
                              load_snapshots)
 from tests.fakes import FakeKojiSession, FakeTransport, Response
 
@@ -46,7 +46,7 @@ def build(name, version, patches=(), subpackages=None, ref="main"):
 class LoggerStateMixin:
     """Возврат логгера пакета в исходное состояние после прогона CLI.
 
-    main() зовёт logs.configure(): на логгере kojipatch остаётся хендлер с
+    main() зовёт logs.configure(): на логгере dashboard остаётся хендлер с
     уже никому не нужным потоком и propagate=False. Само по себе это
     безвредно, но следующий тест, который пишет в лог мимо assertLogs,
     молча потерял бы свои строки. Восстановление вешаем через addCleanup,
@@ -55,7 +55,7 @@ class LoggerStateMixin:
 
     def setUp(self):
         super().setUp()
-        logger = logging.getLogger("kojipatch")
+        logger = logging.getLogger("dashboard")
         state = (list(logger.handlers), logger.level, logger.propagate)
         self.addCleanup(self._restore_logger, logger, state)
 
@@ -105,7 +105,7 @@ class CliTest(TempDirTest):
 
     def test_dashboard_command_writes_the_page(self):
         path = os.path.join(self.tmp, "dash.html")
-        self.assertEqual(main(["dashboard", "-o", path]), 0)
+        self.assertEqual(main(["page", "-o", path]), 0)
         with open(path, encoding="utf-8") as handle:
             self.assertIn("Перетащите снапшоты сюда", handle.read())
 
@@ -113,7 +113,7 @@ class CliTest(TempDirTest):
         # дашборд без снапшотов: страница, которой данные принесут потом.
         # Ни конфига, ни хаба ей не нужно
         out = self.out_path("dashboard.html")
-        code, err = self.run_cli(["dashboard", "-o", out])
+        code, err = self.run_cli(["page", "-o", out])
         self.assertEqual(code, 0)
         with open(out, encoding="utf-8") as handle:
             html = handle.read()
@@ -141,7 +141,7 @@ class CliTest(TempDirTest):
             with self.assertRaises(SystemExit):
                 main(["--help"])
         text = out.getvalue()
-        for word in ("collect", "dashboard"):
+        for word in ("collect", "page"):
             self.assertIn(word, text)
 
 
@@ -153,8 +153,8 @@ class LogLevelTest(LoggerStateMixin, unittest.TestCase):
 
     def test_written_file_is_logged_at_info(self):
         out = self.out_path()
-        with self.assertLogs("kojipatch.cli", level="INFO") as caught:
-            code = main(["dashboard", "-o", out])
+        with self.assertLogs("dashboard.cli", level="INFO") as caught:
+            code = main(["page", "-o", out])
         self.assertEqual(code, 0)
         self.assertIn(out, "\n".join(caught.output))
 
@@ -163,15 +163,15 @@ class LogLevelTest(LoggerStateMixin, unittest.TestCase):
         # «файл» — отличается от ошибки конфига и тоже фатальна
         directory = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, directory, True)
-        with self.assertLogs("kojipatch.cli", level="ERROR") as caught:
-            code = main(["dashboard", "-o", directory])
+        with self.assertLogs("dashboard.cli", level="ERROR") as caught:
+            code = main(["page", "-o", directory])
         self.assertEqual(code, 2)
         self.assertIn("ошибка ввода-вывода", "\n".join(caught.output))
 
     def test_error_carries_a_traceback_record_at_debug(self):
         # пользователю — одна строка, разработчику — трейсбек, но только
         # когда он его попросил уровнем
-        with self.assertLogs("kojipatch.cli", level="DEBUG") as caught:
+        with self.assertLogs("dashboard.cli", level="DEBUG") as caught:
             main(["--config", "/nonexistent.yaml", "collect", "--tag", "t"])
         self.assertIn(logging.ERROR, [r.levelno for r in caught.records])
         with_traceback = [r for r in caught.records
@@ -179,7 +179,7 @@ class LogLevelTest(LoggerStateMixin, unittest.TestCase):
         self.assertTrue(with_traceback, caught.output)
 
     def test_error_alone_has_no_traceback_record(self):
-        with self.assertLogs("kojipatch.cli", level="ERROR") as caught:
+        with self.assertLogs("dashboard.cli", level="ERROR") as caught:
             main(["--config", "/nonexistent.yaml", "collect", "--tag", "t"])
         for record in caught.records:
             self.assertIsNone(record.exc_info)
@@ -188,14 +188,14 @@ class LogLevelTest(LoggerStateMixin, unittest.TestCase):
         err = io.StringIO()
         with redirect_stderr(err):
             with self.assertRaises(SystemExit):
-                main(["--log-level", "loud", "dashboard"])
+                main(["--log-level", "loud", "page"])
         self.assertIn("--log-level", err.getvalue())
 
     def test_verbose_flag_is_gone(self):
         err = io.StringIO()
         with redirect_stderr(err):
             with self.assertRaises(SystemExit):
-                main(["-v", "dashboard"])
+                main(["-v", "page"])
         self.assertIn("unrecognized", err.getvalue())
 
     def test_help_mentions_log_level(self):
@@ -359,7 +359,7 @@ class LoggerIsolationTest(unittest.TestCase):
         # прогоняем настоящий тест целиком, вместе с его setUp и уборкой,
         # и смотрим на глобальное состояние после: если восстановление
         # пропадёт, этот тест упадёт
-        logger = logging.getLogger("kojipatch")
+        logger = logging.getLogger("dashboard")
         before = (list(logger.handlers), logger.level, logger.propagate)
         case = CliTest("test_dashboard_command_writes_the_page")
         result = unittest.TestResult()
