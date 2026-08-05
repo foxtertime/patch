@@ -43,7 +43,7 @@
       ? -1 : (a.snapshot.tag > b.snapshot.tag ? 1 : 0);
   }
 
-  function fire() { for (var i = 0; i < listeners.length; i++) listeners[i](); }
+  function fire() { for (const listener of listeners) listener(); }
 
   /* Любое изменение состава — целиком или никак.
 
@@ -109,11 +109,8 @@
   }
 
   function isDuplicate(snapshot) {
-    for (var i = 0; i < items.length; i++) {
-      if (items[i].snapshot.tag === snapshot.tag
-          && items[i].snapshot.generated === snapshot.generated) return true;
-    }
-    return false;
+    return items.some((item) => item.snapshot.tag === snapshot.tag
+      && item.snapshot.generated === snapshot.generated);
   }
 
   /* Разбор одного файла. Ничего не бросает: одна опечатка в имени тега не

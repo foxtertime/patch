@@ -31,48 +31,48 @@
      считается — выбор снапшота, диапазон сравнения, фильтры, поиск,
      сортировка. Здесь — короткие имена для того, что зовут отсюда чаще
      всего. */
-  var page = pagemod.create({ viewmodel: viewmodel, diffmod: diffmod,
+  let page = pagemod.create({ viewmodel: viewmodel, diffmod: diffmod,
                               store: store, labels: labels, text: text });
-  var st = page.st;
-  var curSnap = page.curSnap, curPair = page.curPair;
-  var visibleRows = page.visibleRows, sortRows = page.sortRows;
-  var rowKey = page.rowKey, openOf = page.openOf;
-  var activeFilters = page.activeFilters, totalRows = page.totalRows;
-  var snapshots = page.snapshots;
+  const st = page.st;
+  const curSnap = page.curSnap, curPair = page.curPair;
+  const visibleRows = page.visibleRows, sortRows = page.sortRows;
+  const rowKey = page.rowKey, openOf = page.openOf;
+  const activeFilters = page.activeFilters, totalRows = page.totalRows;
+  const snapshots = page.snapshots;
 
-  var stateSection = document.getElementById('tab-state');
-  var diffSection = document.getElementById('tab-diff');
-  var controls = document.getElementById('controls');
-  var chipsBox = document.getElementById('chips');
-  var search = document.getElementById('q');
-  var clearBtn = document.getElementById('q-clear');
-  var counter = document.getElementById('count');
-  var expandBtn = document.getElementById('expand');
-  var copyBtn = document.getElementById('copy-nvr');
-  var tabBtns = Array.prototype.slice.call(document.querySelectorAll('.tab'));
-  var stateBody = document.getElementById('state-rows');
-  var diffBody = document.getElementById('diff-rows');
-  var tabsNav = document.querySelector('.tabs');
-  var emptySection = document.getElementById('tab-empty');
-  var sourcesBox = document.getElementById('sources');
-  var chainBox = document.getElementById('chain');
-  var loadErrors = document.getElementById('load-errors');
-  var warningsBox = document.getElementById('warnings');
-  var fileInput = document.getElementById('file-input');
-  var dropZone = document.getElementById('drop');
-  var pickBtn = document.getElementById('pick');
+  const stateSection = document.getElementById('tab-state');
+  const diffSection = document.getElementById('tab-diff');
+  let controls = document.getElementById('controls');
+  const chipsBox = document.getElementById('chips');
+  const search = document.getElementById('q');
+  const clearBtn = document.getElementById('q-clear');
+  const counter = document.getElementById('count');
+  const expandBtn = document.getElementById('expand');
+  const copyBtn = document.getElementById('copy-nvr');
+  const tabBtns = Array.from(document.querySelectorAll('.tab'));
+  const stateBody = document.getElementById('state-rows');
+  const diffBody = document.getElementById('diff-rows');
+  const tabsNav = document.querySelector('.tabs');
+  const emptySection = document.getElementById('tab-empty');
+  const sourcesBox = document.getElementById('sources');
+  const chainBox = document.getElementById('chain');
+  const loadErrors = document.getElementById('load-errors');
+  const warningsBox = document.getElementById('warnings');
+  const fileInput = document.getElementById('file-input');
+  const dropZone = document.getElementById('drop');
+  const pickBtn = document.getElementById('pick');
 
-  var hashLock = false;
+  let hashLock = false;
   /* Писала ли страница адрес сама. С этого мгновения location.hash — её
      собственное эхо, а не то, с чем её открыли. */
-  var hashIsOurs = false;
+  let hashIsOurs = false;
 
   /* ---------- вспомогательное ---------- */
 
   /* Считалки строк живут в text.js. Здесь — короткие имена для тех, кого
      зовут отсюда: тела оставшихся функций читаются лучше, когда в них стоит
      esc(), а не text.esc(). */
-  var esc = text.esc, own = text.own, keys = text.keys, plural = text.plural;
+  const esc = text.esc, own = text.own, keys = text.keys, plural = text.plural;
 
   /* Фильтр ставит и снимает page — он один знает правило про «версия та же»
      и «что-то изменилось». Перерисовка остаётся здесь: страницу рисует
@@ -85,13 +85,12 @@
   /* ---------- сортировка ---------- */
 
   function syncArrows() {
-    var table = document.getElementById(st.tab === 'diff' ? 'diff-table' : 'state-table');
-    var cfg = st.sort[st.tab];
-    var ths = Array.prototype.slice.call(table.querySelectorAll('th[data-sort]'));
-    for (var i = 0; i < ths.length; i++) {
-      var span = ths[i].querySelector('.arrow');
+    const table = document.getElementById(st.tab === 'diff' ? 'diff-table' : 'state-table');
+    const cfg = st.sort[st.tab];
+    for (const th of table.querySelectorAll('th[data-sort]')) {
+      const span = th.querySelector('.arrow');
       if (!span) continue;
-      span.textContent = ths[i].getAttribute('data-sort') === cfg.key
+      span.textContent = th.getAttribute('data-sort') === cfg.key
         ? (cfg.asc ? '▲' : '▼') : '';
     }
   }
@@ -102,7 +101,7 @@
      всю ширину (деталь, «ничего не найдено») пишется числом, а колонку в
      шаблон добавляют отдельно — и число молча остаётся от прежней таблицы. */
   function colCount(tab) {
-    var table = document.getElementById(tab === 'diff' ? 'diff-table'
+    const table = document.getElementById(tab === 'diff' ? 'diff-table'
                                                       : 'state-table');
     return table.querySelectorAll('th').length;
   }
@@ -110,7 +109,7 @@
   /* ---------- карточки, селекторы, чипы ---------- */
 
   function renderStateCards() {
-    var out = cards.stateCards(curSnap());
+    const out = cards.stateCards(curSnap());
     document.getElementById('state-cards').innerHTML = out.big;
     document.getElementById('class-cards').innerHTML = out.classes;
   }
@@ -120,13 +119,12 @@
   }
 
   function syncCards() {
-    var set = activeFilters();
-    var host = st.tab === 'diff' ? diffSection : stateSection;
-    var nodes = Array.prototype.slice.call(host.querySelectorAll('.card[data-filter]'));
-    var empty = !keys(set).length;
-    for (var i = 0; i < nodes.length; i++) {
-      var key = nodes[i].getAttribute('data-filter');
-      nodes[i].setAttribute('aria-pressed',
+    const set = activeFilters();
+    const host = st.tab === 'diff' ? diffSection : stateSection;
+    const empty = !keys(set).length;
+    for (const node of host.querySelectorAll('.card[data-filter]')) {
+      const key = node.getAttribute('data-filter');
+      node.setAttribute('aria-pressed',
         String(key === 'all' ? empty : Boolean(own(set, key))));
     }
   }
@@ -140,7 +138,7 @@
      и её раскрытость. Собрано в одном месте, чтобы обе таблицы получали одно
      и то же — разойдись они здесь, разъехались бы и colspan у деталей. */
   function rowOpts() {
-    var pair = st.tab === 'diff' ? curPair() : null;
+    const pair = st.tab === 'diff' ? curPair() : null;
     return { q: st.q, cols: colCount(st.tab), keyOf: rowKey, openOf: openOf,
              oldTag: pair ? pair.old : 'было',
              newTag: pair ? pair['new'] : 'стало' };
@@ -150,20 +148,17 @@
      одно, а нажатие делало другое. */
   function allOpen(items) {
     if (!items.length) return false;
-    for (var i = 0; i < items.length; i++) {
-      if (!openOf(rowKey(items[i].row), items[i].open)) return false;
-    }
-    return true;
+    return items.every((item) => openOf(rowKey(item.row), item.open));
   }
 
   function render() {
     /* Подсказка привязана к узлу, а таблица сейчас будет перерисована:
        без этого она пережила бы свой якорь и висела бы над пустым местом. */
     hideTip();
-    var items = sortRows(visibleRows());
-    var total = totalRows();
-    var body = st.tab === 'diff' ? diffBody : stateBody;
-    var word = st.tab === 'diff'
+    const items = sortRows(visibleRows());
+    const total = totalRows();
+    const body = st.tab === 'diff' ? diffBody : stateBody;
+    const word = st.tab === 'diff'
       ? plural(total, 'компонент', 'компонента', 'компонентов')
       : plural(total, 'сборка', 'сборки', 'сборок');
 
@@ -204,9 +199,9 @@
      по числу снапшотов, а не по длине предпосчитанного списка пар: переход
      есть у любых двух снапшотов, и предпосчитанные — лишь часть из них. */
   function syncTabs() {
-    for (var t = 0; t < tabBtns.length; t++) {
-      if (tabBtns[t].getAttribute('data-tab') === 'diff') {
-        tabBtns[t].hidden = snapshots().length < 2;
+    for (const btn of tabBtns) {
+      if (btn.getAttribute('data-tab') === 'diff') {
+        btn.hidden = snapshots().length < 2;
       }
     }
   }
@@ -221,18 +216,18 @@
     page.setAnchor(null);
     if (name === 'diff' && snapshots().length < 2) name = 'state';
     st.tab = name;
-    for (var i = 0; i < tabBtns.length; i++) {
-      var on = tabBtns[i].getAttribute('data-tab') === name;
-      tabBtns[i].setAttribute('aria-selected', String(on));
+    for (const btn of tabBtns) {
+      btn.setAttribute('aria-selected',
+        String(btn.getAttribute('data-tab') === name));
     }
     stateSection.hidden = name !== 'state';
     diffSection.hidden = name !== 'diff';
     /* Панель поиска одна на страницу и переезжает к активной таблице:
        два одинаковых поля с разными id путали бы и пользователя, и hash. */
-    var host = name === 'diff' ? diffSection : stateSection;
+    const host = name === 'diff' ? diffSection : stateSection;
     /* Не anchor: так зовётся отмеченный узел рельса, и локальная переменная
        с тем же именем забирала бы себе его сброс строкой выше. */
-    var wrap = host.querySelector('.tablewrap');
+    const wrap = host.querySelector('.tablewrap');
     host.insertBefore(controls, wrap);
     host.insertBefore(chipsBox, wrap);
     search.placeholder = name === 'diff'
@@ -243,7 +238,7 @@
   /* ---------- состояние в адресной строке ---------- */
 
   function writeHash() {
-    var next = hash.format(page.hashParts());
+    const next = hash.format(page.hashParts());
     hashIsOurs = true;
     if (location.hash === next) return;
     hashLock = true;
@@ -253,11 +248,11 @@
     } catch (e) {
       location.hash = next;
     }
-    setTimeout(function () { hashLock = false; }, 0);
+    setTimeout(() => { hashLock = false; }, 0);
   }
 
   function readHash() {
-    var raw = location.hash.replace(/^#/, '');
+    const raw = location.hash.replace(/^#/, '');
     if (!raw) return false;
     page.restore(hash.parse(raw));
     search.value = st.q;
@@ -273,47 +268,47 @@
      а в NVR эпохи нет, поэтому ведущее «N:» отбрасываем. */
   function nvrOf(row) {
     if (row.nvr) return row.nvr;
-    var evr = row.new_evr || row.old_evr;
+    const evr = row.new_evr || row.old_evr;
     return evr ? row.name + '-' + String(evr).replace(/^[0-9]+:/, '') : row.name;
   }
 
   /* Подпись кнопки берём один раз при загрузке: если запомнить текущую, то
      второй клик подряд запомнит «Скопировано» и вернёт кнопку к нему навсегда. */
-  var COPY_LABEL = copyBtn.textContent;
-  var flashTimer = null;
+  const COPY_LABEL = copyBtn.textContent;
+  let flashTimer = null;
 
   function flash(text) {
     copyBtn.textContent = text;
     if (flashTimer) clearTimeout(flashTimer);
-    flashTimer = setTimeout(function () {
+    flashTimer = setTimeout(() => {
       flashTimer = null;
       copyBtn.textContent = COPY_LABEL;
     }, 1400);
   }
 
   function copyFallback(text) {
-    var area = document.createElement('textarea');
+    const area = document.createElement('textarea');
     area.value = text;
     area.setAttribute('readonly', 'readonly');
     area.style.position = 'fixed';
     area.style.left = '-9999px';
     document.body.appendChild(area);
     area.select();
-    var ok = false;
+    let ok = false;
     try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
     document.body.removeChild(area);
     flash(ok ? 'Скопировано' : 'Не вышло');
   }
 
   function copyNvr() {
-    var items = sortRows(visibleRows()), lines = [], i;
+    let items = sortRows(visibleRows()), lines = [], i;
     for (i = 0; i < items.length; i++) lines.push(nvrOf(items[i].row));
-    var text = lines.join('\n');
+    const text = lines.join('\n');
     if (!text) return;
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(
-        function () { flash('Скопировано ' + lines.length); },
-        function () { copyFallback(text); });
+        () => { flash(`Скопировано ${lines.length}`); },
+        () => { copyFallback(text); });
     } else {
       copyFallback(text);
     }
@@ -324,7 +319,7 @@
   /* Переключаем от того состояния, которое человек видит на экране, а не от
      наличия ключа: строку, раскрытую поиском, иначе не свернуть. */
   function toggleRow(key) {
-    var items = visibleRows(), deep = false, i;
+    let items = visibleRows(), deep = false, i;
     for (i = 0; i < items.length; i++) {
       if (rowKey(items[i].row) === key) { deep = items[i].open; break; }
     }
@@ -333,14 +328,14 @@
   }
 
   function bodyHandler(e) {
-    var node = e.target, body = e.currentTarget;
+    let node = e.target, body = e.currentTarget;
     while (node && node !== body) {
       /* Ссылка внутри строки ведёт наружу и не должна разворачивать строку. */
       if (node.tagName === 'A') return;
       if (node.getAttribute) {
-        var filter = node.getAttribute('data-filter');
+        const filter = node.getAttribute('data-filter');
         if (filter) { e.preventDefault(); toggleFilter(filter); return; }
-        var key = node.getAttribute('data-row');
+        const key = node.getAttribute('data-row');
         if (key) { e.preventDefault(); toggleRow(key); return; }
       }
       node = node.parentNode;
@@ -349,7 +344,7 @@
 
   function bindBody(body) {
     body.addEventListener('click', bodyHandler);
-    body.addEventListener('keydown', function (e) {
+    body.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') bodyHandler(e);
     });
   }
@@ -357,27 +352,27 @@
   bindBody(diffBody);
 
   /* Карточки, чипы и селекторы — делегированием: их разметка перерисовывается. */
-  document.addEventListener('click', function (e) {
-    var node = e.target;
+  document.addEventListener('click', (e) => {
+    let node = e.target;
     while (node && node !== document) {
       if (node.getAttribute) {
-        var chip = node.getAttribute('data-chip');
+        const chip = node.getAttribute('data-chip');
         if (chip !== null && chip !== undefined) { toggleFilter(chip); return; }
         if (node.className && String(node.className).indexOf('card') !== -1) {
-          var f = node.getAttribute('data-filter');
+          const f = node.getAttribute('data-filter');
           if (f) { toggleFilter(f); return; }
         }
-        var stop = node.getAttribute('data-node');
+        const stop = node.getAttribute('data-node');
         if (stop !== null && stop !== undefined) {
           rail.pickNode(parseInt(stop, 10));
           return;
         }
-        var tab = node.getAttribute('data-tab');
+        let tab = node.getAttribute('data-tab');
         if (tab) { showTab(tab); render(); return; }
         /* Крестик и призрак живут на рельсе, а он перерисовывается целиком,
            поэтому их обработчики здесь, а не на самих кнопках. */
         if (node.getAttribute('data-add')) { files.openPicker(); return; }
-        var gone = node.getAttribute('data-drop-snap');
+        const gone = node.getAttribute('data-drop-snap');
         if (gone !== null && gone !== undefined) {
           store.remove(parseInt(gone, 10));
           return;
@@ -387,28 +382,27 @@
     }
   });
 
-  /* Сортировка. Шапки статичны, поэтому обработчики можно навесить один раз. */
-  var sortHeads = Array.prototype.slice.call(document.querySelectorAll('th[data-sort]'));
-  for (var hi = 0; hi < sortHeads.length; hi++) {
-    (function (th) {
-      function fire() {
-        page.sortBy(th.getAttribute('data-sort'));
-        render();
+  /* Сортировка. Шапки статичны, поэтому обработчики можно навесить один раз.
+     th объявлен на каждый виток, поэтому обработчики видят свою шапку, а не
+     последнюю: раньше это делала обёртка-IIFE. */
+  for (const th of document.querySelectorAll('th[data-sort]')) {
+    function fire() {
+      page.sortBy(th.getAttribute('data-sort'));
+      render();
+    }
+    th.setAttribute('tabindex', '0');
+    th.addEventListener('click', fire);
+    th.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+        e.preventDefault(); fire();
       }
-      th.setAttribute('tabindex', '0');
-      th.addEventListener('click', fire);
-      th.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
-          e.preventDefault(); fire();
-        }
-      });
-    }(sortHeads[hi]));
+    });
   }
 
   /* Каждое нажатие перестраивает весь tbody вместе с раскрытыми деталями, а
      тег — это тысячи сборок. Ждём паузы в наборе. */
-  var SEARCH_DELAY = 120;
-  var searchTimer = null;
+  const SEARCH_DELAY = 120;
+  let searchTimer = null;
 
   /* Крестик следует за полем без задержки: перерисовку таблицы откладывают
      ради тысяч строк, а показать крестик ничего не стоит, и запаздывать
@@ -417,17 +411,17 @@
     clearBtn.hidden = !search.value;
   }
 
-  search.addEventListener('input', function () {
+  search.addEventListener('input', () => {
     syncClear();
     if (searchTimer) clearTimeout(searchTimer);
-    searchTimer = setTimeout(function () {
+    searchTimer = setTimeout(() => {
       searchTimer = null;
       st.q = search.value.trim().toLowerCase();
       render();
     }, SEARCH_DELAY);
   });
 
-  clearBtn.addEventListener('click', function () {
+  clearBtn.addEventListener('click', () => {
     /* Отложенный поиск отменяем не ради правильности — сработав, он
        прочитал бы уже пустое поле и ничего не испортил, — а ради работы:
        это лишняя перерисовка всей таблицы через 120 мс после той, что мы
@@ -442,20 +436,18 @@
     render();
   });
 
-  expandBtn.addEventListener('click', function () {
-    var items = visibleRows();
-    var collapse = allOpen(items);
+  expandBtn.addEventListener('click', () => {
+    const items = visibleRows();
+    const collapse = allOpen(items);
     /* Пишем явное false, а не удаляем ключ: иначе строки, раскрытые поиском,
        остались бы раскрытыми, а подпись кнопки уже сменилась бы. */
-    for (var i = 0; i < items.length; i++) {
-      page.setOpen(rowKey(items[i].row), !collapse);
-    }
+    for (const item of items) page.setOpen(rowKey(item.row), !collapse);
     render();
   });
 
   copyBtn.addEventListener('click', copyNvr);
 
-  window.addEventListener('hashchange', function () {
+  window.addEventListener('hashchange', () => {
     if (hashLock) return;
     if (readHash()) { page.dropDeadFilters(); showTab(st.tab); rebuild(); }
   });
@@ -466,12 +458,12 @@
      момент создания, и порядок объявлений здесь ничего не решает. Городить
      ради одного подписчика шину событий незачем — страница перерисовывается
      целиком. */
-  var app = {};
-  var tips = tipsmod.create({ node: document.getElementById('tip') });
-  var hideTip = tips.hide;
-  var rail = railmod.create({ box: chainBox, page: page, store: store,
+  const app = {};
+  const tips = tipsmod.create({ node: document.getElementById('tip') });
+  const hideTip = tips.hide;
+  let rail = railmod.create({ box: chainBox, page: page, store: store,
                               text: text, app: app, hideTip: hideTip });
-  var files = filesmod.create({ store: store, text: text,
+  let files = filesmod.create({ store: store, text: text,
     dom: { input: fileInput, drop: dropZone, errors: loadErrors,
            pick: pickBtn } });
   app.render = render;
@@ -494,7 +486,7 @@
 
   /* ---------- кнопка «наверх» ---------- */
 
-  var toTop = document.getElementById('totop');
+  const toTop = document.getElementById('totop');
 
   /* Порог — высота окна, а не круглое число точек: «ниже первого экрана»
      человек видит глазами, а «ниже шестисот точек» ни о чём не говорит и
@@ -503,11 +495,11 @@
     toTop.hidden = window.pageYOffset <= window.innerHeight;
   }
 
-  toTop.addEventListener('click', function () {
+  toTop.addEventListener('click', () => {
     /* Плавную прокрутку понимают не все браузеры, и её отдельно просят
        отключить те, кому от движения плохо. В обоих случаях поднимаемся
        прыжком: доехать важнее, чем доехать красиво. */
-    var smooth = 'scrollBehavior' in document.documentElement.style
+    const smooth = 'scrollBehavior' in document.documentElement.style
       && !(window.matchMedia
            && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
     if (smooth) window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -521,7 +513,7 @@
   /* Пустой дашборд показывает только зону загрузки: вкладки без данных
      обещали бы содержимое, которого нет. */
   function syncEmpty() {
-    var has = store.list().length > 0;
+    const has = store.list().length > 0;
     emptySection.hidden = has;
     sourcesBox.hidden = !has;
     tabsNav.hidden = !has;
@@ -537,9 +529,8 @@
      же строками у страницы больше нет. */
   function renderSources() {
     rail.render();
-    var warns = store.warnings(), wout = '', i;
-    for (i = 0; i < warns.length; i++) wout += '<div class="warn">' + esc(warns[i]) + '</div>';
-    warningsBox.innerHTML = wout;
+    warningsBox.innerHTML = store.warnings()
+      .map((w) => `<div class="warn">${esc(w)}</div>`).join('');
   }
 
   /* Единственная дверь для данных. Порядок здесь не косметический, и стоит он
@@ -564,7 +555,7 @@
     rebuild();
   }
 
-  store.onChange(function () {
+  store.onChange(() => {
     applyData(viewmodel.buildPageData(store.snapshots()));
     renderSources();
     syncEmpty();

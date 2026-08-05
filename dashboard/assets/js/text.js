@@ -88,13 +88,13 @@
 
   function keys(obj) {
     let out = [];
-    for (var k in obj) { if (obj.hasOwnProperty(k)) out.push(k); }
+    for (const k in obj) { if (obj.hasOwnProperty(k)) out.push(k); }
     return out;
   }
 
   function setFrom(list) {
     let out = {};
-    for (var i = 0; i < (list || []).length; i++) out[list[i]] = 1;
+    for (const key of list || []) out[key] = 1;
     return out;
   }
 

@@ -51,8 +51,8 @@
   function setClasses(list) {
     CLASSES = list || [];
     CLASS_LABELS = {};
-    for (var i = 0; i < CLASSES.length; i++) {
-      CLASS_LABELS[text.slug(CLASSES[i])] = 'патчи ' + CLASSES[i];
+    for (const name of CLASSES) {
+      CLASS_LABELS[text.slug(name)] = `патчи ${name}`;
     }
   }
 

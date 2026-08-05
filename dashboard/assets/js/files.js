@@ -31,7 +31,7 @@
     let timers = [];
 
     function stopTimers() {
-      for (var i = 0; i < timers.length; i++) clearTimeout(timers[i]);
+      for (const timer of timers) clearTimeout(timer);
       timers = [];
     }
 
