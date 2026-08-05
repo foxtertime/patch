@@ -1,104 +1,36 @@
-/* Поведение страницы: загрузка снапшотов, фильтры, поиск, адресная строка.
-   Считает данные viewmodel.js, а что именно считать — решает store.js;
-   разметку строит tables.js с cards.js, а здесь её кладут в узлы и
-   связывают с событиями. */
+/* Корень страницы: находит свои узлы, кладёт в них разметку, связывает
+   события. Что показывать — знает page.js, из чего строить разметку —
+   tables.js с cards.js, а что вообще есть на странице — store.js. */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
     module.exports = factory(require('./viewmodel.js'), require('./store.js'),
                              require('./diff.js'), require('./text.js'),
                              require('./labels.js'), require('./markup.js'),
-                             require('./tables.js'), require('./cards.js'));
+                             require('./tables.js'), require('./cards.js'),
+                             require('./page.js'));
   } else {
     root.KP = root.KP || {};
     root.KP.ui = factory(root.KP.viewmodel, root.KP.store, root.KP.diff,
                          root.KP.text, root.KP.labels, root.KP.markup,
-                         root.KP.tables, root.KP.cards);
+                         root.KP.tables, root.KP.cards, root.KP.page);
   }
 }(typeof globalThis !== 'undefined' ? globalThis : this,
-  function (viewmodel, store, diffmod, text, labels, markup, tables, cards) {
+  function (viewmodel, store, diffmod, text, labels, markup, tables, cards,
+            pagemod) {
   'use strict';
 
-  /* Данные страницы считаются здесь же, из снапшотов, которые человек
-     подгружает в дашборд сам. */
-  var DATA = { generated: '', patch_classes: [], snapshots: [], pairs: [] };
-  var SNAPS = [], PAIRS = [];
-  /* Выбранный переход — имена снапшотов, а не номер в массиве. Номер
-     значил что-то, только пока переходы приходили готовым списком в
-     известном порядке; с произвольными диапазонами он не значит ничего, а
-     имя переживает и перестановку цепочки, и выгрузку соседа. */
-  var pairSel = { from: null, to: null };
-  /* Посчитанные переходы по имени диапазона. Заводится заново на каждую
-     смену состава: снапшот с тем же именем — тот же файл, но набор вокруг
-     него другой, и сводность диапазона могла измениться. */
-  var pairCache = {};
-  /* Отмеченный первым кликом узел, пока второй не выбран. Живёт только до
-     следующего клика, смены вкладки или смены состава снапшотов: это шаг
-     выбора, а не состояние страницы. */
-  var anchor = null;
-
-  /* Единственная дверь для данных: сюда приходит то, что посчитал
-     viewmodel.js, отсюда перерисовывается страница. Зовётся при каждом
-     изменении набора снапшотов, поэтому всё, что зависит от их состава,
-     здесь именно пересчитывается, а не дописывается. */
-  function applyData(pageData) {
-    /* Держим выбор именами: после перестановки или удаления номер
-       показал бы другой снапшот, ничем не выдав подмены. Имя — полное,
-       с временем сбора: одного тега мало, см. snapKey().
-
-       Восстанавливаем только то, что человек выбрал сам. Снапшоты приезжают
-       по одному файлу, каждый файл — свой applyData, и «прежним выбором»
-       без picked оказывался бы тот, который дашборд выбрал сам на прошлом
-       шаге: после первого же файла умолчание «свежий снапшот и самый
-       широкий переход» не срабатывало бы больше никогда. */
-    var wantTag = picked.tag && SNAPS[st.tag] ? snapKey(SNAPS[st.tag]) : null;
-    var wantPair = picked.pair ? pairKey(currentEnds()) : null;
-    var foundTag = false, foundPair = false;
-    var ci;
-    DATA = pageData;
-    SNAPS = pageData.snapshots || [];
-    PAIRS = pageData.pairs || [];
-    labels.setClasses(pageData.patch_classes || []);
-    /* Умолчание: последний снапшот цепочки и самый широкий переход. Именно
-       это обещает README, и обещание не должно зависеть от того, одним
-       файлом человек подгрузил снапшоты или пятью. */
-    st.tag = SNAPS.length ? SNAPS.length - 1 : 0;
-    for (ci = 0; wantTag !== null && ci < SNAPS.length; ci++) {
-      if (snapKey(SNAPS[ci]) === wantTag) { st.tag = ci; foundTag = true; }
-    }
-    seedPairs();
-    /* Умолчание: вся цепочка. Выбор восстанавливаем, только если оба его
-       конца ещё на странице; иначе снова работает умолчание. */
-    if (wantPair) {
-      var parts = wantPair.split('..');
-      if (snapIndexByKey(parts[0]) !== -1 && snapIndexByKey(parts[1]) !== -1) {
-        pairSel.from = parts[0];
-        pairSel.to = parts[1];
-        foundPair = true;
-      }
-    }
-    if (!foundPair) { pairSel.from = null; pairSel.to = null; }
-    /* Выбранного больше нет на странице — значит, нет и выбора: дальше снова
-       работает умолчание. Иначе следующий файл открылся бы «прежним
-       выбором», которого человек не делал. */
-    if (picked.tag && !foundTag) picked.tag = false;
-    if (picked.pair && !foundPair) picked.pair = false;
-    syncTabs();
-    /* Адрес читаем, только пока он чужой — тот, с которым страницу открыли.
-       Дальше в нём лежит наша же прошлая запись, и она вернула бы прежний
-       выбор в обход picked, снова похоронив умолчание. Ссылку, присланную
-       позже, приносит hashchange. */
-    if (!hashIsOurs) readHash();
-    /* Фильтр переживает смену состава снапшотов, а его предмет — нет: класс
-       патчей уходит вместе со своим снапшотом, тег строки — вместе с
-       последней такой строкой. Зовём отдельно от readHash(), который выше
-       зовут уже не всегда: иначе страница показывала бы пустую таблицу под
-       фильтр, которого не поставить и не снять — карточки с ним не осталось
-       ни одной, а в чипе вместо подписи стоял бы сам ключ. */
-    dropDeadFilters();
-    showTab(st.tab);
-    rebuild();
-  }
-
+  /* Состояние страницы живёт в page.js: там же и всё, что из него
+     считается — выбор снапшота, диапазон сравнения, фильтры, поиск,
+     сортировка. Здесь — короткие имена для того, что зовут отсюда чаще
+     всего. */
+  var page = pagemod.create({ viewmodel: viewmodel, diffmod: diffmod,
+                              store: store, labels: labels, text: text });
+  var st = page.st, picked = page.picked;
+  var curSnap = page.curSnap, curPair = page.curPair;
+  var visibleRows = page.visibleRows, sortRows = page.sortRows;
+  var rowKey = page.rowKey, openOf = page.openOf;
+  var currentEnds = page.currentEnds, pairKey = page.pairKey;
+  var snapKey = page.snapKey, activeFilters = page.activeFilters;
 
   var stateSection = document.getElementById('tab-state');
   var diffSection = document.getElementById('tab-diff');
@@ -122,316 +54,29 @@
   var dropZone = document.getElementById('drop');
   var pickBtn = document.getElementById('pick');
 
-  /* Всё состояние страницы в одном месте: отсюда же оно уезжает в
-     location.hash и оттуда же восстанавливается при перезагрузке. */
-  var st = {
-    tab: 'state',
-    /* Свежий тег выбирает applyData: до прихода данных выбирать не из чего.
-       Переход здесь не хранится вовсе — его концы названы именами
-       снапшотов и лежат в pairSel. */
-    tag: 0,
-    q: '',
-    /* «Изменения» открываются на изменившихся компонентах: неизменившиеся
-       строки в этой таблице — шум, из-за которого не видно изменившихся.
-       Фильтр обычный, он виден чипом и снимается как любой другой. */
-    filters: { state: {}, diff: { 'changed': 1 } },
-    sort: { state: { key: 'name', asc: true }, diff: { key: 'name', asc: true } }
-  };
-  /* Раскрытие строк: ключи вида "state:os-9.2:nginx", значения true/false.
-     Состояние трёхзначное — отсутствие ключа значит «решает поиск»: строку,
-     которая попала в выдачу только совпадением в деталях, разворачивает сам
-     поиск. Явный ключ всегда сильнее: иначе такую строку было бы не свернуть. */
-  var expanded = {};
   var hashLock = false;
-  /* Выбрал ли снапшот и переход человек — кликом по селектору или адресом,
-     который он открыл. Пока не выбрал, при каждом изменении состава действует
-     умолчание; см. applyData(). */
-  var picked = { tag: false, pair: false };
   /* Писала ли страница адрес сама. С этого мгновения location.hash — её
      собственное эхо, а не то, с чем её открыли. */
   var hashIsOurs = false;
 
   /* ---------- вспомогательное ---------- */
 
-  /* Считалки строк, подписи и куски разметки живут в своих модулях. Здесь
-     только короткие имена для тех, кого зовут отсюда: тела оставшихся
-     функций читаются лучше, когда в них стоит esc(), а не text.esc(). */
-  var esc = text.esc, own = text.own, has = text.has, keys = text.keys,
-      setFrom = text.setFrom, slug = text.slug, plural = text.plural,
-      stampOf = text.stampOf, gapLabel = text.gapLabel;
+  /* Считалки строк живут в text.js. Здесь — короткие имена для тех, кого
+     зовут отсюда: тела оставшихся функций читаются лучше, когда в них стоит
+     esc(), а не text.esc(). */
+  var esc = text.esc, own = text.own, keys = text.keys, plural = text.plural,
+      setFrom = text.setFrom, stampOf = text.stampOf, gapLabel = text.gapLabel;
+  var totalRows = page.totalRows, snapshots = page.snapshots;
 
-
-  /* ---------- фильтры ---------- */
-
-  function activeFilters() { return st.filters[st.tab]; }
-
+  /* Фильтр ставит и снимает page — он один знает правило про «версия та же»
+     и «что-то изменилось». Перерисовка остаётся здесь: страницу рисует
+     корень. */
   function toggleFilter(key) {
-    var set = activeFilters();
-    if (key === 'all') { st.filters[st.tab] = {}; }
-    else if (own(set, key)) { delete set[key]; }
-    else {
-      /* «версия та же» — не уточнение к «что-то изменилось», а другой срез
-         той же таблицы. Складывать их по И значит показать «версия не
-         менялась, но что-то другое поехало» — не то, что просит карточка. */
-      if (key === 'unchanged') delete set['changed'];
-      set[key] = 1;
-    }
+    page.toggleFilter(key);
     render();
   }
 
-  function stateMatches(row) {
-    var set = st.filters.state, key;
-    for (key in set) {
-      if (!set.hasOwnProperty(key)) continue;
-      if (key === 'has-patch') { if (!row.patches.length) return false; }
-      else if (key === 'problem') { if (!row.problems.length) return false; }
-      else if (row.marks.indexOf(key) === -1) return false;
-    }
-    return true;
-  }
-
-  function diffMatches(row) {
-    var set = st.filters.diff, key;
-    for (key in set) {
-      if (!set.hasOwnProperty(key)) continue;
-      if (key === 'changed') { if (!row.changed) return false; }
-      else if (row.marks.indexOf(key) === -1) return false;
-    }
-    return true;
-  }
-
-  /* ---------- поиск ---------- */
-
-  /* Поиск идёт и по видимым полям строки, и по её деталям. Если совпало
-     только в деталях, строка не просто остаётся — она сразу разворачивается,
-     иначе непонятно, почему она в выдаче. */
-  function scanState(row, q) {
-    if (!q) return { show: true, deep: false };
-    var shallow = has(row.name, q) || has(row.nvr, q) || has(row.branch, q)
-               || has(row.evr, q) || has(row.tagged_in, q);
-    var deep = has(row.project, q) || has(row.completed, q) || has(row.owner, q);
-    var i, j, p;
-    for (i = 0; !deep && i < (row.koji_tags || []).length; i++) {
-      if (has(row.koji_tags[i], q)) deep = true;
-    }
-    for (i = 0; !deep && i < row.patches.length; i++) {
-      p = row.patches[i];
-      if (has(p.name, q) || has(p.path, q) || has(p['class'], q)) deep = true;
-      for (j = 0; !deep && j < (p.cves || []).length; j++) {
-        if (has(p.cves[j], q)) deep = true;
-      }
-    }
-    for (i = 0; !deep && i < row.rpms.length; i++) {
-      if (has(row.rpms[i], q)) deep = true;
-    }
-    for (i = 0; !deep && i < row.problems.length; i++) {
-      if (has(row.problems[i], q)) deep = true;
-    }
-    return { show: shallow || deep, deep: !shallow && deep };
-  }
-
-  function scanDiff(row, q) {
-    if (!q) return { show: true, deep: false };
-    var shallow = has(row.name, q) || has(row.old_evr, q) || has(row.new_evr, q);
-    var deep = has(row.old_branch, q) || has(row.new_branch, q)
-            || has(row.old_tagged_in, q) || has(row.new_tagged_in, q);
-    var lists = [row.old_patches, row.new_patches];
-    var i, j, k, p;
-    for (i = 0; !deep && i < lists.length; i++) {
-      for (j = 0; !deep && j < lists[i].length; j++) {
-        p = lists[i][j];
-        if (has(p.name, q) || has(p.path, q) || has(p['class'], q)) deep = true;
-        for (k = 0; !deep && k < (p.cves || []).length; k++) {
-          if (has(p.cves[k], q)) deep = true;
-        }
-      }
-    }
-    for (i = 0; !deep && i < row.rpm_rows.length; i++) {
-      for (j = 0; !deep && j < 2; j++) {
-        if (row.rpm_rows[i][j] && has(row.rpm_rows[i][j], q)) deep = true;
-      }
-    }
-    return { show: shallow || deep, deep: !shallow && deep };
-  }
-
-  /* ---------- какие строки видны ---------- */
-
-  function curSnap() { return SNAPS[st.tag] || null; }
-  function curPair() { return pairFor(currentEnds()); }
-
-  /* Имя снапшота — тег и время сбора. Одного тега мало: один и тот же тег
-     законно приходит из разных прогонов («тот же тег месяц назад против
-     сегодняшнего» — самый частый способ сравнения), и по имени тега такие
-     снапшоты неразличимы. Любое добавление, удаление или перестановка молча
-     переводили бы выбор на другой прогон, а ссылка «tag=os-9.2» всегда
-     открывала бы последний. */
-  function snapKey(snap) {
-    return snap ? snap.tag + '@' + (snap.generated || '') : '';
-  }
-
-  function snapIndexByKey(key) {
-    for (var i = 0; i < SNAPS.length; i++) {
-      if (snapKey(SNAPS[i]) === key) return i;
-    }
-    return -1;
-  }
-
-  /* Концы выбранного перехода в порядке цепочки. Направление задаёт
-     цепочка, а не порядок кликов: «было» — то, что левее. Обратный порядок
-     поменял бы местами «появился» и «исчез», причём молча.
-
-     Ничего не выбрано или конец выгрузили — умолчание «вся цепочка»: то же
-     самое, что дашборд показывал и раньше, просто названное иначе. */
-  function currentEnds() {
-    if (SNAPS.length < 2) return null;
-    var a = snapIndexByKey(pairSel.from), b = snapIndexByKey(pairSel.to);
-    if (a === -1 || b === -1 || a === b) return [0, SNAPS.length - 1];
-    return a < b ? [a, b] : [b, a];
-  }
-
-  /* Имя перехода для адресной строки: имена обоих снапшотов, а не их тегов.
-     У трёх прогонов одного тега все переходы назывались бы
-     «os-9.2..os-9.2», и ссылка на любой из них открывала бы последний. */
-  function pairKey(ends) {
-    if (!ends || !SNAPS[ends[0]] || !SNAPS[ends[1]]) return '';
-    return snapKey(SNAPS[ends[0]]) + '..' + snapKey(SNAPS[ends[1]]);
-  }
-
-  /* Концы принимаются в любом порядке: направление задаёт цепочка, и
-     выправляет его currentEnds(). */
-  function setPairEnds(a, b) {
-    pairSel.from = snapKey(SNAPS[a]);
-    pairSel.to = snapKey(SNAPS[b]);
-    picked.pair = true;
-  }
-
-  /* Единственный тег в цепочке с таким именем, иначе -1. Предпосчитанные
-     переходы названы тегами, а один тег законно приходит из двух прогонов;
-     такую пару по имени не опознать, и в кэш она не попадёт — её посчитают
-     по требованию. */
-  function onlyIndexWithTag(tag) {
-    var found = -1, i;
-    for (i = 0; i < SNAPS.length; i++) {
-      if (SNAPS[i].tag !== tag) continue;
-      if (found !== -1) return -1;
-      found = i;
-    }
-    return found;
-  }
-
-  /* Кэш наполняем тем, что уже посчитано при загрузке. Сопоставляем по
-     именам концов, а не по раскладке diffChain: знать, что она кладёт
-     сперва соседей, а потом сводную пару, здесь незачем — она может
-     измениться, и молчаливый переезд был бы худшим из исходов. */
-  function seedPairs() {
-    pairCache = {};
-    var i, lo, hi;
-    for (i = 0; i < PAIRS.length; i++) {
-      lo = onlyIndexWithTag(PAIRS[i].old);
-      hi = onlyIndexWithTag(PAIRS[i]['new']);
-      if (lo === -1 || hi === -1 || lo >= hi) continue;
-      pairCache[pairKey([lo, hi])] = PAIRS[i];
-    }
-  }
-
-  /* Переход для этих концов: из кэша, а если его там нет — считаем и
-     кладём. Расчёт синхронный: это один дифф, столько же работы, сколько
-     страница уже делает на загрузке для каждого соседнего перехода. */
-  function pairFor(ends) {
-    if (!ends) return null;
-    var key = pairKey(ends);
-    if (own(pairCache, key)) return pairCache[key];
-    var raw = store.snapshots();
-    if (!raw[ends[0]] || !raw[ends[1]]) return null;
-    /* Сводным считается диапазон во всю цепочку, и только когда снапшотов
-       больше двух: на двух единственный переход и есть вся цепочка, и
-       подписывать его итогом значит сообщать очевидное. */
-    var summary = ends[0] === 0 && ends[1] === SNAPS.length - 1
-      && SNAPS.length > 2;
-    var block = viewmodel.pairBlock(
-      diffmod.diffSnapshots(raw[ends[0]], raw[ends[1]], summary), raw);
-    pairCache[key] = block;
-    return block;
-  }
-
-  function visibleRows() {
-    var q = st.q, out = [], i, row, scan;
-    if (st.tab === 'diff') {
-      var pair = curPair();
-      var rows = pair ? pair.rows : [];
-      for (i = 0; i < rows.length; i++) {
-        row = rows[i];
-        if (!diffMatches(row)) continue;
-        scan = scanDiff(row, q);
-        if (!scan.show) continue;
-        out.push({ row: row, open: scan.deep });
-      }
-      return out;
-    }
-    var snap = curSnap();
-    var builds = snap ? snap.builds : [];
-    for (i = 0; i < builds.length; i++) {
-      row = builds[i];
-      if (!stateMatches(row)) continue;
-      scan = scanState(row, q);
-      if (!scan.show) continue;
-      out.push({ row: row, open: scan.deep });
-    }
-    return out;
-  }
-
-  function totalRows() {
-    if (st.tab === 'diff') { var p = curPair(); return p ? p.rows.length : 0; }
-    var s = curSnap();
-    return s ? s.builds.length : 0;
-  }
-
-  /* Ключ раскрытой строки. Снапшот и пара названы полными именами по той же
-     причине, что и в адресе: у двух прогонов одного тега иначе было бы одно
-     состояние раскрытия на двоих. */
-  function rowKey(row) {
-    if (st.tab === 'diff') {
-      return 'diff:' + pairKey(currentEnds()) + ':' + row.name;
-    }
-    return 'state:' + snapKey(curSnap()) + ':' + row.name;
-  }
-
-  /* Единственное место, где решается, раскрыта ли строка: явно выбранное
-     человеком состояние, а если его нет — то, что предложил поиск (deep). */
-  function openOf(key, deep) {
-    return expanded.hasOwnProperty(key) ? expanded[key] : Boolean(deep);
-  }
-
   /* ---------- сортировка ---------- */
-
-  /* Версии сравниваются как строки, а не по правилам rpm, и это осознанно:
-     в соседних строках стоят версии разных компонентов, так что «правильный»
-     порядок между ними всё равно ничего не значит. Про 1.10 выше 1.9
-     предупреждает подсказка на заголовке колонки. */
-  function sortValue(row, key) {
-    if (st.tab === 'diff') {
-      if (key === 'old') return row.old_evr || '';
-      if (key === 'new') return row.new_evr || '';
-      if (key === 'dpatch') return row.patches_added.length + row.patches_removed.length;
-      if (key === 'drpm') return row.rpms_added.length + row.rpms_removed.length;
-      return row.name || '';
-    }
-    if (key === 'patches') return row.patches.length;
-    if (key === 'rpms') return row.rpms.length;
-    return row[key] || '';
-  }
-
-  function sortRows(items) {
-    var cfg = st.sort[st.tab];
-    items.sort(function (a, b) {
-      var x = sortValue(a.row, cfg.key), y = sortValue(b.row, cfg.key), res;
-      if (typeof x === 'number' || typeof y === 'number') res = (x || 0) - (y || 0);
-      else res = x < y ? -1 : (x > y ? 1 : 0);
-      if (res === 0) res = a.row.name < b.row.name ? -1 : (a.row.name > b.row.name ? 1 : 0);
-      return cfg.asc ? res : -res;
-    });
-    return items;
-  }
 
   function syncArrows() {
     var table = document.getElementById(st.tab === 'diff' ? 'diff-table' : 'state-table');
@@ -445,7 +90,7 @@
     }
   }
 
-  /* ---------- кусочки разметки ---------- */
+  /* ---------- сколько колонок ---------- */
 
   /* Сколько колонок в таблице вкладки. Считаем по самой разметке: строка на
      всю ширину (деталь, «ничего не найдено») пишется числом, а колонку в
@@ -455,8 +100,6 @@
                                                       : 'state-table');
     return table.querySelectorAll('th').length;
   }
-
-
 
   /* ---------- карточки, селекторы, чипы ---------- */
 
@@ -469,7 +112,6 @@
   function renderDiffCards() {
     document.getElementById('diff-cards').innerHTML = cards.diffCards(curPair());
   }
-
 
   function syncCards() {
     var set = activeFilters();
@@ -558,7 +200,7 @@
   function syncTabs() {
     for (var t = 0; t < tabBtns.length; t++) {
       if (tabBtns[t].getAttribute('data-tab') === 'diff') {
-        tabBtns[t].hidden = SNAPS.length < 2;
+        tabBtns[t].hidden = snapshots().length < 2;
       }
     }
   }
@@ -570,8 +212,8 @@
        сделает. Смена состава снапшотов проходит здесь же: applyData
        заканчивается showTab, а номер узла после прихода файла стоит уже
        у другого снапшота. */
-    anchor = null;
-    if (name === 'diff' && SNAPS.length < 2) name = 'state';
+    page.setAnchor(null);
+    if (name === 'diff' && snapshots().length < 2) name = 'state';
     st.tab = name;
     for (var i = 0; i < tabBtns.length; i++) {
       var on = tabBtns[i].getAttribute('data-tab') === name;
@@ -600,8 +242,9 @@
        меняется, и присланная ссылка «tag=1» показала бы другой снапшот,
        ничем не выдав подмены. Имя полное, с временем сбора, — иначе два
        прогона одного тега на такую ссылку отвечали бы одинаково. */
-    if (SNAPS.length) parts.push('tag=' + encodeURIComponent(snapKey(SNAPS[st.tag])));
-    if (SNAPS.length > 1) {
+    var snaps = snapshots();
+    if (snaps.length) parts.push('tag=' + encodeURIComponent(snapKey(snaps[st.tag])));
+    if (snaps.length > 1) {
       parts.push('pair=' + encodeURIComponent(pairKey(currentEnds())));
     }
     /* f= пишем всегда, в том числе пустой: у вкладки «Изменения» фильтр по
@@ -633,87 +276,6 @@
     try { return decodeURIComponent(s); } catch (e) { return null; }
   }
 
-  /* Токен фильтра мог устареть — приехать из чужого хеша или пережить свой
-     снапшот. Свой мы узнаём по подписи, по классу патчей или по тегу живой
-     строки; чужой молча выбрасываем, чтобы страница не показывала пустую
-     таблицу под фильтр, которого не поставить и не снять — его нет ни на
-     одной карточке. Вкладка приходит доводом, а не берётся из st: судить
-     приходится и о той, на которой человека сейчас нет. */
-  function knownFilter(key, tab) {
-    var classes = labels.classes(), i;
-    if (!key || key === 'all') return false;
-    if (labels.LABELS.hasOwnProperty(key)) return true;
-    for (i = 0; i < classes.length; i++) {
-      if (slug(classes[i]) === key) return true;
-    }
-    var host = tab === 'diff' ? curPair() : curSnap();
-    var rows = host ? (tab === 'diff' ? host.rows : host.builds) : [];
-    for (i = 0; i < rows.length; i++) {
-      if (rows[i].marks.indexOf(key) !== -1) return true;
-    }
-    return false;
-  }
-
-  /* Единственное место, где обещание knownFilter выполняется: и для фильтров
-     из хеша, и для тех, что человек поставил кликом, а данные под ними
-     сменились. Обе вкладки сразу: наборы фильтров у них свои, и мёртвый
-     фильтр на невидимой сейчас вкладке встретил бы человека той же пустой
-     таблицей через один клик по ней. */
-  function dropDeadFilters() {
-    var tabs = ['state', 'diff'], t, i, tab, from, live;
-    for (t = 0; t < tabs.length; t++) {
-      tab = tabs[t];
-      from = keys(st.filters[tab]);
-      live = [];
-      for (i = 0; i < from.length; i++) {
-        if (knownFilter(from[i], tab)) live.push(from[i]);
-      }
-      st.filters[tab] = setFrom(live);
-    }
-  }
-
-  /* Так ли назван этот снапшот. Полное имя, с временем сбора, называет
-     прогон и однозначно; голый тег у двойников подходит нескольким.
-     Спутать их нельзя: в полном имени есть «@», в теге его не бывает. */
-  function snapNamed(index, name) {
-    return snapKey(SNAPS[index]) === name || SNAPS[index].tag === name;
-  }
-
-  /* Последний диапазон, концы которого названы в этом порядке: левый конец
-     левее правого. Ищем именно парой, а не каждый конец сам по себе:
-     у двойников тега «os-9.2..os-9.3» на цепочке 9.2, 9.3, 9.2 самый
-     свежий os-9.2 стоит правее os-9.3, и независимый поиск открыл бы
-     обратное сравнение, поменяв местами «появился» и «исчез».
-
-     Последний — значит с самым свежим левым концом, у которого правый ещё
-     есть справа, а при нём с самым свежим правым. Не то же, что «tag=»,
-     которая берёт последний прогон и всё: на цепочке 9.2, 9.3, 9.2 левым
-     концом «os-9.2..os-9.3» будет первый прогон 9.2, потому что за
-     последним никакого 9.3 уже нет. */
-  function lastEndsNamed(left, right) {
-    var lo, hi, found = null;
-    for (lo = 0; lo < SNAPS.length; lo++) {
-      if (!snapNamed(lo, left)) continue;
-      for (hi = lo + 1; hi < SNAPS.length; hi++) {
-        if (snapNamed(hi, right)) found = [lo, hi];
-      }
-    }
-    return found;
-  }
-
-  /* Имя диапазона из адреса. Полная форма называет прогоны, короткая —
-     теги; короткую оставляем читаемой, потому что её пишут руками и
-     присылают в переписке.
-
-     Ссылку, написанную задом наперёд, разворачиваем по цепочке — но только
-     когда в этом порядке она не читается вовсе. Иначе разворот молча
-     подменял бы сравнение, которое человек назвал сам. */
-  function endsFromHash(value) {
-    var at = String(value).indexOf('..');
-    if (at === -1) return null;
-    var left = value.slice(0, at), right = value.slice(at + 2);
-    return lastEndsNamed(left, right) || lastEndsNamed(right, left);
-  }
 
   function readHash() {
     var raw = location.hash.replace(/^#/, '');
@@ -727,28 +289,24 @@
       if (val === null) continue;   /* битый кусок пропускаем, остальные читаем */
       if (key === 'tab') {
         /* Сравнивать нечего — вкладки «Изменения» на странице тоже нет. */
-        tab = (val === 'diff' && SNAPS.length > 1) ? 'diff' : 'state';
-        if (val === 'diff' && SNAPS.length < 2) dropped = true;
+        tab = (val === 'diff' && snapshots().length > 1) ? 'diff' : 'state';
+        if (val === 'diff' && snapshots().length < 2) dropped = true;
       } else if (key === 'tag') {
         /* Ссылку правят руками, и «tag=os-9.2» без времени сбора — её
            законная форма. Два прогона одного тега она не различает: берём
            последний по цепочке, самый свежий. Сама страница пишет всегда
            полное имя, поэтому её ссылки однозначны. */
-        for (var j = 0; j < SNAPS.length; j++) {
+        for (var j = 0; j < snapshots().length; j++) {
           /* Ссылка — такой же выбор человека, как клик по кнопке: он должен
              пережить приход следующего файла. */
-          if (snapKey(SNAPS[j]) === val || SNAPS[j].tag === val) {
-            st.tag = j;
-            picked.tag = true;
-          }
+          if (page.snapNamed(j, val)) page.selectSnapshot(j);
         }
       } else if (key === 'pair') {
         /* Не разобрали — остаёмся на переходе по умолчанию. Ссылка — такой
            же выбор человека, как клик по кнопке: он должен пережить приход
            следующего файла. */
-        var ends = endsFromHash(val);
-        if (ends) { pairSel.from = snapKey(SNAPS[ends[0]]);
-                    pairSel.to = snapKey(SNAPS[ends[1]]); picked.pair = true; }
+        var ends = page.endsFromName(val);
+        if (ends) page.setPairEnds(ends[0], ends[1]);
       } else if (key === 'f') filters = val ? val.split(',') : [];
       else if (key === 'q') st.q = val.trim().toLowerCase();
       else if (key === 'sort') sort = val.split(':');
@@ -832,7 +390,7 @@
     for (i = 0; i < items.length; i++) {
       if (rowKey(items[i].row) === key) { deep = items[i].open; break; }
     }
-    expanded[key] = !openOf(key, deep);
+    page.setOpen(key, !openOf(key, deep));
     render();
   }
 
@@ -896,10 +454,7 @@
   for (var hi = 0; hi < sortHeads.length; hi++) {
     (function (th) {
       function fire() {
-        var key = th.getAttribute('data-sort');
-        var cfg = st.sort[st.tab];
-        if (cfg.key === key) cfg.asc = !cfg.asc;
-        else { cfg.key = key; cfg.asc = true; }
+        page.sortBy(th.getAttribute('data-sort'));
         render();
       }
       th.setAttribute('tabindex', '0');
@@ -955,7 +510,7 @@
     /* Пишем явное false, а не удаляем ключ: иначе строки, раскрытые поиском,
        остались бы раскрытыми, а подпись кнопки уже сменилась бы. */
     for (var i = 0; i < items.length; i++) {
-      expanded[rowKey(items[i].row)] = !collapse;
+      page.setOpen(rowKey(items[i].row), !collapse);
     }
     render();
   });
@@ -964,7 +519,7 @@
 
   window.addEventListener('hashchange', function () {
     if (hashLock) return;
-    if (readHash()) { dropDeadFilters(); showTab(st.tab); rebuild(); }
+    if (readHash()) { page.dropDeadFilters(); showTab(st.tab); rebuild(); }
   });
 
   /* ---------- подсказки ---------- */
@@ -1117,7 +672,7 @@
        для посчитанных на месте пар в pairFor, для предпосчитанных в
        diff.js. Двух копий и так на одну больше, чем надо; третья, тут,
        разошлась бы с обеими молча. */
-    var pair = ends ? pairFor(ends) : null;
+    var pair = ends ? page.pairFor(ends) : null;
     var sum = pair && pair.summary ? '<span class="sum">итог</span>' : '';
     /* Подпись рельса стоит в шапке панели и написана прямо в шаблоне: она
        одна и та же при любых данных, и рисовать её заново на каждую
@@ -1142,7 +697,8 @@
      снапшот открыт. На «Изменениях» нажатого чипа нет: там выбирают не
      узел, а отрезок, и концы диапазона показаны заливкой. */
   function stopHtml(at, item, when, here, live, hot) {
-    var cls = 'pick' + (here ? ' on' : '') + (anchor === at ? ' anchor' : '');
+    var cls = 'pick' + (here ? ' on' : '')
+      + (page.anchor() === at ? ' anchor' : '');
     var body = '<span class="node"></span><span class="nm">' + esc(item.tag)
       + '</span><span class="when">' + esc(when) + '</span>';
     var chip;
@@ -1165,8 +721,8 @@
 
   function nodeTip(at, here, live) {
     if (!live) return here ? 'Открыт сейчас.' : 'Открыть этот снапшот.';
-    if (anchor === null) return 'Отметить началом сравнения.';
-    return anchor === at ? 'Снять отметку.' : 'Сравнить с отмеченным.';
+    if (page.anchor() === null) return 'Отметить началом сравнения.';
+    return page.anchor() === at ? 'Снять отметку.' : 'Сравнить с отмеченным.';
   }
 
   function source(item) {
@@ -1212,25 +768,21 @@
        и снимать её будет некому. */
     hideTip();
     if (st.tab !== 'diff') {
-      st.tag = at;
-      /* Выбор стал явным, и дальше страница держит его именем: приход или
-         уход соседнего снапшота не должен молча переселить таблицу на
-         другой прогон. */
-      picked.tag = true;
+      page.selectSnapshot(at);
       renderStateCards();
       render();
       focusNode(at);
       return;
     }
-    if (anchor === null) { anchor = at; renderChain(); }
-    else if (anchor === at) { anchor = null; renderChain(); }
+    if (page.anchor() === null) { page.setAnchor(at); renderChain(); }
+    else if (page.anchor() === at) { page.setAnchor(null); renderChain(); }
     else {
       /* Концы отдаём в порядке кликов: направление задаёт цепочка, и
          выправляет его currentEnds() — единственное место, где это правило
          записано. Второе такое же здесь однажды разошлось бы с ним. */
-      var mark = anchor;
-      anchor = null;
-      setPairEnds(mark, at);
+      var mark = page.anchor();
+      page.setAnchor(null);
+      page.setPairEnds(mark, at);
       renderDiffCards();
       render();
     }
@@ -1335,6 +887,28 @@
     var warns = store.warnings(), wout = '', i;
     for (i = 0; i < warns.length; i++) wout += '<div class="warn">' + esc(warns[i]) + '</div>';
     warningsBox.innerHTML = wout;
+  }
+
+  /* Единственная дверь для данных. Порядок здесь не косметический, и стоит он
+     в корне, а не в page.applyData: считать состояние — дело page, а решать,
+     что после этого перерисовать, — дело того, кто владеет узлами. */
+  function applyData(pageData) {
+    page.applyData(pageData);
+    syncTabs();
+    /* Адрес читаем, только пока он чужой — тот, с которым страницу открыли.
+       Дальше в нём лежит наша же прошлая запись, и она вернула бы прежний
+       выбор в обход picked, снова похоронив умолчание. Ссылку, присланную
+       позже, приносит hashchange. */
+    if (!hashIsOurs) readHash();
+    /* Фильтр переживает смену состава снапшотов, а его предмет — нет: класс
+       патчей уходит вместе со своим снапшотом, метка строки — вместе с
+       последней такой строкой. Зовём отдельно от readHash(), который выше
+       зовут уже не всегда: иначе страница показывала бы пустую таблицу под
+       фильтр, которого не поставить и не снять — карточки с ним не осталось
+       ни одной, а в чипе вместо подписи стоял бы сам ключ. */
+    page.dropDeadFilters();
+    showTab(st.tab);
+    rebuild();
   }
 
   store.onChange(function () {
