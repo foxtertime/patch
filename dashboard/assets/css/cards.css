@@ -1,17 +1,15 @@
 /* Карточки-счётчики над таблицами. */
 
 .cards { display: grid; gap: .6rem; }
-/* Итоги тега — крупно; разрезы по классам и статусам — плотной сеткой. */
+/* Итоги — крупно, разрезы по классам и статусам — плотной сеткой. Ряд
+   итогов один и тот же на обеих вкладках: на «Состоянии» это итоги тега, на
+   «Изменениях» — итоги перехода, и вкладки открывают одну за другой. Ряд,
+   который при переключении меняет число карточек и их ширину, читался бы
+   как другая страница, поэтому и там и там их четыре. */
 .cards.global { grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
   margin-bottom: .6rem; }
 .cards.diff { grid-template-columns: repeat(auto-fit, minmax(122px, 1fr));
   margin-bottom: 1.5rem; }
-/* Стороны перехода — те же большие карточки, но их всего две, и предел
-   сверху здесь есть: растянутые на всю полосу, два числа стали бы плакатом.
-   Нижний предел тот же, что у итогов тега на «Состоянии», — на узком экране
-   ряды обеих вкладок ломаются одинаково. */
-.cards.sides { grid-template-columns: repeat(auto-fit, minmax(230px, 300px));
-  margin-bottom: .6rem; }
 .card { background: var(--card); border: 1px solid var(--line);
   border-radius: var(--r-2); padding: .6rem .7rem; box-shadow: var(--shadow);
   transition: border-color var(--dur) var(--ease),

@@ -177,8 +177,8 @@ class TemplateContractTest(unittest.TestCase):
         # Сколько сборок было и сколько стало — крупным первым рядом, как
         # итоги тега на «Состоянии»: разрезы под ним про то, что
         # изменилось, а эти два числа про то, между чем считали.
-        self.assertIn('id="diff-sides"', self.html)
-        self.assertLess(self.html.index('id="diff-sides"'),
+        self.assertIn('id="diff-pair"', self.html)
+        self.assertLess(self.html.index('id="diff-pair"'),
                         self.html.index('id="diff-cards"'))
 
     def test_the_rail_gap_label_holds_its_own_width(self):

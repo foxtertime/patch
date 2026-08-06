@@ -421,7 +421,7 @@ test('над карточками диффа стоят стороны пере�
   store.add([snap('os-9.2', AUG,
                   { builds: [build('nginx'), build('curl')] })], 'b.json');
   pressTab(dom, 'diff');
-  var sides = dom.id('diff-sides').innerHTML;
+  var sides = dom.id('diff-pair').innerHTML;
   assert.match(sides, /class="l">было<\/div><div class="n">1 /, sides);
   assert.match(sides, /class="l">стало<\/div><div class="n">2 /, sides);
   assert.match(sides, /os-9\.1, 2026-07-01 00:00/, sides);
@@ -440,7 +440,7 @@ test('смена диапазона переписывает стороны', fu
   pressTab(dom, 'diff');
   clickNode(dom, 1);
   clickNode(dom, 2);
-  var sides = dom.id('diff-sides').innerHTML;
+  var sides = dom.id('diff-pair').innerHTML;
   assert.match(sides, /class="l">было<\/div><div class="n">2 /, sides);
   assert.match(sides, /class="l">стало<\/div><div class="n">3 /, sides);
 });
