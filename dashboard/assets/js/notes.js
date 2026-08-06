@@ -60,11 +60,6 @@
       if (note.el.parentNode) note.el.parentNode.removeChild(note.el);
     }
 
-    function fade(note) {
-      note.el.className = `note ${note.kind} fading`;
-      note.gone = timer(() => drop(note), FADE);
-    }
-
     /* Курсор пришёл: отсчёт стоит, и класс гашения снимается сразу —
        окошко, которое уже догорало, возвращается к жизни, а не остаётся
        прозрачным до ухода курсора. */
@@ -73,11 +68,18 @@
       note.el.className = `note ${note.kind}`;
     }
 
-    /* Отсчёт всегда начинается с полного срока: окошко, к которому
+    /* Два независимых таймера, а не вложенных: гашение и уборка — разные
+       события, и заводить второе изнутри первого значит связать их
+       порядком выполнения там, где связи нет.
+
+       Отсчёт всегда начинается с полного срока: окошко, к которому
        вернулись, не должно гаснуть быстрее того, которое видят впервые. */
     function arm(note) {
       hold(note);
-      note.dim = timer(() => fade(note), LIFE);
+      note.dim = timer(() => {
+        note.el.className = `note ${note.kind} fading`;
+      }, LIFE);
+      note.gone = timer(() => drop(note), LIFE + FADE);
     }
 
     function el(tag, cls, text) {

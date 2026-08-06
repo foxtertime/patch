@@ -1,7 +1,8 @@
-/* Загрузка снапшотов файлами: выбор через диалог, бросок на страницу и
-   сообщения о том, что не приехало. Владеет полем выбора, зоной броска и
-   плашкой сообщений; наружу отдаёт только openPicker — её зовёт призрачная
-   кнопка рельса. */
+/* Загрузка снапшотов файлами: выбор через диалог и бросок на страницу.
+   Владеет полем выбора и зоной броска; наружу отдаёт только openPicker —
+   её зовёт призрачная кнопка рельса. О том, что не приехало, модуль
+   рассказывает окошком, но не рисует его: показывать сообщения — дело
+   notes, а дело этого модуля — читать файлы. */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
     module.exports = factory();
@@ -12,59 +13,26 @@
 }(typeof globalThis !== 'undefined' ? globalThis : this, () => {
   'use strict';
 
-  /* Сообщение о загрузке — событие, а не состояние страницы: файл
-     отвергнут, состав снапшотов прежний, и через минуту эта строка
-     сообщает только о том, что человек и так уже понял. Поэтому гаснет
-     сама. Десяти секунд хватает прочитать две строки, а не хватит —
-     сообщение повторится, стоит поднести файл снова.
-
-     Предупреждение о разных хабах в соседнем блоке так не гасят, и это
-     не забывчивость: оно описывает не событие, а то, что на экране
-     сейчас, и правдиво ровно до смены состава. */
-  const ERRORS_LIFE = 10000;
-  const ERRORS_FADE = 400;
-
   function create(deps) {
-    const store = deps.store, esc = deps.text.esc;
+    const store = deps.store, notes = deps.notes;
     const input = deps.dom.input, dropZone = deps.dom.drop;
-    const errorsBox = deps.dom.errors, pickBtn = deps.dom.pick;
-    let timers = [];
+    const pickBtn = deps.dom.pick;
 
-    function stopTimers() {
-      for (const timer of timers) clearTimeout(timer);
-      timers = [];
-    }
-
-    function showErrors(errors) {
-      const out = errors.map((e) => `<li>${esc(e)}</li>`).join('');
-      /* Свежее сообщение начинает свой срок с нуля: догорающий чужой таймер
-         погасил бы его раньше, чем человек успел прочитать. */
-      stopTimers();
-      errorsBox.className = 'problems loaderrors';
-      errorsBox.innerHTML = out;
-      if (!out) return;
-      /* Два независимых таймера, а не вложенных: гашение и уборка — разные
-         события, и заводить второе изнутри первого значит связать их
-         порядком выполнения там, где связи нет. */
-      timers.push(setTimeout(() => {
-        errorsBox.className = 'problems loaderrors fading';
-      }, ERRORS_LIFE));
-      timers.push(setTimeout(() => {
-        errorsBox.innerHTML = '';
-        errorsBox.className = 'problems loaderrors';
-      }, ERRORS_LIFE + ERRORS_FADE));
-    }
-
-    /* Сообщение показываем одно на всю пачку и только когда прочитан
-       последний файл: читаются они вразнобой, и по сообщению на каждый
-       перебило бы предыдущее раньше, чем его успели прочесть. */
     function loadFiles(list) {
       let errors = [], pending = list.length;
       if (!pending) return;
+      /* Сообщение показываем одно на всю пачку и только когда прочитан
+         последний файл: читаются они вразнобой, и по сообщению на каждый
+         залепило бы угол экрана раньше, чем первое успели прочесть.
+
+         Число в заголовке — число причин, а не файлов: один файл несёт
+         несколько снапшотов и получает отказ на каждый. */
       function done() {
         pending -= 1;
         if (pending) return;
-        showErrors(errors);
+        if (!errors.length) return;
+        notes.show({ kind: 'error', title: `Не загружено: ${errors.length}`,
+                     lines: errors });
       }
       /* file объявлен на каждый виток, поэтому обработчики читателя видят
          свой файл, а не последний из пачки. Раньше это делала обёртка-IIFE. */

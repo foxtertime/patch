@@ -24,6 +24,22 @@ function has(over, key) {
   return Object.prototype.hasOwnProperty.call(over, key);
 }
 
+/* Текст всплывающих окошек. Читаем поддерево, а не innerHTML: окошки
+   собраны узлами, и у заглушки innerHTML для них пустой. */
+function deepText(node) {
+  var out = node.textContent || '', i;
+  for (i = 0; i < node.children.length; i++) {
+    out += ' ' + deepText(node.children[i]);
+  }
+  return out;
+}
+
+function noteText(dom) {
+  var out = '', list = dom.id('notes').querySelectorAll('.note'), i;
+  for (i = 0; i < list.length; i++) out += ' ' + deepText(list[i]);
+  return out.trim();
+}
+
 function build(name, over) {
   over = over || {};
   var version = has(over, 'version') ? over.version : '1.0';
@@ -704,7 +720,7 @@ test('файл роняют на страницу — снапшот загру�
            { dataTransfer: { files: [domstub.file('a.json', text)] } });
   await dom.tick();
   assert.strictEqual(store.list().length, 1);
-  assert.strictEqual(dom.id('load-errors').innerHTML, '');
+  assert.strictEqual(noteText(dom), '');
   assert.strictEqual(dom.id('tab-empty').hidden, true);
 });
 
@@ -729,8 +745,7 @@ test('не-JSON — строка ошибки, загруженное на ме�
   dom.fire(dom.id('drop'), 'drop',
            { dataTransfer: { files: [domstub.file('bad.json', '{ сломано')] } });
   await dom.tick();
-  assert.ok(dom.id('load-errors').innerHTML.indexOf('bad.json') !== -1,
-            dom.id('load-errors').innerHTML);
+  assert.ok(noteText(dom).indexOf('bad.json') !== -1, noteText(dom));
   assert.strictEqual(store.list().length, 1);
   assert.ok(dom.id('chain').innerHTML.indexOf('os-9.1') !== -1);
 });
@@ -741,9 +756,9 @@ test('ошибку загрузки видно и когда дашборд уж
   dom.fire(dom.id('drop'), 'drop',
            { dataTransfer: { files: [domstub.file('a.json', good)] } });
   await dom.tick();
-  /* Зона загрузки спрятана, как только появились данные. Список ошибок
-     внутри неё был бы невидим — и человек не узнал бы, что файл отвергнут. */
-  var node = dom.id('load-errors'), empty = dom.id('tab-empty');
+  /* Зона загрузки спрятана, как только появились данные. Окошко внутри
+     неё было бы невидимо — и человек не узнал бы, что файл отвергнут. */
+  var node = dom.id('notes'), empty = dom.id('tab-empty');
   while (node) {
     assert.notStrictEqual(node, empty, 'ошибки спрятаны вместе с зоной загрузки');
     node = node.parentNode;
@@ -756,8 +771,7 @@ test('нечитаемый файл не проходит молча', async fun
   dom.fire(dom.id('drop'), 'drop',
            { dataTransfer: { files: [domstub.file('x.json', '', true)] } });
   await dom.tick();
-  assert.ok(dom.id('load-errors').innerHTML.indexOf('x.json') !== -1,
-            dom.id('load-errors').innerHTML);
+  assert.ok(noteText(dom).indexOf('x.json') !== -1, noteText(dom));
 });
 
 test('тот же файл дважды — отказ, цепочка не удваивается', async function () {
@@ -770,8 +784,7 @@ test('тот же файл дважды — отказ, цепочка не уд
            { dataTransfer: { files: [domstub.file('a.json', text)] } });
   await dom.tick();
   assert.strictEqual(store.list().length, 1);
-  assert.ok(dom.id('load-errors').innerHTML.indexOf('уже загружен') !== -1,
-            dom.id('load-errors').innerHTML);
+  assert.ok(noteText(dom).indexOf('уже загружен') !== -1, noteText(dom));
 });
 
 test('негодный снапшот не вешает страницу', async function () {
@@ -786,8 +799,8 @@ test('негодный снапшот не вешает страницу', async
            { dataTransfer: { files: [domstub.file('bad.json', poison)] } });
   await dom.tick();
   assert.strictEqual(store.list().length, 0, 'негодный снапшот остался в хранилище');
-  assert.ok(dom.id('load-errors').innerHTML.indexOf('bad.json') !== -1,
-            'причина не написана на экране: ' + dom.id('load-errors').innerHTML);
+  assert.ok(noteText(dom).indexOf('bad.json') !== -1,
+            'причина не написана на экране: ' + noteText(dom));
   assert.strictEqual(dom.id('tab-empty').hidden, false);
   /* Дашборд должен остаться рабочим: следующий годный файл загружается. */
   dom.fire(dom.id('drop'), 'drop',
@@ -813,8 +826,7 @@ test('негодный снапшот не уносит соседей по за
   await dom.tick();
   assert.deepStrictEqual(store.list().map(function (i) { return i.tag; }),
                          ['os-9.1']);
-  assert.ok(dom.id('load-errors').innerHTML.indexOf('bad.json') !== -1,
-            dom.id('load-errors').innerHTML);
+  assert.ok(noteText(dom).indexOf('bad.json') !== -1, noteText(dom));
 });
 
 test('разные хабы — предупреждение на странице', function () {
@@ -1350,13 +1362,12 @@ test('повторно поднесённый снапшот объясняет�
     t.mock.timers.enable({ apis: ['setTimeout'] });
     var dom = load();
     sameFileTwice(dom, t);
-    assert.match(dom.id('load-errors').innerHTML, /os-9\.2/,
+    assert.match(noteText(dom), /os-9\.2/,
                  'человеку должны сказать, что именно отвергнуто');
     assert.strictEqual(store.list().length, 1, 'цепочка не удвоилась');
 
     t.mock.timers.tick(30000);
-    assert.strictEqual(dom.id('load-errors').innerHTML, '',
-                       'сообщение обязано уйти само');
+    assert.strictEqual(noteText(dom), '', 'сообщение обязано уйти само');
   });
 
 test('новое сообщение продлевает срок, а не наследует остаток чужого',
@@ -1369,7 +1380,7 @@ test('новое сообщение продлевает срок, а не на�
              { dataTransfer: { files: [domstub.file('b.json', '{ сломано')] } });
     t.mock.timers.tick(1);
     t.mock.timers.tick(9000);                 /* прежний срок уже истёк бы */
-    assert.match(dom.id('load-errors').innerHTML, /b\.json/,
+    assert.match(noteText(dom), /b\.json/,
                  'свежее сообщение не должно гаснуть по чужому таймеру');
   });
 

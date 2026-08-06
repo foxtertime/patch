@@ -13,18 +13,18 @@
                              require('./tables.js'), require('./cards.js'),
                              require('./page.js'), require('./hash.js'),
                              require('./rail.js'), require('./files.js'),
-                             require('./tips.js'));
+                             require('./tips.js'), require('./notes.js'));
   } else {
     root.KP = root.KP || {};
     root.KP.ui = factory(root.KP.viewmodel, root.KP.store, root.KP.diff,
                          root.KP.text, root.KP.labels, root.KP.markup,
                          root.KP.tables, root.KP.cards, root.KP.page,
                          root.KP.hash, root.KP.rail, root.KP.files,
-                         root.KP.tips);
+                         root.KP.tips, root.KP.notes);
   }
 }(typeof globalThis !== 'undefined' ? globalThis : this,
   function (viewmodel, store, diffmod, text, labels, markup, tables, cards,
-            pagemod, hash, railmod, filesmod, tipsmod) {
+            pagemod, hash, railmod, filesmod, tipsmod, notesmod) {
   'use strict';
 
   /* Состояние страницы живёт в page.js: там же и всё, что из него
@@ -56,7 +56,6 @@
   const emptySection = document.getElementById('tab-empty');
   const sourcesBox = document.getElementById('sources');
   const chainBox = document.getElementById('chain');
-  const loadErrors = document.getElementById('load-errors');
   const warningsBox = document.getElementById('warnings');
   const fileInput = document.getElementById('file-input');
   const dropZone = document.getElementById('drop');
@@ -461,11 +460,11 @@
   const app = {};
   const tips = tipsmod.create({ node: document.getElementById('tip') });
   const hideTip = tips.hide;
+  const notes = notesmod.create({ node: document.getElementById('notes') });
   let rail = railmod.create({ box: chainBox, page: page, store: store,
                               text: text, app: app, hideTip: hideTip });
-  let files = filesmod.create({ store: store, text: text,
-    dom: { input: fileInput, drop: dropZone, errors: loadErrors,
-           pick: pickBtn } });
+  let files = filesmod.create({ store: store, notes: notes,
+    dom: { input: fileInput, drop: dropZone, pick: pickBtn } });
   app.render = render;
   app.renderStateCards = renderStateCards;
   app.renderDiffCards = renderDiffCards;

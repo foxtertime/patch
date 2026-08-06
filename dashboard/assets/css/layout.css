@@ -16,12 +16,6 @@
 
 .warn { color: var(--major); font-size: .82rem; margin-bottom: .35rem;
   padding-left: .55rem; border-left: 3px solid var(--major); }
-.loaderrors:not(:empty) { margin: 0 0 1rem; }
-/* Сообщение о загрузке гаснет само — оно про событие, а не про состояние.
-   Под prefers-reduced-motion переход снимается общим правилом ниже, и
-   сообщение просто исчезает; уходит оно в обоих случаях. */
-.loaderrors { transition: opacity .4s; }
-.loaderrors.fading { opacity: 0; }
 
 /* Экран загрузки — не редкий случай, а входная дверь: страница не помнит
    загруженное между перезагрузками, и этот экран человек видит каждый раз.
