@@ -1,4 +1,4 @@
-"""Точка входа: collect, dashboard."""
+"""Точка входа: collect, page."""
 import argparse
 import logging
 import os
@@ -21,16 +21,16 @@ logger = logging.getLogger(__name__)
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="kojipatch",
+        prog="dashboard",
         description="Дашборд патчей: агрегация koji и GitLab")
     # Версия стоит до подкоманды и печатается даже без неё: у argparse
     # действие version завершает разбор на месте, не доходя до проверки
     # обязательного подпараметра. Спрашивают её как раз тогда, когда
     # собирать нечего — например, разбирая чужой снапшот.
     parser.add_argument("--version", action="version",
-                        version="kojipatch " + __version__,
+                        version="dashboard " + __version__,
                         help="напечатать версию и выйти")
-    parser.add_argument("--config", default=os.environ.get("KOJIPATCH_CONFIG"),
+    parser.add_argument("--config", default=os.environ.get("DASHBOARD_CONFIG"),
                         help="путь к YAML-конфигу")
     parser.add_argument("--koji-hub", help="перекрыть koji.hub из конфига")
     parser.add_argument("--gitlab-api", help="перекрыть адрес GitLab API")
@@ -52,20 +52,23 @@ def _parser() -> argparse.ArgumentParser:
                          help="koji-тег; можно указать несколько раз")
     collect.add_argument("-o", "--output", default="snapshot.json")
 
-    dashboard = subparsers.add_parser(
-        "dashboard",
-        help="положить дашборд на диск (данные подгружаются в нём)")
-    dashboard.add_argument("-o", "--output", default="dashboard.html")
+    # Не «dashboard»: программа теперь так и зовётся, и строка запуска
+    # читалась бы как «dashboard dashboard». Команда называет то, что кладёт
+    # на диск, — страницу.
+    page = subparsers.add_parser(
+        "page", help="положить страницу дашборда на диск (данные "
+                     "подгружаются в неё)")
+    page.add_argument("-o", "--output", default="dashboard.html")
     return parser
 
 
 def _load_config(args):
     overrides = {"koji_hub": args.koji_hub, "gitlab_api": args.gitlab_api,
                  "patch_dir": args.patch_dir}
-    # дашборд пуст, пока в него не подгрузят снапшоты руками — koji.hub
-    # ему не нужен
+    # страница пуста, пока в неё не подгрузят снапшоты руками — koji.hub
+    # ей не нужен
     return load_config(args.config, overrides,
-                       require_hub=args.command != "dashboard")
+                       require_hub=args.command != "page")
 
 
 def _collect(args, cfg):
@@ -101,7 +104,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         return _fatal("фатальная ошибка", exc)
 
     try:
-        if args.command == "dashboard":
+        if args.command == "page":
             with open(args.output, "w", encoding="utf-8") as handle:
                 handle.write(build_html())
             logger.info("написан %s", args.output)

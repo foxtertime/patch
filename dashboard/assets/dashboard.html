@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Koji patch dashboard</title>
+<!-- Версию подставляет build.py: страницу присылают друг другу файлом, и
+     по ней должно быть видно, чем она собрана. -->
+<meta name="generator" content="dashboard __DASHBOARD_VERSION__">
+<!--__STYLES__-->
+</head>
+<body>
+<div class="wrap">
+  <h1>dashboard <span class="ver">__DASHBOARD_VERSION__</span></h1>
+  <div class="sources" id="sources" hidden>
+    <div class="srchead">
+      <span class="l">снапшоты</span>
+    </div>
+    <div class="chain" id="chain"></div>
+  </div>
+  <section id="tab-empty">
+    <div class="drop" id="drop">
+      <p class="dropmain">Перетащите снапшоты сюда</p>
+      <p class="dropsub">или <button type="button" class="linkish" id="pick">выберите файлы</button>.
+        Это JSON, который делает <span class="mono">dashboard collect</span>.</p>
+    </div>
+  </section>
+  <input type="file" id="file-input" accept=".json,application/json" multiple hidden>
+  <nav class="tabs">
+    <button class="tab" data-tab="state" aria-selected="true">Состояние</button>
+    <button class="tab" data-tab="diff" data-tip="Что изменилось между двумя тегами: компоненты, версии, патчи, состав RPM, ветки.">Изменения</button>
+  </nav>
+  <section id="tab-state">
+    <div class="cards global" id="state-cards"></div>
+    <div class="cards diff" id="class-cards"></div>
+    <div class="controls" id="controls">
+      <div class="searchbox">
+        <input type="search" id="q" placeholder="Компонент, тег, ветка, патч, CVE, RPM…" autocomplete="off">
+        <button type="button" id="q-clear" hidden aria-label="Очистить поиск"
+                data-tip="Очистить строку поиска">✕</button>
+      </div>
+      <!-- Кнопка и плашка стоят в одной обёртке: плашка позиционируется от
+           кнопки, а вся панель управления переезжает между вкладками. -->
+      <div class="filterbox" id="filterbox">
+        <button type="button" id="filters" class="toggle" aria-expanded="false"
+                aria-haspopup="true"
+                data-tip="Что показывать в таблице: признаки строки и классы патчей. У каждого признака три положения — неважно, есть, нет.">Фильтры</button>
+        <div class="filtermenu" id="filtermenu" hidden></div>
+      </div>
+      <button id="expand" class="toggle" data-tip="Развернуть или свернуть все строки, которые сейчас видны. Фильтры и поиск учитываются.">Expand all</button>
+      <button id="copy-nvr" class="toggle" data-tip="Скопировать NVR отфильтрованных строк">Copy NVR</button>
+      <span class="count" id="count"></span>
+    </div>
+    <div class="tablewrap"><table id="state-table">
+      <thead><tr>
+        <th data-sort="name">компонент <span class="arrow">▲</span></th>
+        <th data-sort="evr" data-tip="Сортировка лексикографическая: 1.10 встанет выше 1.9. Так и задумано — в соседних строках версии принадлежат разным компонентам, и сравнивать их по правилам rpm было бы не осмысленнее.">version-release <span class="arrow"></span></th>
+        <th data-sort="tagged_in" data-tip="Koji-тег, в котором билд действительно затегован. Прочерк — билд затегован прямо в выбранный тег; имя — билд унаследован из этого тега. Вопросительный знак — снапшот собран версией, которая тег ещё не записывала.">тег <span class="arrow"></span></th>
+        <th data-sort="branch" data-tip="Ветка GitLab, из которой собран билд. Если сборка шла с коммита, а не с ветки, рядом стоит метка from-commit.">ветка <span class="arrow"></span></th>
+        <th data-sort="patches" data-tip="Сколько файлов лежит в каталоге PATCH ветки. Полоска показывает, из каких классов они состоят: цвет занимает долю, равную доле класса. Длина полоски одна у всех строк — сколько патчей, говорит число слева. Наведите на полоску, чтобы увидеть точные числа.">патчи <span class="arrow"></span></th>
+        <th data-sort="rpms">RPM <span class="arrow"></span></th>
+        <th data-sort="completed" data-tip="Когда koji завершил сборку, в московском времени. Хаб отдаёт UTC, в снапшоте хранится он же — перевод делается при построении дашборда. Сортировка показывает самые залежавшиеся.">собран <span class="arrow"></span></th>
+        <th data-sort="owner" data-tip="Кто запустил сборку в koji. Сортировка собирает сборки одного человека подряд.">владелец <span class="arrow"></span></th>
+        <th>метки</th>
+        <th>ссылки</th>
+      </tr></thead>
+      <tbody id="state-rows"></tbody>
+    </table></div>
+  </section>
+  <section id="tab-diff" hidden>
+    <div class="cards diff" id="diff-cards"></div>
+    <div class="tablewrap"><table id="diff-table">
+      <thead><tr>
+        <th data-sort="name">компонент <span class="arrow">▲</span></th>
+        <th data-sort="old" data-tip="Сортировка лексикографическая: 1.10 встанет выше 1.9. Так и задумано — в соседних строках версии принадлежат разным компонентам.">было <span class="arrow"></span></th>
+        <th></th>
+        <th data-sort="new" data-tip="Сортировка лексикографическая: 1.10 встанет выше 1.9. Так и задумано — в соседних строках версии принадлежат разным компонентам.">стало <span class="arrow"></span></th>
+        <th data-sort="dpatch" data-tip="Сколько файлов патчей пришло и ушло. Сортировка — по сумме пришедших и ушедших: сверху компоненты, у которых стек патчей менялся сильнее всего.">Δ патчей <span class="arrow"></span></th>
+        <th data-sort="drpm" data-tip="Сколько бинарных пакетов появилось и исчезло. Сортировка — по сумме появившихся и исчезнувших.">Δ RPM <span class="arrow"></span></th>
+        <th>метки</th>
+        <th>ссылки</th>
+      </tr></thead>
+      <tbody id="diff-rows"></tbody>
+    </table></div>
+  </section>
+</div>
+<button type="button" id="totop" hidden aria-label="Наверх"
+        data-tip="Вернуться к началу страницы">↑</button>
+<!-- Сообщения лежат поверх страницы, а не в её потоке, и снаружи «пустого»
+     экрана: как только появились данные, экран прячется, и отказ файла
+     внутри него никто бы не увидел. Строка же в потоке увозила таблицу
+     сначала вниз, а через десять секунд обратно. -->
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+<div id="tip" role="tooltip"></div>
+<!--__SCRIPTS__-->
+</body>
+</html>

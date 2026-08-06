@@ -8,20 +8,20 @@
 
   /* src и noarch — не «ещё одна архитектура», а исходник и пакет, которому
      архитектура не нужна. Остальные идут по алфавиту. */
-  var LEADING = ['src', 'noarch'];
+  const LEADING = ['src', 'noarch'];
 
   function archOf(nvra) {
-    var index = String(nvra).lastIndexOf('.');
+    const index = String(nvra).lastIndexOf('.');
     return index === -1 ? '?' : String(nvra).slice(index + 1);
   }
 
   function archRank(arch) {
-    var index = LEADING.indexOf(arch);
+    const index = LEADING.indexOf(arch);
     return index === -1 ? LEADING.length : index;
   }
 
   function compareArch(a, b) {
-    var ra = archRank(a), rb = archRank(b);
+    const ra = archRank(a), rb = archRank(b);
     if (ra !== rb) return ra < rb ? -1 : 1;
     /* Внутри ведущей группы имя уже определено рангом; сравнивать нечего. */
     if (ra < LEADING.length) return 0;
@@ -29,7 +29,7 @@
   }
 
   function compareNvra(a, b) {
-    var byArch = compareArch(archOf(a), archOf(b));
+    const byArch = compareArch(archOf(a), archOf(b));
     if (byArch) return byArch;
     return a < b ? -1 : a > b ? 1 : 0;
   }
@@ -38,6 +38,5 @@
     return (items || []).slice().sort(compareNvra);
   }
 
-  return { archOf: archOf, compareArch: compareArch,
-           compareNvra: compareNvra, sortRpms: sortRpms };
+  return { archOf, compareArch, compareNvra, sortRpms };
 }));

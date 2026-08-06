@@ -1,10 +1,10 @@
-"""Сборка страницы: шаблон и скрипты в одном файле."""
+"""Сборка страницы: шаблон, стили и скрипты в одном файле."""
 import re
 import unittest
 
-from kojipatch import __version__
-from kojipatch.build import SCRIPTS, BuildError, build_html
-from kojipatch.config import DEFAULT_PATCH_CLASSES
+from dashboard import __version__
+from dashboard.build import STYLES, SCRIPTS, BuildError, build_html
+from dashboard.config import DEFAULT_PATCH_CLASSES
 
 RICH = "tests/fixtures/rich-old.json"
 
@@ -13,13 +13,14 @@ class BuildHtml(unittest.TestCase):
     def test_no_placeholder_remains(self):
         html = build_html()
         self.assertNotIn("<!--__SCRIPTS__-->", html)
-        self.assertNotIn("__KOJIPATCH_VERSION__", html)
+        self.assertNotIn("<!--__STYLES__-->", html)
+        self.assertNotIn("__DASHBOARD_VERSION__", html)
 
     def test_version_is_stamped_into_the_page(self):
         # Страницу пересылают файлом, и у того, кто её открыл, исходников
         # под рукой нет: чем собрана, должно быть видно в ней самой.
         html = build_html()
-        self.assertIn('<meta name="generator" content="kojipatch %s">'
+        self.assertIn('<meta name="generator" content="dashboard %s">'
                       % __version__, html)
         self.assertIn('<span class="ver">%s</span>' % __version__, html)
 
@@ -33,6 +34,25 @@ class BuildHtml(unittest.TestCase):
         html = build_html()
         positions = [html.index("/* %s */" % name) for name in SCRIPTS]
         self.assertEqual(positions, sorted(positions))
+
+    def test_every_style_is_inlined(self):
+        html = build_html()
+        for name in STYLES:
+            self.assertIn("/* %s */" % name, html,
+                          "в собранном файле нет %s" % name)
+
+    def test_styles_keep_cascade_order(self):
+        # При равной специфичности выигрывает то, что ниже: перестановка
+        # файлов в STYLES молча меняет вид страницы.
+        html = build_html()
+        positions = [html.index("/* %s */" % name) for name in STYLES]
+        self.assertEqual(positions, sorted(positions))
+
+    def test_styles_go_before_scripts(self):
+        # Стили стоят в head, скрипты — в конце body: страница не должна
+        # успеть показаться неоформленной.
+        html = build_html()
+        self.assertLess(html.index("/* base.css */"), html.index("/* ui.js */"))
 
     def test_no_external_resources(self):
         """Дашборд открывают там, где интернета нет."""
@@ -53,6 +73,8 @@ class BuildHtml(unittest.TestCase):
             build_html(template_path="/nope/dashboard.html")
 
     def test_template_without_placeholder_is_reported(self):
+        # Любого из трёх плейсхолдеров достаточно, чтобы сборка отказалась:
+        # страница без стилей или без скриптов открылась бы молча сломанной.
         with self.assertRaises(BuildError):
             build_html(template_path=RICH)
 
@@ -85,8 +107,12 @@ class TemplateContractTest(unittest.TestCase):
         self.assertIn('id="q"', self.html)
         self.assertIn('id="expand"', self.html)
 
-    def test_has_active_filter_chip_bar(self):
-        self.assertIn('id="chips"', self.html)
+    def test_has_a_filter_menu(self):
+        # Поставленные фильтры больше не стоят строкой чипов под панелью:
+        # их показывает и правит меню под кнопкой.
+        self.assertIn('id="filters"', self.html)
+        self.assertIn('id="filtermenu"', self.html)
+        self.assertNotIn('id="chips"', self.html)
 
     def test_has_copy_nvr_button(self):
         self.assertIn('id="copy-nvr"', self.html)
@@ -129,11 +155,23 @@ class TemplateContractTest(unittest.TestCase):
         self.assertIn(".tabs[hidden] { display: none; }", self.html)
         self.assertNotIn(".sources { display: flex", self.html)
 
-    def test_load_errors_live_outside_the_empty_screen(self):
-        # Экран загрузки прячется, как только появились данные. Список
-        # ошибок внутри него был бы невидим ровно тогда, когда нужен.
-        empty = self.html.index('<section id="tab-empty">')
-        self.assertLess(self.html.index('id="load-errors"'), empty)
+    def test_toasts_live_outside_the_empty_screen(self):
+        # Экран загрузки прячется, как только появились данные. Окошко
+        # сообщения внутри него было бы невидимо ровно тогда, когда нужно.
+        start = self.html.index('<section id="tab-empty">')
+        end = self.html.index("</section>", start)
+        at = self.html.index('id="toasts"')
+        self.assertFalse(start < at < end)
+
+    def test_marks_wrap_inside_their_cell(self):
+        # Меток у строки бывает полтора десятка, и в одну строку они
+        # растягивали таблицу за край окна вместе со всей страницей:
+        # обёртка таблицы не прокручивается, поэтому уезжала вся страница.
+        self.assertIn("td.marks { white-space: normal; }", self.html)
+        self.assertNotIn("td.marks { white-space: nowrap", self.html)
+        # А сама метка не переносится: разорванная посередине, она
+        # перестаёт читаться как метка.
+        self.assertRegex(self.html, r"\.mark \{[^}]*white-space: nowrap")
 
     def test_reuses_ref_html_css_variables(self):
         for name in ("--bg", "--fg", "--muted", "--line", "--card",
@@ -175,9 +213,9 @@ class TemplateContractTest(unittest.TestCase):
 
 class LoggingTest(unittest.TestCase):
     def test_page_size_is_logged_at_debug(self):
-        with self.assertLogs("kojipatch", level="DEBUG") as caught:
+        with self.assertLogs("dashboard", level="DEBUG") as caught:
             build_html()
-        self.assertIn("kojipatch.build", "\n".join(caught.output))
+        self.assertIn("dashboard.build", "\n".join(caught.output))
 
 
 if __name__ == "__main__":

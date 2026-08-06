@@ -1,7 +1,7 @@
 'use strict';
 var test = require('node:test');
 var assert = require('node:assert');
-var vercmp = require('../../kojipatch/assets/js/vercmp.js');
+var vercmp = require('../../dashboard/assets/js/vercmp.js');
 
 test('одинаковые строки равны', function () {
   assert.strictEqual(vercmp.rpmvercmp('1.0', '1.0'), 0);

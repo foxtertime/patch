@@ -5,8 +5,8 @@
 }(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
 
-  var DIGITS = /^(\d+)/;
-  var ALPHA = /^([A-Za-z]+)/;
+  const DIGITS = /^(\d+)/;
+  const ALPHA = /^([A-Za-z]+)/;
 
   /* Python-версия опирается на str.isalnum(), который шире \w и включает,
      например, надстрочные цифры «²»/«³» (U+00B2/U+00B3). Этот диапазон
@@ -18,10 +18,10 @@
      task-3-report.md) — воспроизводить его квирки бит в бит незачем, важно
      лишь не падать и не зацикливаться, а это обеспечено независимо от
      точных границ диапазона. */
-  var ALNUM = /[0-9A-Za-zÀ-￿]/;
+  const ALNUM = /[0-9A-Za-zÀ-￿]/;
 
   function stripSeparators(text) {
-    var index = 0;
+    let index = 0;
     while (index < text.length
            && !(ALNUM.test(text.charAt(index))
                 || text.charAt(index) === '~' || text.charAt(index) === '^')) {
@@ -57,9 +57,9 @@
 
       if (!a || !b) break;
 
-      var numeric = /[0-9]/.test(a.charAt(0));
-      var re = numeric ? DIGITS : ALPHA;
-      var matchA = re.exec(a), matchB = re.exec(b);
+      const numeric = /[0-9]/.test(a.charAt(0));
+      const re = numeric ? DIGITS : ALPHA;
+      const matchA = re.exec(a), matchB = re.exec(b);
 
       if (matchA === null || matchB === null) {
         /* Разобрать нечем ни ту, ни другую сторону — выходим, чтобы не
@@ -70,7 +70,7 @@
         return numeric ? -1 : 1;
       }
 
-      var segA = matchA[1], segB = matchB[1];
+      let segA = matchA[1], segB = matchB[1];
       a = a.slice(segA.length);
       b = b.slice(segB.length);
 
@@ -88,12 +88,12 @@
   }
 
   function compareEvr(a, b) {
-    var epochA = Number(a[0] || 0), epochB = Number(b[0] || 0);
+    const epochA = Number(a[0] || 0), epochB = Number(b[0] || 0);
     if (epochA !== epochB) return epochA > epochB ? 1 : -1;
-    var result = rpmvercmp(a[1], b[1]);
+    const result = rpmvercmp(a[1], b[1]);
     if (result) return result;
     return rpmvercmp(a[2], b[2]);
   }
 
-  return { rpmvercmp: rpmvercmp, compareEvr: compareEvr };
+  return { rpmvercmp, compareEvr };
 }));

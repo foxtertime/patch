@@ -1,7 +1,7 @@
 'use strict';
 var test = require('node:test');
 var assert = require('node:assert');
-var rpms = require('../../kojipatch/assets/js/rpms.js');
+var rpms = require('../../dashboard/assets/js/rpms.js');
 
 test('архитектура — хвост после последней точки', function () {
   assert.strictEqual(rpms.archOf('nginx-1.24.0-3.el9.x86_64'), 'x86_64');

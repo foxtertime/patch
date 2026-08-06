@@ -1,0 +1,108 @@
+/* Каркас страницы: панель источников, экран загрузки, вкладки,
+   панель управления с поиском, чипы фильтров, кнопка «наверх». */
+
+/* Панель источников: что сейчас загружено и в каком порядке сравнивается.
+   Она же и есть орган управления составом — добавляют, переставляют и
+   убирают снапшоты прямо на рельсе, а не в отдельном списке под ним. */
+.sources { margin-bottom: 1.1rem; }
+/* Шапка панели: как её зовут — слева, что с ней можно сделать — справа.
+   Рельс идёт под ней во всю ширину и ни с кем эту ширину не делит: полосе,
+   которая прокручивается, нельзя оставлять сбоку соседей — они отъедали бы
+   у неё место ровно тогда, когда его и так не хватает. */
+.srchead { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem;
+  margin-bottom: .35rem; }
+.srchead .l { color: var(--muted); font-size: .64rem; text-transform: uppercase;
+  letter-spacing: .09em; margin-right: auto; }
+
+
+/* Экран загрузки — не редкий случай, а входная дверь: страница не помнит
+   загруженное между перезагрузками, и этот экран человек видит каждый раз.
+   Поэтому он набран как обложка, а не как заглушка. Пунктирная рамка
+   говорит «сюда можно ронять» без единого слова инструкции. */
+.drop { border: 1px dashed var(--line); border-radius: var(--r-2);
+  padding: 5rem 1.5rem; text-align: center; background: var(--card);
+  transition: border-color var(--dur) var(--ease),
+              background var(--dur) var(--ease); }
+/* Пока файл над страницей, зона поднимается, а не темнеет: на тёмной теме
+   «активно» читается как «светлее», и обратное движение сбивало бы. */
+.drop.over { border-color: var(--fg); background: var(--line); }
+.dropmain { font-size: 1.05rem; font-weight: 500; letter-spacing: -.01em;
+  margin: 0 0 .5rem; }
+.dropsub { color: var(--muted); font-size: .82rem; margin: 0; }
+/* Кнопка внутри фразы: выглядит ссылкой, потому что стоит в тексте, но
+   остаётся кнопкой — она открывает диалог, а никуда не ведёт. */
+.linkish { display: inline; padding: 0; border: 0; border-radius: 0;
+  background: none; color: var(--accent); font: inherit;
+  text-decoration: underline; cursor: pointer; }
+.linkish:hover { border: 0; }
+
+/* Вкладки: не «кнопки приложения», а закладки документа — активная
+   подчёркнута той же линией, что и шапка таблицы под ней. */
+.tabs { display: flex; gap: .25rem; border-bottom: 1px solid var(--line);
+  margin-bottom: 1rem; }
+/* display: flex у .tabs сильнее hidden из стилей браузера: без этой строки
+   спрятанная скриптом полоса вкладок осталась бы на экране. Панели
+   источников такая строка не нужна — своего display у неё нет. */
+.tabs[hidden] { display: none; }
+.tab { appearance: none; background: none; border: 0; border-radius: 0;
+  padding: .5rem .1rem; margin: 0 1.2rem -1px 0; color: var(--muted);
+  font: inherit; font-size: .82rem; font-weight: 500; cursor: pointer;
+  letter-spacing: .04em; text-transform: lowercase;
+  border-bottom: 2px solid transparent;
+  transition: color var(--dur) var(--ease),
+              border-color var(--dur) var(--ease); }
+.tab:hover { color: var(--fg); }
+.tab[aria-selected=true] { color: var(--fg); border-bottom-color: var(--fg); }
+.tab[hidden] { display: none; }
+
+.controls { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center;
+  position: sticky; top: 0; background: var(--bg); padding: .6rem 0; z-index: 20;
+  border-bottom: 1px solid var(--line); }
+/* Поле поиска с крестиком внутри. Растягивается по строке фильтров
+   вместо самого поля — оно теперь внутри и занимает всю ширину. */
+.searchbox { position: relative; flex: 1 1 auto; min-width: 200px;
+  display: flex; }
+input[type=search] {
+  width: 100%; padding: .5rem 2.1rem .5rem .75rem; border-radius: 6px;
+  border: 1px solid var(--line); background: var(--card); color: var(--fg); font: inherit;
+}
+/* Свой крестик вместо нативного: тот есть только в WebKit, а в Firefox
+   его нет вовсе — два разных поведения хуже одного своего. Нативный
+   прячем, иначе в Chrome было бы два крестика подряд. */
+input[type=search]::-webkit-search-cancel-button { appearance: none;
+  -webkit-appearance: none; }
+#q-clear { position: absolute; right: .3rem; top: 50%;
+  transform: translateY(-50%); width: 1.6rem; height: 1.6rem; padding: 0;
+  border: 0; border-radius: 50%; background: none; color: var(--muted);
+  font-size: .8rem; line-height: 1; cursor: pointer; }
+#q-clear:hover { color: var(--fg); background: var(--line); }
+#q-clear[hidden] { display: none; }
+input[type=search]:focus { outline: 2px solid var(--accent); outline-offset: -1px;
+  border-color: var(--accent); }
+button {
+  padding: .38rem .75rem; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--card); color: var(--fg); font: inherit; font-size: .8rem;
+  cursor: pointer;
+  transition: border-color var(--dur) var(--ease),
+              background var(--dur) var(--ease),
+              color var(--dur) var(--ease);
+}
+button:hover { border-color: var(--fg); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.toggle { flex: 0 0 auto; white-space: nowrap; }
+.toggle[disabled] { opacity: .5; cursor: default; }
+.count { color: var(--muted); font-size: .85rem; margin-left: auto;
+  font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+
+/* Кнопка «наверх». Тег в тысячу сборок — это метры прокрутки, а фильтры и
+   вкладки остались вверху. Появляется ниже первого экрана: на нетронутой
+   странице она была бы пятном поверх таблицы и ничего не решала. Ниже
+   подсказки по z-index — та всплывает поверх всего. */
+#totop { position: fixed; right: 1.25rem; bottom: 1.25rem; z-index: 90;
+  width: 2.6rem; height: 2.6rem; border-radius: 50%; cursor: pointer;
+  border: 1px solid var(--line); background: var(--card); color: var(--fg);
+  font: inherit; font-size: 1.1rem; line-height: 1;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, .18); }
+#totop:hover { border-color: var(--accent); color: var(--accent); }
+#totop[hidden] { display: none; }

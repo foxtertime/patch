@@ -3,8 +3,8 @@ import re
 import tempfile
 import unittest
 
-from kojipatch.classify import CVE_RE, Classifier, find_cves
-from kojipatch.config import Config, ConfigError, GitlabHost, load_config
+from dashboard.classify import CVE_RE, Classifier, find_cves
+from dashboard.config import Config, ConfigError, GitlabHost, load_config
 
 MINIMAL = """
 koji:
@@ -84,7 +84,7 @@ class LoadConfigTest(unittest.TestCase):
 
     def test_missing_file_is_an_error(self):
         with self.assertRaises(ConfigError):
-            load_config("/nonexistent/kojipatch.yaml")
+            load_config("/nonexistent/dashboard.yaml")
 
     def test_koji_section_must_be_a_mapping(self):
         with self.assertRaises(ConfigError):
@@ -311,7 +311,7 @@ class TokenTest(unittest.TestCase):
     текст исключения, а тот уходит в лог, в проблемы билда, в снапшот и в
     HTML."""
 
-    ENV = "KOJIPATCH_TEST_TOKEN"
+    ENV = "DASHBOARD_TEST_TOKEN"
 
     def setUp(self):
         os.environ.pop(self.ENV, None)

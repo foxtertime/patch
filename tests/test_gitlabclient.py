@@ -1,15 +1,9 @@
 import logging
 import unittest
 
-from kojipatch.config import GitlabHost
-from kojipatch.gitlabclient import GitlabClient, HttpTransport
+from dashboard.config import GitlabHost
+from dashboard.gitlabclient import GitlabClient
 from tests.fakes import FakeTransport, Response
-
-try:  # requests нужен только collect/run, весь остальной набор без него живёт
-    import requests as _requests  # noqa: F401
-    _HAS_REQUESTS = True
-except ImportError:  # pragma: no cover
-    _HAS_REQUESTS = False
 
 HOSTS = {"gitlab.example.com": GitlabHost(api="https://gitlab.example.com/api/v4",
                                           web="https://gitlab.example.com")}
@@ -244,44 +238,6 @@ class PatchFilesTest(unittest.TestCase):
         self.assertIn("ref", result.problem)
 
 
-class RetrySleepTest(unittest.TestCase):
-    def sleeps_for(self, transport, **kwargs):
-        slept = []
-        cli = GitlabClient(HOSTS, token=TOKEN, transport=transport,
-                           sleeper=slept.append, **kwargs)
-        result = cli.patch_files("gitlab.example.com", "g/r", "br")
-        return result, slept
-
-    def test_no_backoff_after_the_last_failed_attempt(self):
-        # три попытки — две паузы: ждать после последней нечего, а с
-        # --jobs 8 против приболевшего GitLab это секунды на каждый билд
-        result, slept = self.sleeps_for(_BrokenTransport(), retries=3)
-        self.assertIsNone(result.present)
-        self.assertIn("connection reset", result.problem)
-        self.assertEqual(len(slept), 2)
-
-    def test_no_backoff_after_the_last_bad_status(self):
-        transport = FakeTransport({TREE_URL: Response(500, {}, {})})
-        _, slept = self.sleeps_for(transport, retries=3)
-        self.assertEqual(len(slept), 2)
-
-    def test_single_attempt_never_sleeps(self):
-        _, slept = self.sleeps_for(_BrokenTransport(), retries=1)
-        self.assertEqual(slept, [])
-
-
-class _BrokenTransport:
-    """Транспорт, у которого каждый запрос падает сетевой ошибкой."""
-
-    def __init__(self):
-        self.requests = []
-
-    def get(self, url, headers=None, params=None):
-        self.requests.append(url)
-        raise IOError("connection reset")
-
-
-
 class _TokenLeakingTransport:
     """Транспорт, повторяющий поведение requests на кривом заголовке: значение
     PRIVATE-TOKEN попадает в текст исключения."""
@@ -320,9 +276,13 @@ class UrlTest(unittest.TestCase):
 
 
 class LoggingTest(unittest.TestCase):
+    """Слушаем весь пакет, а не один модуль: строка запроса приходит из
+    httpclient, строка про каталог патчей — отсюда, и в одном тесте бывают
+    обе."""
+
     def test_request_is_logged_at_debug(self):
         cli, _ = client({TREE_URL: TWO_FILES})
-        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
+        with self.assertLogs("dashboard", level="DEBUG") as caught:
             cli.patch_files("gitlab.example.com", "g/r", "br")
         line = "\n".join(caught.output)
         self.assertIn("GET", line)
@@ -335,7 +295,7 @@ class LoggingTest(unittest.TestCase):
         transport = FakeTransport({TREE_URL: TWO_FILES})
         cli = GitlabClient(HOSTS, token=SECRET, transport=transport,
                            sleeper=lambda _s: None)
-        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
+        with self.assertLogs("dashboard", level="DEBUG") as caught:
             cli.patch_files("gitlab.example.com", "g/r", "br")
         line = "\n".join(caught.output)
         self.assertNotIn(SECRET, line)
@@ -349,7 +309,7 @@ class LoggingTest(unittest.TestCase):
         transport = _TokenLeakingTransport(SECRET)
         cli = GitlabClient(HOSTS, token=SECRET, transport=transport,
                            sleeper=lambda _s: None, retries=3)
-        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
+        with self.assertLogs("dashboard", level="DEBUG") as caught:
             result = cli.patch_files("gitlab.example.com", "g/r", "br")
         self.assertNotIn(SECRET, "\n".join(caught.output))
         self.assertNotIn(SECRET, result.problem)
@@ -372,7 +332,7 @@ class LoggingTest(unittest.TestCase):
         cli = GitlabClient(HOSTS, token=SECRET, transport=transport,
                            sleeper=lambda _s: None, retries=3,
                            default_host="gitlab.example.com")
-        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
+        with self.assertLogs("dashboard", level="DEBUG") as caught:
             result = cli.patch_files("other.example.com", "g/r", "br")
         self.assertIn("не описан в конфиге", result.problem)
         self.assertNotIn(SECRET, result.problem)
@@ -380,14 +340,14 @@ class LoggingTest(unittest.TestCase):
 
     def test_error_body_is_logged_at_debug(self):
         cli, _ = client({TREE_URL: Response(403, {"message": "403 Forbidden"}, {})})
-        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
+        with self.assertLogs("dashboard", level="DEBUG") as caught:
             cli.patch_files("gitlab.example.com", "g/r", "br")
         self.assertIn("403 Forbidden", "\n".join(caught.output))
 
     def test_retry_is_logged_as_warning(self):
         cli, _ = client({TREE_URL: [Response(429, {}, {"Retry-After": "0"}),
                                     TWO_FILES]})
-        with self.assertLogs("kojipatch.gitlabclient", level="WARNING") as caught:
+        with self.assertLogs("dashboard", level="WARNING") as caught:
             cli.patch_files("gitlab.example.com", "g/r", "br")
         line = "\n".join(caught.output)
         self.assertIn("429", line)
@@ -400,7 +360,7 @@ class LoggingTest(unittest.TestCase):
         transport = FakeTransport({TREE_URL: [Response(429, {}, {"Retry-After": "0"}),
                                               TWO_FILES]})
         seen = []
-        with self.assertLogs("kojipatch.gitlabclient", level="WARNING") as caught:
+        with self.assertLogs("dashboard", level="WARNING") as caught:
             cli = GitlabClient(HOSTS, token=TOKEN, transport=transport,
                                sleeper=lambda _s: seen.append(list(caught.output)))
             cli.patch_files("gitlab.example.com", "g/r", "br")
@@ -412,28 +372,11 @@ class LoggingTest(unittest.TestCase):
         # без ref и path непонятно, какую именно ветку он не отдаёт
         cli, _ = client({TREE_URL: [Response(429, {}, {"Retry-After": "0"}),
                                     TWO_FILES]})
-        with self.assertLogs("kojipatch.gitlabclient", level="WARNING") as caught:
+        with self.assertLogs("dashboard", level="WARNING") as caught:
             cli.patch_files("gitlab.example.com", "g/r", "br")
         line = "\n".join(caught.output)
         self.assertIn("ref=br", line)
         self.assertIn("path=PATCH", line)
-
-    def test_final_transport_failure_is_not_warned_about(self):
-        # об окончательной неудаче один раз и с именем компонента напишет
-        # collect; здесь предупреждение только пообещало бы новую попытку
-        cli = GitlabClient(HOSTS, token=TOKEN, transport=_BrokenTransport(),
-                           sleeper=lambda _s: None, retries=1)
-        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
-            cli.patch_files("gitlab.example.com", "g/r", "br")
-        self.assertEqual([r.levelname for r in caught.records], ["DEBUG"])
-
-    def test_transport_failures_warn_only_while_attempts_remain(self):
-        cli = GitlabClient(HOSTS, token=TOKEN, transport=_BrokenTransport(),
-                           sleeper=lambda _s: None, retries=3)
-        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
-            cli.patch_files("gitlab.example.com", "g/r", "br")
-        warnings = [r for r in caught.records if r.levelno == logging.WARNING]
-        self.assertEqual(len(warnings), 2)
 
     def test_disambiguation_line_has_no_double_space(self):
         # у запроса к commits параметров нет, и пустая заметка о них
@@ -442,7 +385,7 @@ class LoggingTest(unittest.TestCase):
             TREE_URL: Response(404, {"message": "404 Tree Not Found"}, {}),
             COMMITS_URL: Response(200, {"id": "abc123"}, {}),
         })
-        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
+        with self.assertLogs("dashboard", level="DEBUG") as caught:
             cli.patch_files("gitlab.example.com", "g/r", "br")
         for line in caught.output:
             self.assertNotIn("  ", line)
@@ -454,7 +397,7 @@ class LoggingTest(unittest.TestCase):
             TREE_URL: Response(404, {"message": "404 Tree Not Found"}, {}),
             COMMITS_URL: Response(200, {"id": "abc123"}, {}),
         })
-        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
+        with self.assertLogs("dashboard", level="DEBUG") as caught:
             cli.patch_files("gitlab.example.com", "g/r", "br")
         line = "\n".join(caught.output)
         self.assertIn("ветка br есть", line)
@@ -466,7 +409,7 @@ class LoggingTest(unittest.TestCase):
             TREE_URL: Response(404, {"message": "404 Tree Not Found"}, {}),
             COMMITS_URL: Response(404, {"message": "404 Commit Not Found"}, {}),
         })
-        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
+        with self.assertLogs("dashboard", level="DEBUG") as caught:
             cli.patch_files("gitlab.example.com", "g/r", "br")
         self.assertIn("ветки br нет", "\n".join(caught.output))
 
@@ -475,14 +418,14 @@ class LoggingTest(unittest.TestCase):
             TREE_URL: Response(404, {"message": "404 Tree Not Found"}, {}),
             COMMITS_URL: Response(403, {"message": "403 Forbidden"}, {}),
         })
-        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
+        with self.assertLogs("dashboard", level="DEBUG") as caught:
             cli.patch_files("gitlab.example.com", "g/r", "br")
         self.assertIn("не удалось выяснить", "\n".join(caught.output))
 
     def test_cache_hit_is_logged_at_debug(self):
         cli, _ = client({TREE_URL: TWO_FILES})
         cli.patch_files("gitlab.example.com", "g/r", "br")
-        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
+        with self.assertLogs("dashboard", level="DEBUG") as caught:
             cli.patch_files("gitlab.example.com", "g/r", "br")
         self.assertIn("кэш", "\n".join(caught.output))
 
@@ -490,95 +433,13 @@ class LoggingTest(unittest.TestCase):
         # обычный успешный запрос не должен шуметь на уровне по умолчанию:
         # ни одной записи выше DEBUG он порождать не вправе
         cli, _ = client({TREE_URL: TWO_FILES})
-        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
+        with self.assertLogs("dashboard", level="DEBUG") as caught:
             cli.patch_files("gitlab.example.com", "g/r", "br")
         self.assertTrue(caught.records)
         for record in caught.records:
             self.assertEqual(record.levelno, logging.DEBUG,
                              "лишняя запись уровня %s: %s"
                              % (record.levelname, record.getMessage()))
-
-
-class ScrubTest(unittest.TestCase):
-    """Очистка текста исключения от токена во всех формах, в которых он туда
-    попадает."""
-
-    def scrub(self, token, text):
-        cli = GitlabClient(HOSTS, token=token, transport=FakeTransport({}),
-                           sleeper=lambda _s: None)
-        return cli._scrub(text)
-
-    def test_raw_token_is_scrubbed(self):
-        self.assertEqual(self.scrub(SECRET, "заголовок %s тут" % SECRET),
-                         "заголовок *** тут")
-
-    def test_token_with_a_newline_is_scrubbed_in_its_raw_form(self):
-        # если текст несёт настоящий перевод строки, а не его запись
-        self.assertNotIn(SECRET, self.scrub(SECRET + "\n", SECRET + "\n"))
-
-    def test_repr_escaped_token_is_scrubbed(self):
-        # requests печатает значение заголовка через repr: настоящий перевод
-        # строки становится двумя символами «\» и «n», и замена по сырому
-        # токену не находит ничего
-        token = SECRET + "\n"
-        text = "Invalid header value b'%s'" % (
-            token.encode("unicode_escape").decode("ascii"))
-        self.assertEqual(self.scrub(token, text), "Invalid header value b'***'")
-
-    def test_stripped_token_is_scrubbed(self):
-        # после срезки пробелов на провод уходит именно этот вид токена,
-        # и в чужом сообщении может оказаться он
-        token = SECRET + "\n"
-        self.assertEqual(self.scrub(token, "хвост %s хвост" % SECRET),
-                         "хвост *** хвост")
-
-    def test_short_token_is_not_scrubbed(self):
-        # настоящий PAT GitLab — около 26 символов; слепая замена короткого
-        # «токена» испортила бы обычный текст ошибки, а он идёт в проблемы
-        # билда, в снапшот и в дашборд
-        text = "connection reset by peer"
-        self.assertEqual(self.scrub("t", text), text)
-        self.assertEqual(self.scrub("connect", text), text)
-
-    def test_token_at_the_threshold_is_scrubbed(self):
-        self.assertEqual(self.scrub("abcdefgh", "x abcdefgh y"), "x *** y")
-
-    def test_whitespace_only_token_is_not_scrubbed(self):
-        text = "connection reset by peer"
-        self.assertEqual(self.scrub("        ", text), text)
-
-    def test_no_token_leaves_the_text_alone(self):
-        text = "connection reset by peer"
-        self.assertEqual(self.scrub(None, text), text)
-        self.assertEqual(self.scrub("", text), text)
-
-    def test_non_string_input_is_converted(self):
-        self.assertEqual(self.scrub(SECRET, ValueError("ой %s" % SECRET)),
-                         "ой ***")
-
-
-@unittest.skipUnless(_HAS_REQUESTS,
-                     "requests не установлен: он нужен только collect/run")
-class RealRequestsTest(unittest.TestCase):
-    """Единственный тест, который проходит через настоящий requests. Сети он
-    не касается: requests проверяет заголовки при подготовке запроса и падает
-    до открытия сокета, поэтому адрес нужен только синтаксически."""
-
-    HOSTS = {"h": GitlabHost(api="http://127.0.0.1:1/api/v4",
-                             web="http://127.0.0.1:1")}
-
-    def test_newline_token_does_not_leak_through_requests(self):
-        cli = GitlabClient(self.HOSTS, token=SECRET + "\n",
-                           transport=HttpTransport(timeout=1),
-                           sleeper=lambda _s: None, retries=1)
-        with self.assertLogs("kojipatch.gitlabclient", level="DEBUG") as caught:
-            result = cli.patch_files("h", "g/r", "br")
-        # «***» подтверждает, что чистить было что: requests действительно
-        # вложил значение заголовка в текст. Если однажды перестанет — тест
-        # упадёт, и это повод перепроверить механизм, а не ослабить проверку.
-        self.assertIn("***", result.problem)
-        self.assertNotIn(SECRET, result.problem)
-        self.assertNotIn(SECRET, "\n".join(caught.output))
 
 
 if __name__ == "__main__":

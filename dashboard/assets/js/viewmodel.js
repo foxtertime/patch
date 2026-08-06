@@ -1,5 +1,5 @@
 /* Данные страницы: снапшоты и пары, готовые к отрисовке.
-   Порт kojipatch/render.py (всё, кроме сборки самого HTML). */
+   Порт dashboard/render.py (всё, кроме сборки самого HTML). */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
     module.exports = factory(require('./diff.js'), require('./rpms.js'));
@@ -40,8 +40,8 @@
      _.-~/ , уходит в проценты. Своя функция, а не encodeURIComponent:
      тот экранирует «/» и не трогает «!*'()», и ссылки разъехались бы. */
   function quote(text) {
-    return String(text).replace(/[^A-Za-z0-9_.\-~/]/g, function (ch) {
-      var code = ch.charCodeAt(0), out = '', bytes, i;
+    return String(text).replace(/[^A-Za-z0-9_.\-~/]/g, (ch) => {
+      let code = ch.charCodeAt(0), out = '', bytes, i;
       if (code < 128) return '%' + ('0' + code.toString(16).toUpperCase()).slice(-2);
       bytes = unescape(encodeURIComponent(ch));
       for (i = 0; i < bytes.length; i++) {
@@ -69,7 +69,7 @@
 
   function evrOf(build) {
     if (missing(build.version) || missing(build.release)) return null;
-    var prefix = build.epoch ? build.epoch + ':' : '';
+    const prefix = build.epoch ? build.epoch + ':' : '';
     return prefix + build.version + '-' + build.release;
   }
 
@@ -84,8 +84,8 @@
      2014, поэтому смещение задано числом, а не через часовые пояса.
      Дата без часа не переводится: прибавив три часа к неизвестному
      времени, мы бы утверждали то, чего не знаем. */
-  var MSK_SHIFT_MS = 3 * 60 * 60 * 1000;
-  var STAMP = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/;
+  const MSK_SHIFT_MS = 3 * 60 * 60 * 1000;
+  const STAMP = /^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/;
 
   function pad(n) { return (n < 10 ? '0' : '') + n; }
 
@@ -93,10 +93,10 @@
      смещению примешался бы пояс машины, на которой открыт дашборд. */
   function toMsk(value) {
     if (!value || String(value).length <= 10) return value === undefined ? null : value;
-    var m = STAMP.exec(String(value));
+    const m = STAMP.exec(String(value));
     if (!m) return value;
-    var ms = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]) + MSK_SHIFT_MS;
-    var d = new Date(ms);
+    const ms = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]) + MSK_SHIFT_MS;
+    const d = new Date(ms);
     return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-'
       + pad(d.getUTCDate()) + ' ' + pad(d.getUTCHours()) + ':'
       + pad(d.getUTCMinutes()) + ':' + pad(d.getUTCSeconds());
@@ -114,9 +114,9 @@
   }
 
   /* Порядок меток состояния после классов патчей. Он же порядок в колонке
-     «теги»: сперва откуда билд, потом что не так с патчами, потом ошибки. */
-  var STATE_TAG_ORDER = ['inherited', 'no-source', 'from-commit', 'no-patch',
-                         'gitlab-error', 'internal-error'];
+     «метки»: сперва откуда билд, потом что не так с патчами, потом ошибки. */
+  const STATE_TAG_ORDER = ['inherited', 'no-source', 'from-commit', 'no-patch',
+                           'gitlab-error', 'internal-error'];
 
   /* Позиция метки в строке. Классы патчей идут первыми, в порядке списка
      классов — том же, в каком стоят карточки классов. */
@@ -129,7 +129,7 @@
   }
 
   function compareKeys(a, b) {
-    var i;
+    let i;
     for (i = 0; i < a.length; i++) {
       if (a[i] < b[i]) return -1;
       if (a[i] > b[i]) return 1;
@@ -139,30 +139,30 @@
 
   /* Метки строки, всегда в одном и том же порядке.
 
-     Порядок здесь позиционный: колонку «теги» читают по месту, а порядок
+     Порядок здесь позиционный: колонку «метки» читают по месту, а порядок
      файлов в каталоге PATCH задаёт GitLab и он разный от репозитория к
      репозиторию. Без сортировки у одной строки первым стоял бы cve, у
      соседней sast, и колонка перестала бы читаться. */
-  function buildTags(build, tag, classOrder) {
+  function buildMarks(build, tag, classOrder) {
     classOrder = classOrder || [];
-    var tags = [], patches = build.patches || [], problems = build.problems || [];
-    var i, key, gitlabError = false, internalError = false;
+    let marks = [], patches = build.patches || [], problems = build.problems || [];
+    let i, key, gitlabError = false, internalError = false;
     for (i = 0; i < patches.length; i++) {
       key = slug(patches[i]['class']);
-      if (tags.indexOf(key) === -1) tags.push(key);
+      if (marks.indexOf(key) === -1) marks.push(key);
     }
-    if (inheritedIn(build, tag)) tags.push('inherited');
-    if (!build.source) tags.push('no-source');
-    else if (build.source.ref_kind === 'commit') tags.push('from-commit');
-    if (build.patch_dir_present === false) tags.push('no-patch');
+    if (inheritedIn(build, tag)) marks.push('inherited');
+    if (!build.source) marks.push('no-source');
+    else if (build.source.ref_kind === 'commit') marks.push('from-commit');
+    if (build.patch_dir_present === false) marks.push('no-patch');
     for (i = 0; i < problems.length; i++) {
       if (problems[i].indexOf('gitlab:') === 0
           || problems[i].indexOf('bad source') === 0) gitlabError = true;
       if (problems[i].indexOf('internal error') === 0) internalError = true;
     }
-    if (gitlabError) tags.push('gitlab-error');
-    if (internalError) tags.push('internal-error');
-    return tags.sort(function (a, b) {
+    if (gitlabError) marks.push('gitlab-error');
+    if (internalError) marks.push('internal-error');
+    return marks.sort((a, b) => {
       return compareKeys(tagSortKey(a, classOrder), tagSortKey(b, classOrder));
     });
   }
@@ -174,15 +174,15 @@
   }
 
   function patchDicts(patches) {
-    var out = [], i;
+    let out = [], i;
     for (i = 0; i < patches.length; i++) out.push(patchDict(patches[i]));
     return out;
   }
 
   function buildRow(build, kojiWeb, tag, classOrder) {
-    var counts = {}, patches = build.patches || [], i;
+    let counts = {}, patches = build.patches || [], i;
     for (i = 0; i < patches.length; i++) bump(counts, patches[i]['class']);
-    var source = build.source || null;
+    let source = build.source || null;
     return {
       name: orNull(build.name), nvr: orNull(build.nvr),
       version: orNull(build.version), release: orNull(build.release),
@@ -194,8 +194,9 @@
       koji_url: kojiUrl(kojiWeb, build.nvr),
       completed: toMsk(build.completed), owner: orNull(build.owner),
       build_id: orNull(build.build_id), task_id: orNull(build.task_id),
-      // koji_tags, а не tags: ключ tags в строке занят вычисляемыми
-      // метками дашборда, и путать их нельзя
+      // koji_tags — это теги koji, а marks рядом — метки строки,
+      // которые страница считает сама; путать их нельзя, оттого и разные
+      // имена
       tagged_in: orNull(build.tag_name), inherited: inheritedIn(build, tag),
       koji_tags: (build.tags || []).slice(),
       patches: patchDicts(patches),
@@ -204,17 +205,17 @@
       patch_counts: counts, rpms: rpmsmod.sortRpms(build.rpms || []),
       patch_dir_present: orNull(build.patch_dir_present),
       problems: (build.problems || []).slice(),
-      tags: buildTags(build, tag, classOrder)
+      marks: buildMarks(build, tag, classOrder)
     };
   }
 
   function snapshotCounts(rows, classNames) {
-    var byClass = {}, i, name, row, counts, bucket;
+    let byClass = {}, i, name, row, counts, bucket;
     for (i = 0; i < classNames.length; i++) {
       byClass[classNames[i]] = { builds: 0, files: 0 };
     }
-    var withPatches = 0, withoutPatches = 0, problems = 0, files = 0;
-    var inherited = 0, direct = 0;
+    let withPatches = 0, withoutPatches = 0, problems = 0, files = 0;
+    let inherited = 0, direct = 0;
     for (i = 0; i < rows.length; i++) {
       row = rows[i];
       if (row.inherited === true) inherited += 1;
@@ -240,19 +241,19 @@
              patch_files: files, by_class: byClass };
   }
 
-  function diffTags(component) {
-    var tags = [component.status];
-    if (component.repackaged) tags.push('repackaged');
-    if (component.patches_added.length) tags.push('patches+');
-    if (component.patches_removed.length) tags.push('patches-');
-    if (component.branch_changed) tags.push('branch-changed');
-    if (component.tag_changed) tags.push('tag-changed');
-    return tags;
+  function diffMarks(component) {
+    const marks = [component.status];
+    if (component.repackaged) marks.push('repackaged');
+    if (component.patches_added.length) marks.push('patches+');
+    if (component.patches_removed.length) marks.push('patches-');
+    if (component.branch_changed) marks.push('branch-changed');
+    if (component.tag_changed) marks.push('tag-changed');
+    return marks;
   }
 
   function diffRow(component, kojiWeb, oldTag, newTag) {
-    var old = component.old || null, fresh = component['new'] || null;
-    var shown = fresh || old;
+    const old = component.old || null, fresh = component['new'] || null;
+    const shown = fresh || old;
     return {
       old_tagged_in: old ? orNull(old.tag_name) : null,
       new_tagged_in: fresh ? orNull(fresh.tag_name) : null,
@@ -274,9 +275,24 @@
       // так один и тот же подпакет стоит в обеих колонках на одной высоте,
       // и NVRA не дублируются в данных страницы
       rpm_rows: diff.alignRpms(old, fresh),
+      // Своё у каждой стороны: раскрытая строка показывает не сравнение, а
+      // две карточки одной сборки, и «кто собрал» с «когда» у них разные.
+      old_owner: old ? orNull(old.owner) : null,
+      new_owner: fresh ? orNull(fresh.owner) : null,
+      old_completed: old ? toMsk(old.completed) : null,
+      new_completed: fresh ? toMsk(fresh.completed) : null,
+      old_project: (old && old.source) ? orNull(old.source.project) : null,
+      new_project: (fresh && fresh.source) ? orNull(fresh.source.project) : null,
+      old_koji_url: old ? kojiUrl(kojiWeb, old.nvr) : null,
+      new_koji_url: fresh ? kojiUrl(kojiWeb, fresh.nvr) : null,
+      old_source_url: (old && old.source) ? orNull(old.source.web_url) : null,
+      new_source_url: (fresh && fresh.source)
+        ? orNull(fresh.source.web_url) : null,
+      // Ссылки строки — одной стороны, той, что показана в таблице: колонка
+      // «ссылки» ведёт к тому билду, о котором строка и рассказывает.
       koji_url: shown ? kojiUrl(kojiWeb, shown.nvr) : null,
       source_url: (shown && shown.source) ? orNull(shown.source.web_url) : null,
-      tags: diffTags(component)
+      marks: diffMarks(component)
     };
   }
 
@@ -286,7 +302,7 @@
      Снапшот прежней версии списка не несёт — тогда выводим классы из
      самих патчей по алфавиту: выдумывать порядок конфига нельзя. */
   function patchClassesOf(snapshots) {
-    var out = [], i, j, list;
+    let out = [], i, j, list;
     for (i = 0; i < snapshots.length; i++) {
       list = snapshots[i].patch_classes || [];
       for (j = 0; j < list.length; j++) {
@@ -294,7 +310,7 @@
       }
     }
     if (out.length) return out;
-    var seen = {}, derived = [], builds, patches, k;
+    let seen = {}, derived = [], builds, patches, k;
     for (i = 0; i < snapshots.length; i++) {
       builds = snapshots[i].builds || [];
       for (j = 0; j < builds.length; j++) {
@@ -307,14 +323,14 @@
         }
       }
     }
-    return derived.sort(function (a, b) { return a < b ? -1 : a > b ? 1 : 0; });
+    return derived.sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
   }
 
   /* Снапшот по имени тега. Тег не уникален: два прогона одного тега —
      штатный случай (дашборд для того и открывает несколько файлов), и тогда
      сюда попадает первый совпавший, а не тот, который сравнивает пара. */
   function snapshotByTag(snapshots, tag) {
-    var i;
+    let i;
     for (i = 0; i < snapshots.length; i++) {
       if (snapshots[i].tag === tag) return snapshots[i];
     }
@@ -322,9 +338,9 @@
   }
 
   function pairBlock(pair, snapshots) {
-    var oldSnap = snapshotByTag(snapshots, pair.old_tag);
-    var newSnap = snapshotByTag(snapshots, pair.new_tag);
-    var rows = [], i, component, source;
+    const oldSnap = snapshotByTag(snapshots, pair.old_tag);
+    const newSnap = snapshotByTag(snapshots, pair.new_tag);
+    let rows = [], i, component, source;
     for (i = 0; i < pair.components.length; i++) {
       component = pair.components[i];
       /* Расхождение с render.py, где хаб брался у первого снапшота: адрес
@@ -345,7 +361,7 @@
     }
     /* Счётчики копируем: в данных страницы не должно остаться ссылки на
        внутренний объект пары — правка одного молча меняла бы другое. */
-    var counts = {}, key;
+    let counts = {}, key;
     for (key in pair.counts) {
       if (Object.prototype.hasOwnProperty.call(pair.counts, key)) {
         counts[key] = pair.counts[key];
@@ -361,18 +377,18 @@
      дашборда на входе только сами снапшоты. */
   function buildPageData(snapshots) {
     snapshots = snapshots || [];
-    var classNames = patchClassesOf(snapshots);
+    const classNames = patchClassesOf(snapshots);
     // метки классов в строке — те же slug'и, что и ключи карточек классов
-    var classOrder = [], i;
+    let classOrder = [], i;
     for (i = 0; i < classNames.length; i++) classOrder.push(slug(classNames[i]));
 
-    var blocks = [];
+    const blocks = [];
     for (i = 0; i < snapshots.length; i++) {
-      var snap = snapshots[i];
+      const snap = snapshots[i];
       // порядок билдов в снапшоте не гарантирован — сортируем здесь
-      var rows = (snap.builds || []).map(function (b) {
+      const rows = (snap.builds || []).map((b) => {
         return buildRow(b, snap.koji_web, snap.tag, classOrder);
-      }).sort(function (a, b) {
+      }).sort((a, b) => {
         return a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
       });
       blocks.push({ tag: orNull(snap.tag), generated: orNull(snap.generated),
@@ -380,8 +396,8 @@
                     counts: snapshotCounts(rows, classNames), builds: rows });
     }
 
-    var pairs = [];
-    var chain = diff.diffChain(snapshots);
+    const pairs = [];
+    const chain = diff.diffChain(snapshots);
     for (i = 0; i < chain.length; i++) {
       pairs.push(pairBlock(chain[i], snapshots));
     }

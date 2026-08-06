@@ -6,14 +6,14 @@
 var test = require('node:test');
 var assert = require('node:assert');
 var domstub = require('./domstub.js');
-var store = require('../../kojipatch/assets/js/store.js');
+var store = require('../../dashboard/assets/js/store.js');
 /* Модуль диффа тесты подменяют, чтобы считать расчёты переходов по
    требованию. Зачем это нужно и почему считается именно здесь — у
    countDiffs, рядом с тестами кэша. */
-var diffmod = require('../../kojipatch/assets/js/diff.js');
+var diffmod = require('../../dashboard/assets/js/diff.js');
 var realDiffSnapshots = diffmod.diffSnapshots;
 
-var UI = require.resolve('../../kojipatch/assets/js/ui.js');
+var UI = require.resolve('../../dashboard/assets/js/ui.js');
 
 function patch(name, cls) {
   return { path: 'PATCH/' + name, name: name, 'class': cls, cves: [],
@@ -22,6 +22,22 @@ function patch(name, cls) {
 
 function has(over, key) {
   return Object.prototype.hasOwnProperty.call(over, key);
+}
+
+/* Текст всплывающих окошек. Читаем поддерево, а не innerHTML: окошки
+   собраны узлами, и у заглушки innerHTML для них пустой. */
+function deepText(node) {
+  var out = node.textContent || '', i;
+  for (i = 0; i < node.children.length; i++) {
+    out += ' ' + deepText(node.children[i]);
+  }
+  return out;
+}
+
+function noteText(dom) {
+  var out = '', list = dom.id('toasts').querySelectorAll('.toast'), i;
+  for (i = 0; i < list.length; i++) out += ' ' + deepText(list[i]);
+  return out.trim();
 }
 
 function build(name, over) {
@@ -114,7 +130,7 @@ test('каждый запрос скрипта находит свой узел'
   var heads = dom.document.querySelectorAll('th[data-sort]'), i;
   assert.ok(dom.document.querySelector('.tabs'));
   assert.strictEqual(dom.document.querySelectorAll('.tab').length, 2);
-  assert.strictEqual(heads.length, 12);
+  assert.strictEqual(heads.length, 13);
   for (i = 0; i < heads.length; i++) {
     assert.ok(heads[i].querySelector('.arrow'),
               'у колонки ' + heads[i].getAttribute('data-sort') + ' нет стрелки');
@@ -593,58 +609,15 @@ test('подпись рельса стоит в шаблоне, а не в ра�
                      dom.id('chain').innerHTML);
 });
 
-test('диапазон во всю цепочку помечен итогом, а соседний — нет',
-  function () {
-    var dom = load();
-    threeChain(dom);
-    clickNode(dom, 0);
-    clickNode(dom, 2);
-    assert.match(dom.id('chain').innerHTML, /class="sum">итог/,
-                 dom.id('chain').innerHTML);
-    clickNode(dom, 0);
-    clickNode(dom, 1);
-    assert.strictEqual(dom.id('chain').innerHTML.indexOf('итог'), -1,
-                       dom.id('chain').innerHTML);
-  });
+/* Сводность диапазона — свойство данных, а не рельса: подписи «итог» на
+   рельсе больше нет, и правило «вся цепочка, и только когда снапшотов
+   больше двух» проверяется там, где живёт, — в page.test.js.
 
-/* «Итог» подписывает диапазон во всю цепочку, но на двух снапшотах вся
-   цепочка и есть единственный переход: подписывать его итогом значит
-   сообщать очевидное.
-
-   Переход здесь предпосчитан и приезжает готовым, так что правило рельсу
-   сообщает diff.js. Случай, когда его считают на месте, — ниже. */
-test('на двух снапшотах итога на рельсе нет', function () {
-  var dom = load();
-  store.add([snap('os-9.1', JUL, { builds: [build('nginx', { version: '1.0' })] }),
-             snap('os-9.2', AUG, { builds: [build('nginx', { version: '2.0' })] })],
-            'a.json');
-  pressTab(dom, 'diff');
-  assert.strictEqual(dom.id('chain').innerHTML.indexOf('итог'), -1,
-                     dom.id('chain').innerHTML);
-});
-
-/* Два прогона одного тега в кэш предпосчитанных пар не попадают: по имени
-   тега такую пару не опознать. Значит, переход считается на месте, и
-   сводность решает уже pairFor — то самое правило, которое на разных
-   тегах сторожит diff.js. */
-test('у двух прогонов одного тега итога тоже нет', function () {
-  var dom = load();
-  store.add([snap('os-9.2', JUL, { builds: [build('nginx', { version: '1.0' })] }),
-             snap('os-9.2', AUG, { builds: [build('nginx', { version: '2.0' })] })],
-            'a.json');
-  pressTab(dom, 'diff');
-  assert.ok(dom.id('diff-rows').innerHTML.indexOf('nginx') !== -1,
-            'переход не посчитался, сценарий проверяет не то: '
-            + dom.id('diff-rows').innerHTML);
-  assert.strictEqual(dom.id('chain').innerHTML.indexOf('итог'), -1,
-                     dom.id('chain').innerHTML);
-});
-
-/* Та же сводность, но с положительной стороны и там же, в pairFor. Тег в
-   цепочке двоится, поэтому в кэш предпосчитанного не попадает ни одна пара:
-   диапазон во всю цепочку считается на месте, и «итог» на рельсе ставит
-   именно правило из pairFor, а не приехавший из diff.js признак. */
-test('диапазон во всю цепочку помечен итогом и когда посчитан на месте',
+   Здесь остаётся то, что без страницы не проверить: что диапазон во всю
+   цепочку и правда открыт по умолчанию. Двойник тега берётся нарочно — на
+   нём пара в кэш предпосчитанного не попадает, и переход считается на
+   месте. */
+test('по умолчанию открыт диапазон во всю цепочку, даже при двойниках тега',
   function () {
     var dom = load();
     store.add([snap('os-9.2', JUL, { builds: [build('nginx', { version: '1.0' })] }),
@@ -658,8 +631,6 @@ test('диапазон во всю цепочку помечен итогом и
     assert.match(html, /1\.0/, html);
     assert.match(html, /3\.0/, html);
     assert.strictEqual(html.indexOf('2.0'), -1, html);
-    assert.match(dom.id('chain').innerHTML, /class="sum">итог/,
-                 dom.id('chain').innerHTML);
   });
 
 /* Зачем возврат фокуса нужен странице: клик перерисовывает рельс целиком,
@@ -668,12 +639,10 @@ test('диапазон во всю цепочку помечен итогом и
    заново, пройдя весь рельс сначала.
 
    Что из этого проверяет тест: после клика фокус стоит на узле с тем же
-   номером — значит, focusNode() зовут, и свой узел он находит. Отличить
-   «фокус вернули на перерисованный узел» от «фокус никуда и не уходил»
-   тест не может: innerHTML в заглушке — обычная строка, рельс от неё не
-   перерисовывается, и подставная кнопка из clickNode остаётся живым
-   узлом, который focusNode и находит. Само исчезновение узла живёт в
-   браузере, и заглушкой его не изобразить. */
+   номером. Узел при этом настоящий, перерисованный: запись в innerHTML
+   заглушка разбирает тем же разбором, что и шаблон, поэтому подставная
+   кнопка из clickNode до проверки не доживает — её уносит перерисовка
+   рельса, ровно как в браузере. */
 test('после клика фокус остаётся на том же узле', function () {
   var dom = load();
   threeChain(dom);
@@ -749,7 +718,7 @@ test('файл роняют на страницу — снапшот загру�
            { dataTransfer: { files: [domstub.file('a.json', text)] } });
   await dom.tick();
   assert.strictEqual(store.list().length, 1);
-  assert.strictEqual(dom.id('load-errors').innerHTML, '');
+  assert.strictEqual(noteText(dom), '');
   assert.strictEqual(dom.id('tab-empty').hidden, true);
 });
 
@@ -774,8 +743,7 @@ test('не-JSON — строка ошибки, загруженное на ме�
   dom.fire(dom.id('drop'), 'drop',
            { dataTransfer: { files: [domstub.file('bad.json', '{ сломано')] } });
   await dom.tick();
-  assert.ok(dom.id('load-errors').innerHTML.indexOf('bad.json') !== -1,
-            dom.id('load-errors').innerHTML);
+  assert.ok(noteText(dom).indexOf('bad.json') !== -1, noteText(dom));
   assert.strictEqual(store.list().length, 1);
   assert.ok(dom.id('chain').innerHTML.indexOf('os-9.1') !== -1);
 });
@@ -786,9 +754,9 @@ test('ошибку загрузки видно и когда дашборд уж
   dom.fire(dom.id('drop'), 'drop',
            { dataTransfer: { files: [domstub.file('a.json', good)] } });
   await dom.tick();
-  /* Зона загрузки спрятана, как только появились данные. Список ошибок
-     внутри неё был бы невидим — и человек не узнал бы, что файл отвергнут. */
-  var node = dom.id('load-errors'), empty = dom.id('tab-empty');
+  /* Зона загрузки спрятана, как только появились данные. Окошко внутри
+     неё было бы невидимо — и человек не узнал бы, что файл отвергнут. */
+  var node = dom.id('toasts'), empty = dom.id('tab-empty');
   while (node) {
     assert.notStrictEqual(node, empty, 'ошибки спрятаны вместе с зоной загрузки');
     node = node.parentNode;
@@ -801,8 +769,7 @@ test('нечитаемый файл не проходит молча', async fun
   dom.fire(dom.id('drop'), 'drop',
            { dataTransfer: { files: [domstub.file('x.json', '', true)] } });
   await dom.tick();
-  assert.ok(dom.id('load-errors').innerHTML.indexOf('x.json') !== -1,
-            dom.id('load-errors').innerHTML);
+  assert.ok(noteText(dom).indexOf('x.json') !== -1, noteText(dom));
 });
 
 test('тот же файл дважды — отказ, цепочка не удваивается', async function () {
@@ -815,8 +782,7 @@ test('тот же файл дважды — отказ, цепочка не уд
            { dataTransfer: { files: [domstub.file('a.json', text)] } });
   await dom.tick();
   assert.strictEqual(store.list().length, 1);
-  assert.ok(dom.id('load-errors').innerHTML.indexOf('уже загружен') !== -1,
-            dom.id('load-errors').innerHTML);
+  assert.ok(noteText(dom).indexOf('уже загружен') !== -1, noteText(dom));
 });
 
 test('негодный снапшот не вешает страницу', async function () {
@@ -831,8 +797,8 @@ test('негодный снапшот не вешает страницу', async
            { dataTransfer: { files: [domstub.file('bad.json', poison)] } });
   await dom.tick();
   assert.strictEqual(store.list().length, 0, 'негодный снапшот остался в хранилище');
-  assert.ok(dom.id('load-errors').innerHTML.indexOf('bad.json') !== -1,
-            'причина не написана на экране: ' + dom.id('load-errors').innerHTML);
+  assert.ok(noteText(dom).indexOf('bad.json') !== -1,
+            'причина не написана на экране: ' + noteText(dom));
   assert.strictEqual(dom.id('tab-empty').hidden, false);
   /* Дашборд должен остаться рабочим: следующий годный файл загружается. */
   dom.fire(dom.id('drop'), 'drop',
@@ -858,8 +824,7 @@ test('негодный снапшот не уносит соседей по за
   await dom.tick();
   assert.deepStrictEqual(store.list().map(function (i) { return i.tag; }),
                          ['os-9.1']);
-  assert.ok(dom.id('load-errors').innerHTML.indexOf('bad.json') !== -1,
-            dom.id('load-errors').innerHTML);
+  assert.ok(noteText(dom).indexOf('bad.json') !== -1, noteText(dom));
 });
 
 test('разные хабы — предупреждение на странице', function () {
@@ -868,8 +833,37 @@ test('разные хабы — предупреждение на страниц
   other.koji_hub = 'https://elsewhere/kojihub';
   store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
   store.add([other], 'b.json');
-  assert.ok(dom.id('warnings').innerHTML.indexOf('хаба') !== -1,
-            dom.id('warnings').innerHTML);
+  assert.ok(noteText(dom).indexOf('хаба') !== -1, noteText(dom));
+});
+
+test('перестановка тех же снапшотов предупреждение не повторяет', function () {
+  /* warnings() считается заново от состава, и на каждое перетаскивание
+     набор строк там прежний. Показывать его снова значило бы твердить
+     человеку одно и то же за то, что он двигает узлы. */
+  var dom = load();
+  var other = snap('os-9.2', '2026-08-01T00:00:00+03:00');
+  other.koji_hub = 'https://elsewhere/kojihub';
+  store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
+  store.add([other], 'b.json');
+  var before = dom.id('toasts').querySelectorAll('.toast').length;
+  assert.strictEqual(before, 1, noteText(dom));
+  dragNode(dom, 1, 0, 'before');
+  assert.strictEqual(dom.id('toasts').querySelectorAll('.toast').length, before,
+                     'предупреждение всплыло второй раз: ' + noteText(dom));
+});
+
+test('откатившаяся перестановка объясняется окошком', function () {
+  /* У перестановки нет своего места для ошибок: причина уезжает в
+     предупреждения хранилища. Состав после отката прежний, и не показать
+     её значило бы промолчать о том, что действие не состоялось. */
+  var dom = load();
+  store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
+  store.add([snap('os-9.2', '2026-08-01T00:00:00+03:00')], 'b.json');
+  store.onChange(function () {
+    if (store.list()[0].tag === 'os-9.2') throw new Error('пара не рисуется');
+  });
+  store.move(1, -1);
+  assert.ok(noteText(dom).indexOf('пара не рисуется') !== -1, noteText(dom));
 });
 
 /* Добавляют снапшоты с рельса: призрак в его конце открывает тот же
@@ -900,7 +894,7 @@ test('подписи классов не переживают выгрузку �
   await dom.tick();
   dom.location.hash = '#tab=state&f=sast';
   dom.fireWindow('hashchange');
-  assert.strictEqual(dom.id('chips').innerHTML, '',
+  assert.strictEqual(filterBtn(dom).textContent, 'Фильтры',
                      'фильтр класса из выгруженного снапшота остался живым');
 });
 
@@ -928,19 +922,155 @@ test('фильтр по классу не переживает смену сос
             'a.json');
   await dom.tick();
   pressCard(dom, 'tab-state', 'sast');            /* человек включил фильтр */
-  assert.ok(dom.id('chips').innerHTML.indexOf('sast') !== -1,
-            dom.id('chips').innerHTML);
+  assert.strictEqual(filterBtn(dom).textContent, 'Фильтры · 1');
   store.remove(0);
   store.add([snap('os-9.2', AUG,
                   { classes: ['CVE'],
                     builds: [build('nginx', { patches: [patch('c.patch', 'CVE')] })] })],
             'b.json');
   await dom.tick();
-  assert.strictEqual(dom.id('chips').innerHTML, '',
+  assert.strictEqual(filterBtn(dom).textContent, 'Фильтры',
                      'фильтр класса из выгруженного снапшота остался живым');
   assert.ok(dom.id('state-rows').innerHTML.indexOf('nginx') !== -1,
             'таблица пуста под фильтр, которого нет ни на одной карточке: '
             + dom.id('state-rows').innerHTML);
+});
+
+/* Кнопка фильтров: и орган управления, и единственное место, где с
+   закрытым меню видно, что фильтр вообще стоит. Раньше это говорила строка
+   чипов. */
+function filterBtn(dom) { return dom.id('filters'); }
+
+/* Кнопку меню нажимаем настоящую — ту, которую нарисовал сам модуль.
+   Заодно проверяется, что он её нарисовал: подставной узел сказал бы
+   только про обработчик. Меню при этом обязано быть открыто. */
+function menuBtn(dom, attr, value) {
+  var list = dom.id('filtermenu').querySelectorAll('[' + attr + ']'), i;
+  for (i = 0; i < list.length; i++) {
+    if (list[i].getAttribute(attr) === value) return list[i];
+  }
+  throw new Error('в меню нет ' + attr + '="' + value + '"');
+}
+
+function pressMenu(dom, attr, value) {
+  if (dom.id('filtermenu').hidden) dom.fire(filterBtn(dom), 'click', {});
+  dom.fire(menuBtn(dom, attr, value), 'click', {});
+}
+
+test('меню не закрывается после клика по признаку', function () {
+  /* Условий человек ставит несколько подряд, и переоткрывать меню на
+     каждое — работа, которой он не просил. Своя разметка при этом
+     перерисовывается, и узел, по которому щёлкнули, уходит из дерева: от
+     него до плашки уже не дойти, и клик выглядит внешним. */
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { classes: ['CVE', 'SAST'],
+    builds: [build('nginx', { patches: [patch('c.patch', 'CVE')] })] })],
+    'a.json');
+  dom.fire(filterBtn(dom), 'click', {});
+  dom.fire(menuBtn(dom, 'data-fset', 'cve:1'), 'click', {});
+  assert.strictEqual(dom.id('filtermenu').hidden, false,
+                     'меню закрылось после первого же клика');
+  dom.fire(menuBtn(dom, 'data-fset', 'sast:-1'), 'click', {});
+  assert.strictEqual(dom.id('filtermenu').hidden, false);
+  assert.strictEqual(filterBtn(dom).textContent, 'Фильтры · 2');
+});
+
+test('переключатель группы меню тоже не закрывает', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { classes: ['CVE'],
+    builds: [build('nginx', { patches: [patch('c.patch', 'CVE')] })] })],
+    'a.json');
+  dom.fire(filterBtn(dom), 'click', {});
+  dom.fire(menuBtn(dom, 'data-fmode', 'classes:any'), 'click', {});
+  assert.strictEqual(dom.id('filtermenu').hidden, false);
+  dom.fire(menuBtn(dom, 'data-fclear', '1'), 'click', {});
+  assert.strictEqual(dom.id('filtermenu').hidden, false);
+});
+
+test('после нажатия фокус остаётся на той же кнопке меню', function () {
+  /* Разметка меню перерисовывается целиком, и нажатая кнопка исчезает
+     вместе с фокусом: с клавиатуры второе условие пришлось бы искать табом
+     с начала плашки. */
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { classes: ['CVE'],
+    builds: [build('nginx', { patches: [patch('c.patch', 'CVE')] })] })],
+    'a.json');
+  dom.fire(filterBtn(dom), 'click', {});
+  dom.fire(menuBtn(dom, 'data-fset', 'cve:1'), 'click', {});
+  assert.strictEqual(dom.focused().getAttribute('data-fset'), 'cve:1');
+});
+
+test('клик мимо меню его закрывает', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { builds: [build('nginx')] })], 'a.json');
+  dom.fire(filterBtn(dom), 'click', {});
+  dom.fire(dom.id('state-rows'), 'click', {});
+  assert.strictEqual(dom.id('filtermenu').hidden, true);
+});
+
+test('кнопка фильтров считает поставленные условия', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { classes: ['CVE'],
+    builds: [build('nginx', { patches: [patch('c.patch', 'CVE')] })] })],
+    'a.json');
+  assert.strictEqual(filterBtn(dom).textContent, 'Фильтры');
+  pressCard(dom, 'tab-state', 'cve');
+  assert.strictEqual(filterBtn(dom).textContent, 'Фильтры · 1');
+});
+
+test('меню открывается кнопкой и закрывается ею же', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { builds: [build('nginx')] })], 'a.json');
+  assert.strictEqual(dom.id('filtermenu').hidden, true);
+  dom.fire(filterBtn(dom), 'click', {});
+  assert.strictEqual(dom.id('filtermenu').hidden, false);
+  assert.strictEqual(filterBtn(dom).getAttribute('aria-expanded'), 'true');
+  dom.fire(filterBtn(dom), 'click', {});
+  assert.strictEqual(dom.id('filtermenu').hidden, true);
+});
+
+test('Escape закрывает меню', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { builds: [build('nginx')] })], 'a.json');
+  dom.fire(filterBtn(dom), 'click', {});
+  dom.fire(dom.document.body, 'keydown', { key: 'Escape' });
+  assert.strictEqual(dom.id('filtermenu').hidden, true);
+});
+
+test('меню и плашка правят одно и то же состояние', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { classes: ['CVE'],
+    builds: [build('nginx', { patches: [patch('c.patch', 'CVE')] }),
+             build('curl')] })], 'a.json');
+  pressMenu(dom, 'data-fset', 'cve:-1');
+  assert.strictEqual(filterBtn(dom).textContent, 'Фильтры · 1');
+  assert.ok(dom.id('state-rows').innerHTML.indexOf('curl') !== -1,
+            dom.id('state-rows').innerHTML);
+  assert.strictEqual(dom.id('state-rows').innerHTML.indexOf('nginx'), -1,
+                     'строка с CVE-патчем осталась под фильтром «нет»');
+  /* Плашка того же признака снимает его в «неважно». */
+  pressCard(dom, 'tab-state', 'cve');
+  assert.strictEqual(filterBtn(dom).textContent, 'Фильтры');
+});
+
+test('переключатель группы уезжает в адрес', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { classes: ['CVE'],
+    builds: [build('nginx', { patches: [patch('c.patch', 'CVE')] })] })],
+    'a.json');
+  pressMenu(dom, 'data-fmode', 'classes:any');
+  assert.ok(dom.location.hash.indexOf('any=classes') !== -1,
+            dom.location.hash);
+});
+
+test('«сбросить всё» снимает фильтры вкладки', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { classes: ['CVE'],
+    builds: [build('nginx', { patches: [patch('c.patch', 'CVE')] })] })],
+    'a.json');
+  pressCard(dom, 'tab-state', 'cve');
+  pressMenu(dom, 'data-fclear', '1');
+  assert.strictEqual(filterBtn(dom).textContent, 'Фильтры');
 });
 
 /* Вкладки скрипт переключает делегированием, как карточки: кнопки в шаблоне
@@ -959,7 +1089,7 @@ function pressTab(dom, name) {
 /* Фильтры у вкладок свои, и мёртвым фильтр остаётся молча: пока человек на
    «Изменениях», отсев по одной текущей вкладке ничего не делает с
    «Состоянием», а один клик по вкладке возвращает и пустую таблицу, и
-   «sast · sast» в чипе. */
+   поставленный фильтр на кнопке. */
 test('мёртвый фильтр отсеивается и на той вкладке, где человека сейчас нет',
      async function () {
   var dom = load();
@@ -987,7 +1117,7 @@ test('мёртвый фильтр отсеивается и на той вкла
   assert.strictEqual(dom.id('tab-diff').hidden, false,
                      'человек уехал с «Изменений», сценарий проверяет не то');
   pressTab(dom, 'state');
-  assert.strictEqual(dom.id('chips').innerHTML, '',
+  assert.strictEqual(filterBtn(dom).textContent, 'Фильтры',
                      'на невидимой вкладке фильтр пережил свой снапшот');
   assert.ok(dom.id('state-rows').innerHTML.indexOf('nginx') !== -1,
             'таблица пуста под фильтр, которого нет ни на одной карточке: '
@@ -1395,13 +1525,12 @@ test('повторно поднесённый снапшот объясняет�
     t.mock.timers.enable({ apis: ['setTimeout'] });
     var dom = load();
     sameFileTwice(dom, t);
-    assert.match(dom.id('load-errors').innerHTML, /os-9\.2/,
+    assert.match(noteText(dom), /os-9\.2/,
                  'человеку должны сказать, что именно отвергнуто');
     assert.strictEqual(store.list().length, 1, 'цепочка не удвоилась');
 
     t.mock.timers.tick(30000);
-    assert.strictEqual(dom.id('load-errors').innerHTML, '',
-                       'сообщение обязано уйти само');
+    assert.strictEqual(noteText(dom), '', 'сообщение обязано уйти само');
   });
 
 test('новое сообщение продлевает срок, а не наследует остаток чужого',
@@ -1414,7 +1543,7 @@ test('новое сообщение продлевает срок, а не на�
              { dataTransfer: { files: [domstub.file('b.json', '{ сломано')] } });
     t.mock.timers.tick(1);
     t.mock.timers.tick(9000);                 /* прежний срок уже истёк бы */
-    assert.match(dom.id('load-errors').innerHTML, /b\.json/,
+    assert.match(noteText(dom), /b\.json/,
                  'свежее сообщение не должно гаснуть по чужому таймеру');
   });
 
@@ -1651,25 +1780,35 @@ test('повторный выбор того же диапазона не счи
                      'тот же диапазон посчитан во второй раз, расчётов: ' + again);
 });
 
-/* Снапшот с тем же именем — тот же файл, но набор вокруг него другой:
-   диапазон 9.1→9.3 был всей цепочкой, а с приходом четвёртого файла быть
-   ею перестал. Кэш, переживший смену состава, отдал бы прежний блок, и на
-   рельсе осталась бы метка «итог» у диапазона, который итогом уже не
-   является. */
-test('смена состава снапшотов заводит кэш переходов заново', async function () {
+/* Кэш переходов заводится заново на каждую смену состава снапшотов —
+   проверка живёт в page.test.js, где сам кэш и стоит. Со страницы её было
+   видно по метке «итог» на рельсе; метки больше нет, а другого следа кэш
+   на странице не оставляет. */
+
+test('плашка показывает все три положения признака', function () {
+  /* Плашки страница рисует через innerHTML, а состояние расставляет по
+     готовым узлам: разметка карточек пересобирается только со сменой
+     данных. Поэтому и здесь узел настоящий. */
   var dom = load();
-  threeChain(dom);
-  clickNode(dom, 0);
-  clickNode(dom, 2);
-  assert.match(dom.id('chain').innerHTML, /class="sum">итог/,
-               'диапазон во всю цепочку не помечен итогом, сценарий '
-               + 'проверяет не то: ' + dom.id('chain').innerHTML);
-  await dom.tick();
-  store.add([snap('os-9.4', OCT, { builds: [build('nginx', { version: '4.0' })] })],
-            'd.json');
-  assert.match(dom.location.hash, /pair=os-9\.1%40[^.]*\.\.os-9\.3/,
-               'выбор не пережил приход файла, сценарий проверяет не то: '
-               + dom.location.hash);
-  assert.strictEqual(dom.id('chain').innerHTML.indexOf('итог'), -1,
-                     dom.id('chain').innerHTML);
+  store.add([snap('os-9.1', JUL, { classes: ['CVE'],
+    builds: [build('nginx', { patches: [patch('c.patch', 'CVE')] })] })],
+    'a.json');
+  var node = dom.document.createElement('div');
+  node.setAttribute('class', 'card');
+  node.setAttribute('data-filter', 'cve');
+  dom.id('tab-state').appendChild(node);
+
+  pressMenu(dom, 'data-fset', 'cve:-1');
+  assert.ok(String(node.className).indexOf('is-no') !== -1, node.className);
+  assert.strictEqual(node.getAttribute('aria-pressed'), 'false');
+
+  pressMenu(dom, 'data-fset', 'cve:1');
+  assert.strictEqual(String(node.className).indexOf('is-no'), -1,
+                     node.className);
+  assert.strictEqual(node.getAttribute('aria-pressed'), 'true');
+
+  pressMenu(dom, 'data-fset', 'cve:0');
+  assert.strictEqual(String(node.className).indexOf('is-no'), -1,
+                     node.className);
+  assert.strictEqual(node.getAttribute('aria-pressed'), 'false');
 });
