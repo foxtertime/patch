@@ -275,6 +275,21 @@
       // так один и тот же подпакет стоит в обеих колонках на одной высоте,
       // и NVRA не дублируются в данных страницы
       rpm_rows: diff.alignRpms(old, fresh),
+      // Своё у каждой стороны: раскрытая строка показывает не сравнение, а
+      // две карточки одной сборки, и «кто собрал» с «когда» у них разные.
+      old_owner: old ? orNull(old.owner) : null,
+      new_owner: fresh ? orNull(fresh.owner) : null,
+      old_completed: old ? toMsk(old.completed) : null,
+      new_completed: fresh ? toMsk(fresh.completed) : null,
+      old_project: (old && old.source) ? orNull(old.source.project) : null,
+      new_project: (fresh && fresh.source) ? orNull(fresh.source.project) : null,
+      old_koji_url: old ? kojiUrl(kojiWeb, old.nvr) : null,
+      new_koji_url: fresh ? kojiUrl(kojiWeb, fresh.nvr) : null,
+      old_source_url: (old && old.source) ? orNull(old.source.web_url) : null,
+      new_source_url: (fresh && fresh.source)
+        ? orNull(fresh.source.web_url) : null,
+      // Ссылки строки — одной стороны, той, что показана в таблице: колонка
+      // «ссылки» ведёт к тому билду, о котором строка и рассказывает.
       koji_url: shown ? kojiUrl(kojiWeb, shown.nvr) : null,
       source_url: (shown && shown.source) ? orNull(shown.source.web_url) : null,
       marks: diffMarks(component)

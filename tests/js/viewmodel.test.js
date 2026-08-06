@@ -33,7 +33,7 @@ function build(name, over) {
            release: '1.el9', epoch: null, build_id: 1, task_id: 2,
            tag_name: has(over, 'tag_name') ? over.tag_name : null,
            tags: has(over, 'tags') ? over.tags : [],
-           owner: 'builder',
+           owner: has(over, 'owner') ? over.owner : 'builder',
            completed: has(over, 'completed') ? over.completed : '2026-05-14',
            source: source,
            patch_dir_present: has(over, 'present') ? over.present : true,
@@ -520,6 +520,23 @@ test('ссылка строки пары ведёт на хаб своего с�
 function readJson(rel) {
   return JSON.parse(fs.readFileSync(path.join(__dirname, rel), 'utf8'));
 }
+
+test('строка диффа несёт карточку каждой стороны, а не только сравнение',
+  function () {
+    /* Раскрытие показывает «было» и «стало» двумя карточками одной
+       сборки, поэтому кто собрал, когда, из какого проекта и куда вели
+       ссылки — своё у каждой стороны. */
+    var pair = vm.buildPageData([
+      snap('os-9.1', [build('nginx', { owner: 'alice' })]),
+      snap('os-9.2', [build('nginx', { owner: 'bob', version: '1.2' })])
+    ]).pairs[0];
+    var row = pair.rows[0];
+    assert.strictEqual(row.old_owner, 'alice');
+    assert.strictEqual(row.new_owner, 'bob');
+    assert.strictEqual(row.old_completed, row.new_completed);
+    assert.match(row.old_koji_url, /nginx-1\.0-1\.el9/);
+    assert.match(row.new_koji_url, /nginx-1\.2-1\.el9/);
+  });
 
 /* page-data.golden.json порождён питоновским render.py на тех же
    фикстурах rich-old.json/rich-new.json — эталон паритета, с которым

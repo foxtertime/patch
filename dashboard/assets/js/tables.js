@@ -50,9 +50,14 @@
   /* ---------- вкладка «Состояние» ---------- */
 
   function stateDetail(row, q) {
-    /* Метка from-commit сюда не ставится: она уже стоит в колонке меток той
-       же строки, а раскрытие — продолжение строки, а не отдельная карточка,
-       и повторять в нём то, что видно строчкой выше, незачем. */
+    /* Раскрытие — полная карточка сборки: сюда приходят, когда строки уже
+       мало, и выкидывать поле из-за того, что оно есть и в строке, значит
+       заставлять читать в двух местах сразу. Метки — исключение: у них своя
+       колонка и своя же полоса в раскрытии не нужна.
+
+       Подпись зависит от вида ссылки: значение здесь — либо имя ветки, либо
+       хеш коммита, и назвать хеш веткой значит соврать. */
+    const refName = row.ref_kind === 'commit' ? 'коммит' : 'ветка';
     const branch = row.branch
       ? `<span class="mono">${hl(row.branch, q)}</span>`
       : '<span class="none">источник неизвестен</span>';
@@ -68,17 +73,20 @@
             ? hl(row.completed, q) + (row.completed.length > 10
                 ? '<span class="note">МСК</span>' : '')
             : '<span class="none">—</span>')
-      /* Владельца здесь нет: он стоит в своей колонке той же строки, а
-         раскрытие — её продолжение, а не отдельная карточка. */
+      + kv('владелец', row.owner ? hl(row.owner, q)
+            : '<span class="none">—</span>')
       + kv('build id', esc(row.build_id === null ? '—' : row.build_id))
       + kv('task id', esc(row.task_id === null ? '—' : row.task_id))
+      + kv('ссылка', row.koji_url
+            ? markup.linkHtml(row.koji_url, 'koji')
+            : '<span class="none">—</span>')
       + '</div>'
 
       + `<div class="block">${blockHead('gitlab')}`
       + kv('проект', row.project
             ? `<span class="mono">${hl(row.project, q)}</span>`
             : '<span class="none">—</span>')
-      + kv('ветка', branch)
+      + kv(refName, branch)
       + kv('каталог PATCH', esc(dir))
       + kv('ссылка', row.source_url
             ? markup.linkHtml(row.source_url, 'gitlab')
@@ -152,19 +160,38 @@
     return `<div class="bl side-head">${esc(title)} · <b>${esc(tag)}</b></div>`;
   }
 
-  /* Сводка стороны. markCls пуст у «было» и назван у «стало»: смена тега
-     или ветки — тоже переход, и подсвечивается он там же, где остальные. */
+  /* Значение стороны: прочерк, если его нет, и пометка перехода, если оно
+     изменилось. Помечаем только на стороне «стало» — там же, где и
+     остальные переходы; «было» это состояние, в нём ничего не происходило. */
+  function sideValue(value, changed, q, markCls, mono) {
+    if (!value) return '<span class="none">—</span>';
+    const cls = (mono ? 'mono' : '') + (markCls && changed
+      ? `${mono ? ' ' : ''}${markCls}` : '');
+    return cls ? `<span class="${cls}">${hl(value, q)}</span>` : hl(value, q);
+  }
+
+  /* Сводка стороны — полная карточка сборки, а не выжимка: «было» и «стало»
+     это две карточки одного компонента, и уходить за остальным из раскрытия
+     человеку негде. markCls пуст у «было» и назван у «стало».
+
+     Время сборки не помечается никогда: у пересобранного компонента оно
+     разное всегда, и пометка на нём не сообщала бы ничего. */
   function sideFacts(s, q, markCls) {
     const tagCell = markup.taggedText(s.taggedIn, s.inherited, q);
     return '<div class="side">'
-      + kv('версия', s.evr ? `<span class="mono">${hl(s.evr, q)}</span>`
-                           : '<span class="none">—</span>')
+      + kv('версия', sideValue(s.evr, false, q, '', true))
       + kv('тег', markCls && s.tagChanged
             ? `<span class="${markCls}">${tagCell}</span>` : tagCell)
-      + kv('ветка', s.branch
-            ? `<span class="mono${markCls && s.branchChanged
-                                    ? ` ${markCls}` : ''}">`
-              + `${hl(s.branch, q)}</span>`
+      + kv('собран', s.completed
+            ? hl(s.completed, q) + (s.completed.length > 10
+                ? '<span class="note">МСК</span>' : '')
+            : '<span class="none">—</span>')
+      + kv('владелец', sideValue(s.owner, s.ownerChanged, q, markCls, false))
+      + kv('ветка', sideValue(s.branch, s.branchChanged, q, markCls, true))
+      + kv('проект', sideValue(s.project, s.projectChanged, q, markCls, true))
+      + kv('ссылки', (s.kojiUrl || s.sourceUrl)
+            ? markup.linkHtml(s.kojiUrl, 'koji')
+              + markup.linkHtml(s.sourceUrl, 'git')
             : '<span class="none">—</span>')
       + '</div>';
   }
@@ -178,12 +205,26 @@
   function diffDetail(row, q, oldTag, newTag) {
     const branchChanged = row.marks.indexOf('branch-changed') !== -1;
     const tagChanged = row.marks.indexOf('tag-changed') !== -1;
-    const was = { evr: row.old_evr, branch: row.old_branch,
-                  taggedIn: row.old_tagged_in, inherited: row.old_inherited,
-                  branchChanged, tagChanged };
-    const now = { evr: row.new_evr, branch: row.new_branch,
-                  taggedIn: row.new_tagged_in, inherited: row.new_inherited,
-                  branchChanged, tagChanged };
+    /* У смены владельца и переезда проекта своей метки нет: это не повод
+       для фильтра, а подробность, которую видно, только когда строку уже
+       раскрыли. Поэтому сравниваем прямо здесь. */
+    const ownerChanged = Boolean(row.old_owner && row.new_owner
+      && row.old_owner !== row.new_owner);
+    const projectChanged = Boolean(row.old_project && row.new_project
+      && row.old_project !== row.new_project);
+    const shared = { branchChanged, tagChanged, ownerChanged, projectChanged };
+    const was = Object.assign({
+      evr: row.old_evr, branch: row.old_branch,
+      taggedIn: row.old_tagged_in, inherited: row.old_inherited,
+      owner: row.old_owner, completed: row.old_completed,
+      project: row.old_project, kojiUrl: row.old_koji_url,
+      sourceUrl: row.old_source_url }, shared);
+    const now = Object.assign({
+      evr: row.new_evr, branch: row.new_branch,
+      taggedIn: row.new_tagged_in, inherited: row.new_inherited,
+      owner: row.new_owner, completed: row.new_completed,
+      project: row.new_project, kojiUrl: row.new_koji_url,
+      sourceUrl: row.new_source_url }, shared);
     const oldRpms = markup.rpmSideList(row.rpm_rows, 0);
     const newRpms = markup.rpmSideList(row.rpm_rows, 1);
     return '<div class="sides">'
