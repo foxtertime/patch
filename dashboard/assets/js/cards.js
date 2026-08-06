@@ -169,5 +169,21 @@
                label, `${tip} Клик — фильтр.`)).join('');
   }
 
-  return { stateCards, pairCards, diffCards };
+  /* Сколько карточек ставить в строку, чтобы строки вышли равными.
+
+     Одиннадцать срезов, из которых в строку влезло десять, дают вторую
+     строку из одной карточки и пустоту за ней: ряд читается как
+     недоделанный. Считаем, сколько строк выходит при самой плотной
+     раскладке, и делим карточки на эти строки поровну — одиннадцать по
+     шесть это шесть и пять, обе строки полные.
+
+     Считалка чистая: ширину и отступ меряет тот, у кого есть раскладка. */
+  function columnsFor(items, width, min, gap) {
+    if (items < 1) return 0;
+    const fits = Math.max(1, Math.floor((width + gap) / (min + gap)));
+    const rows = Math.ceil(items / fits);
+    return Math.min(items, Math.ceil(items / rows));
+  }
+
+  return { stateCards, pairCards, diffCards, columnsFor };
 }));
