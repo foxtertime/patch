@@ -80,6 +80,41 @@
     return { big, classes };
   }
 
+  /* Стороны перехода: сколько сборок было в теге и сколько стало. Крупно и
+     первым рядом, как итоги тега на «Состоянии»: разрезы под ними — про то,
+     что изменилось, а эти два числа про то, между чем считали.
+
+     Число берётся у снапшота, а не по строкам таблицы: строка — это
+     компонент перехода, и компонент, которого на этой стороне ещё (или уже)
+     нет, в ней всё равно стоит.
+
+     Под числом — тег и время сбора. Тега мало: два прогона одного тега —
+     законный случай, и «было os-9.4 → стало os-9.4» без времени сбора не
+     сказало бы, какой из них какой. */
+  function sideCards(pair, from, to) {
+    if (!pair || !from || !to) return '';
+    const was = from.counts.builds, now = to.counts.builds;
+    const delta = now - was;
+    let move;
+    if (delta === 0) move = 'Столько же, сколько было.';
+    else {
+      move = `На ${Math.abs(delta)} `
+        + `${plural(Math.abs(delta), 'сборку', 'сборки', 'сборок')} `
+        + `${delta > 0 ? 'больше' : 'меньше'}, чем было.`;
+    }
+    function side(snap, count, label, tip) {
+      return cardHtml(null, true, count,
+        plural(count, 'сборка', 'сборки', 'сборок'),
+        `${snap.tag}, ${text.stampOf(snap.generated)}`, label, tip);
+    }
+    return side(from, was, 'было',
+        `Сколько сборок было в теге на начало перехода — все последние `
+        + `сборки ${from.tag} на момент того сбора.`)
+      + side(to, now, 'стало',
+        `Сколько сборок в теге на конец перехода. ${move} `
+        + `Появилось ${pair.counts.added}, исчезло ${pair.counts.removed}.`);
+  }
+
   function diffCards(pair) {
     if (!pair) return '';
     const c = pair.counts;
@@ -114,5 +149,5 @@
                label, `${tip} Клик — фильтр.`)).join('');
   }
 
-  return { stateCards, diffCards };
+  return { stateCards, sideCards, diffCards };
 }));

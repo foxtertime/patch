@@ -114,7 +114,14 @@
   }
 
   function renderDiffCards() {
-    document.getElementById('diff-cards').innerHTML = cards.diffCards(curPair());
+    const pair = curPair();
+    /* Концы перехода берём у страницы, а не у самой пары: пара знает свои
+       теги, но не то, каким сбором каждого из них она посчитана, — а именно
+       это отличает два прогона одного тега друг от друга. */
+    const ends = page.currentEnds(), snaps = snapshots();
+    document.getElementById('diff-sides').innerHTML = ends
+      ? cards.sideCards(pair, snaps[ends[0]], snaps[ends[1]]) : '';
+    document.getElementById('diff-cards').innerHTML = cards.diffCards(pair);
   }
 
   /* Плашка показывает все три положения признака: нажата — «есть», класс

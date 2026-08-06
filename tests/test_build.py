@@ -173,6 +173,14 @@ class TemplateContractTest(unittest.TestCase):
         # перестаёт читаться как метка.
         self.assertRegex(self.html, r"\.mark \{[^}]*white-space: nowrap")
 
+    def test_diff_tab_has_a_row_for_both_sides(self):
+        # Сколько сборок было и сколько стало — крупным первым рядом, как
+        # итоги тега на «Состоянии»: разрезы под ним про то, что
+        # изменилось, а эти два числа про то, между чем считали.
+        self.assertIn('id="diff-sides"', self.html)
+        self.assertLess(self.html.index('id="diff-sides"'),
+                        self.html.index('id="diff-cards"'))
+
     def test_the_rail_gap_label_holds_its_own_width(self):
         # Подпись над отрезком стояла absolute и ширины ему не добавляла:
         # отрезок сжимался до предела, а подпись, торчащая из него в обе

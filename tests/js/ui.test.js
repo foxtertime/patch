@@ -413,6 +413,38 @@ test('выбор снапшота не мешает следующему выб�
                dom.location.hash);
 });
 
+/* Стороны перехода стоят над разрезами: сколько сборок в теге было и
+   сколько стало. Считает их не таблица переходов, а сами снапшоты. */
+test('над карточками диффа стоят стороны перехода', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { builds: [build('nginx')] })], 'a.json');
+  store.add([snap('os-9.2', AUG,
+                  { builds: [build('nginx'), build('curl')] })], 'b.json');
+  pressTab(dom, 'diff');
+  var sides = dom.id('diff-sides').innerHTML;
+  assert.match(sides, /class="l">было<\/div><div class="n">1 /, sides);
+  assert.match(sides, /class="l">стало<\/div><div class="n">2 /, sides);
+  assert.match(sides, /os-9\.1, 2026-07-01 00:00/, sides);
+});
+
+/* Выбор другого диапазона меняет и стороны: они про его концы, а не про
+   цепочку целиком. */
+test('смена диапазона переписывает стороны', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { builds: [build('nginx')] })], 'a.json');
+  store.add([snap('os-9.2', AUG,
+                  { builds: [build('nginx'), build('curl')] })], 'b.json');
+  store.add([snap('os-9.3', SEP,
+                  { builds: [build('nginx'), build('curl'),
+                             build('zlib')] })], 'c.json');
+  pressTab(dom, 'diff');
+  clickNode(dom, 1);
+  clickNode(dom, 2);
+  var sides = dom.id('diff-sides').innerHTML;
+  assert.match(sides, /class="l">было<\/div><div class="n">2 /, sides);
+  assert.match(sides, /class="l">стало<\/div><div class="n">3 /, sides);
+});
+
 /* Классы чипа по номеру узла: рельс рисуется строкой, и читать её удобнее
    разобранной. */
 function nodeClass(dom, at) {

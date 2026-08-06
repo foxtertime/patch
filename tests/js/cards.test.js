@@ -81,3 +81,53 @@ test('карточки диффа перечисляют все одиннадц
 test('карточка диффа подписана «из скольких»', function () {
   assert.match(cards.diffCards(pair()), /<span class="unit">из 2<\/span>/);
 });
+
+/* Стороны перехода: сколько сборок в теге было и сколько стало. Числа берём
+   у снапшотов, а не по строкам таблицы: строка — это компонент перехода, и
+   компонент, которого на этой стороне нет, в ней всё равно стоит. */
+function side(tag, generated, builds) {
+  return { tag: tag, generated: generated, builds: [],
+           counts: { builds: builds } };
+}
+
+test('без концов перехода карточек сторон нет', function () {
+  assert.strictEqual(cards.sideCards(pair(), null, null), '');
+  assert.strictEqual(cards.sideCards(null, side('os-9.1', '', 1),
+                                     side('os-9.2', '', 2)), '');
+});
+
+test('стороны перехода — две большие карточки со своими числами', function () {
+  var out = cards.sideCards(pair(),
+    side('os-9.1', '2026-07-01T00:00:00+03:00', 4),
+    side('os-9.2', '2026-08-01T00:00:00+03:00', 6));
+  assert.match(out, /class="l">было<\/div><div class="n">4 /, out);
+  assert.match(out, /class="l">стало<\/div><div class="n">6 /, out);
+  assert.strictEqual((out.match(/card big/g) || []).length, 2, out);
+});
+
+/* Фильтра у них нет: сторона перехода — не срез таблицы, а то, между чем
+   считали. Кнопка обещала бы клик, которому нечего делать. */
+test('карточки сторон не кнопки', function () {
+  var out = cards.sideCards(pair(), side('os-9.1', '', 1), side('os-9.2', '', 1));
+  assert.strictEqual(out.indexOf('data-filter'), -1, out);
+  assert.strictEqual(out.indexOf('<button'), -1, out);
+});
+
+/* Тега мало: два прогона одного тега — законный случай, и без времени сбора
+   «было os-9.4 → стало os-9.4» не сказало бы, какой из них какой. */
+test('под числом стоят тег и время сбора', function () {
+  var out = cards.sideCards(pair(),
+    side('os-9.4', '2026-09-01T08:15:00+03:00', 6),
+    side('os-9.4', '2026-10-01T09:00:00+03:00', 7));
+  assert.match(out, /class="rpm">os-9\.4, 2026-09-01 08:15</, out);
+  assert.match(out, /class="rpm">os-9\.4, 2026-10-01 09:00</, out);
+});
+
+test('подсказка «стало» называет разницу сторон', function () {
+  var more = cards.sideCards(pair(), side('a', '', 4), side('b', '', 6));
+  assert.match(more, /На 2 сборки больше/, more);
+  var less = cards.sideCards(pair(), side('a', '', 6), side('b', '', 4));
+  assert.match(less, /На 2 сборки меньше/, less);
+  var same = cards.sideCards(pair(), side('a', '', 4), side('b', '', 4));
+  assert.match(same, /Столько же/, same);
+});
