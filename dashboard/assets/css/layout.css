@@ -14,8 +14,6 @@
 .srchead .l { color: var(--muted); font-size: .64rem; text-transform: uppercase;
   letter-spacing: .09em; margin-right: auto; }
 
-.warn { color: var(--major); font-size: .82rem; margin-bottom: .35rem;
-  padding-left: .55rem; border-left: 3px solid var(--major); }
 
 /* Экран загрузки — не редкий случай, а входная дверь: страница не помнит
    загруженное между перезагрузками, и этот экран человек видит каждый раз.
