@@ -35,7 +35,7 @@ function deepText(node) {
 }
 
 function noteText(dom) {
-  var out = '', list = dom.id('notes').querySelectorAll('.note'), i;
+  var out = '', list = dom.id('toasts').querySelectorAll('.toast'), i;
   for (i = 0; i < list.length; i++) out += ' ' + deepText(list[i]);
   return out.trim();
 }
@@ -758,7 +758,7 @@ test('ошибку загрузки видно и когда дашборд уж
   await dom.tick();
   /* Зона загрузки спрятана, как только появились данные. Окошко внутри
      неё было бы невидимо — и человек не узнал бы, что файл отвергнут. */
-  var node = dom.id('notes'), empty = dom.id('tab-empty');
+  var node = dom.id('toasts'), empty = dom.id('tab-empty');
   while (node) {
     assert.notStrictEqual(node, empty, 'ошибки спрятаны вместе с зоной загрузки');
     node = node.parentNode;
@@ -847,10 +847,10 @@ test('перестановка тех же снапшотов предупреж
   other.koji_hub = 'https://elsewhere/kojihub';
   store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
   store.add([other], 'b.json');
-  var before = dom.id('notes').querySelectorAll('.note').length;
+  var before = dom.id('toasts').querySelectorAll('.toast').length;
   assert.strictEqual(before, 1, noteText(dom));
   dragNode(dom, 1, 0, 'before');
-  assert.strictEqual(dom.id('notes').querySelectorAll('.note').length, before,
+  assert.strictEqual(dom.id('toasts').querySelectorAll('.toast').length, before,
                      'предупреждение всплыло второй раз: ' + noteText(dom));
 });
 

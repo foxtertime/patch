@@ -2,7 +2,7 @@
    Владеет полем выбора и зоной броска; наружу отдаёт только openPicker —
    её зовёт призрачная кнопка рельса. О том, что не приехало, модуль
    рассказывает окошком, но не рисует его: показывать сообщения — дело
-   notes, а дело этого модуля — читать файлы. */
+   toasts, а дело этого модуля — читать файлы. */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
     module.exports = factory();
@@ -14,7 +14,7 @@
   'use strict';
 
   function create(deps) {
-    const store = deps.store, notes = deps.notes;
+    const store = deps.store, toasts = deps.toasts;
     const input = deps.dom.input, dropZone = deps.dom.drop;
     const pickBtn = deps.dom.pick;
 
@@ -31,8 +31,9 @@
         pending -= 1;
         if (pending) return;
         if (!errors.length) return;
-        notes.show({ kind: 'error', title: `Не загружено: ${errors.length}`,
-                     lines: errors });
+        toasts.show({ kind: 'error',
+                      title: `Не загружено: ${errors.length}`,
+                      lines: errors });
       }
       /* file объявлен на каждый виток, поэтому обработчики читателя видят
          свой файл, а не последний из пачки. Раньше это делала обёртка-IIFE. */

@@ -13,18 +13,18 @@
                              require('./tables.js'), require('./cards.js'),
                              require('./page.js'), require('./hash.js'),
                              require('./rail.js'), require('./files.js'),
-                             require('./tips.js'), require('./notes.js'));
+                             require('./tips.js'), require('./toasts.js'));
   } else {
     root.KP = root.KP || {};
     root.KP.ui = factory(root.KP.viewmodel, root.KP.store, root.KP.diff,
                          root.KP.text, root.KP.labels, root.KP.markup,
                          root.KP.tables, root.KP.cards, root.KP.page,
                          root.KP.hash, root.KP.rail, root.KP.files,
-                         root.KP.tips, root.KP.notes);
+                         root.KP.tips, root.KP.toasts);
   }
 }(typeof globalThis !== 'undefined' ? globalThis : this,
   function (viewmodel, store, diffmod, text, labels, markup, tables, cards,
-            pagemod, hash, railmod, filesmod, tipsmod, notesmod) {
+            pagemod, hash, railmod, filesmod, tipsmod, toastsmod) {
   'use strict';
 
   /* Состояние страницы живёт в page.js: там же и всё, что из него
@@ -459,10 +459,10 @@
   const app = {};
   const tips = tipsmod.create({ node: document.getElementById('tip') });
   const hideTip = tips.hide;
-  const notes = notesmod.create({ node: document.getElementById('notes') });
+  const toasts = toastsmod.create({ node: document.getElementById('toasts') });
   let rail = railmod.create({ box: chainBox, page: page, store: store,
                               text: text, app: app, hideTip: hideTip });
-  let files = filesmod.create({ store: store, notes: notes,
+  let files = filesmod.create({ store: store, toasts: toasts,
     dom: { input: fileInput, drop: dropZone, pick: pickBtn } });
   app.render = render;
   app.renderStateCards = renderStateCards;
@@ -556,7 +556,7 @@
     const room = stock === shownStock
       ? Math.max(0, now.length - shownWarnings.length) : fresh.length;
     for (const line of fresh.slice(fresh.length - room)) {
-      notes.show({ kind: 'warn', lines: [line] });
+      toasts.show({ kind: 'warn', lines: [line] });
     }
     shownWarnings = now;
     shownStock = stock;

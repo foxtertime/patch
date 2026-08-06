@@ -31,12 +31,16 @@ koji-хабов и причина откатившейся перестанов�
 
 ## Модуль
 
-`dashboard/assets/js/notes.js` — владелец узла, устроен как `tips.js`: свой
-`#notes`, свои таймеры, наружу одна функция.
+`dashboard/assets/js/toasts.js` — владелец узла, устроен как `tips.js`: свой
+`#toasts`, свои таймеры, наружу одна функция.
+
+Окошко зовётся toast, а не note: классом `note` на странице уже помечена
+приписка к значению в раскрытой строке («прямой», «унаследован»), и вторая
+вещь под тем же именем молча перекрашивала бы первую.
 
 ```js
-const notes = KP.notes.create({ node });
-notes.show({ kind: 'error', title: 'Не загружено: 5', lines: [...] });
+const toasts = KP.toasts.create({ node });
+toasts.show({ kind: 'error', title: 'Не загружено: 5', lines: [...] });
 ```
 
 Окошко собирается узлами через `createElement`, а не строкой в
@@ -59,7 +63,7 @@ notes.show({ kind: 'error', title: 'Не загружено: 5', lines: [...] })
 |---|---:|---|
 | `LIFE` | 10000 мс | столько живёт сообщение сейчас |
 | `FADE` | 400 мс | столько длится гашение сейчас |
-| `MAX_NOTES` | 4 | пятое окошко выталкивает самое старое |
+| `MAX_TOASTS` | 4 | пятое окошко выталкивает самое старое |
 | `MAX_LINES` | 6 | остаток сворачивается в «…и ещё N» |
 
 Список режется, только если под «…и ещё N» уходит больше одной строки:
@@ -69,14 +73,14 @@ notes.show({ kind: 'error', title: 'Не загружено: 5', lines: [...] })
 **Разметка одного окошка:**
 
 ```html
-<div class="note error">
-  <button type="button" class="note-x" aria-label="Закрыть">✕</button>
-  <div class="note-t">Не загружено: 5</div>
-  <ul class="note-l"><li>b.json: снапшот уже загружен</li>…</ul>
+<div class="toast error">
+  <button type="button" class="toast-x" aria-label="Закрыть">✕</button>
+  <div class="toast-t">Не загружено: 5</div>
+  <ul class="toast-l"><li>b.json: снапшот уже загружен</li>…</ul>
 </div>
 ```
 
-Заголовка нет — нет и `div.note-t`.
+Заголовка нет — нет и `div.toast-t`.
 
 **Жизнь.** Десять секунд, потом класс `fading` и через 400 мс узел уходит
 из DOM. У каждого окошка свои два таймера: гашение и уборка — разные
@@ -104,8 +108,8 @@ notes.show({ kind: 'error', title: 'Не загружено: 5', lines: [...] })
 ## Кто зовёт
 
 **`files.js`** теряет `showErrors`, оба таймера, `ERRORS_LIFE`,
-`ERRORS_FADE`, `esc` и узел `errors` в доводах; получает `notes`. Пачка
-дочитана — одно `notes.show({ kind: 'error', title: 'Не загружено: N',
+`ERRORS_FADE`, `esc` и узел `errors` в доводах; получает `toasts`. Пачка
+дочитана — одно `toasts.show({ kind: 'error', title: 'Не загружено: N',
 lines: errors })`. Правило «одно сообщение на пачку и только когда прочитан
 последний файл» остаётся: файлы читаются вразнобой, и сообщение на каждый
 перебивало бы предыдущее. Отказов ноль — `show` не зовётся.
@@ -127,18 +131,18 @@ lines: errors })`. Правило «одно сообщение на пачку 
 
 | откуда | что |
 |---|---|
-| `dashboard.html` | `<ul class="problems loaderrors" id="load-errors">`, `<div class="warnings" id="warnings">`; вместо них `<div class="notes" id="notes" role="status" aria-live="polite">` рядом с `#tip` |
+| `dashboard.html` | `<ul class="problems loaderrors" id="load-errors">`, `<div class="warnings" id="warnings">`; вместо них `<div class="toasts" id="toasts" role="status" aria-live="polite">` рядом с `#tip` |
 | `layout.css` | правила `.warn`, `.loaderrors`, `.loaderrors.fading` |
 | `files.js` | `showErrors`, `stopTimers`, `timers`, обе постоянные |
 | `ui.js` | `loadErrors`, `warningsBox` и строка `warningsBox.innerHTML = …` |
 
 `base.css` перечисляет `.warn` в списке узлов с наборным шрифтом — на его
-место встают `.note-t` и `.note-l li`.
+место встают `.toast-t` и `.toast-l li`.
 
 ## Сборка
 
-`notes.js` встаёт в `SCRIPTS` после `tips.js` и до `ui.js` — он зависит от
-`text` и нужен корню. `notes.css` встаёт в `STYLES` после `table.css` и до
+`toasts.js` встаёт в `SCRIPTS` после `tips.js` и до `ui.js` — он зависит от
+`text` и нужен корню. `toasts.css` встаёт в `STYLES` после `table.css` и до
 `tip.css`: подсказка всплывает поверх всего, и последней в каскаде остаётся
 она.
 
@@ -147,7 +151,7 @@ lines: errors })`. Правило «одно сообщение на пачку 
 
 ## Тесты
 
-**`tests/js/notes.test.js`** — новый, на модуль без страницы (узел даёт
+**`tests/js/toasts.test.js`** — новый, на модуль без страницы (узел даёт
 `domstub`):
 
 - окошко появляется в контейнере, заголовок и строки на месте;
@@ -168,7 +172,7 @@ lines: errors })`. Правило «одно сообщение на пачку 
 самое, но чужими руками и на всю сюиту сразу.
 
 **`tests/js/ui.test.js`** — восемь проверок, читающих сейчас
-`#load-errors`, переезжают на `#notes`; утверждение прежнее: причина
+`#load-errors`, переезжают на `#toasts`; утверждение прежнее: причина
 написана на экране. Добавляются две: предупреждение о хабах всплывает
 окошком, а повторная перестановка того же состава его не повторяет.
 
@@ -186,9 +190,9 @@ node --test tests/js/*.test.js
 
 README: абзац про отказы рядом с зоной загрузки переписывается — отказы
 теперь всплывают в углу и гаснут, предупреждения туда же. Раздел «Скрипты»
-и «Стили» получают строку про `notes`.
+и «Стили» получают строку про `toasts`.
 
 Номер не поднимается: 2.0.0 ещё не выпущена и лежит в `develop`. Запись
 CHANGELOG 2.0.0 дописывается абзацем.
 
-Ветка `feature/notes` от `develop`, вливается `--no-ff` после апрува.
+Ветка `feature/toasts` от `develop`, вливается `--no-ff` после апрува.

@@ -5,7 +5,7 @@
 var test = require('node:test');
 var assert = require('node:assert');
 var domstub = require('./domstub');
-var notesmod = require('../../dashboard/assets/js/notes');
+var toastsmod = require('../../dashboard/assets/js/toasts');
 
 function clock() {
   var pending = [], next = 1;
@@ -35,7 +35,7 @@ function setup() {
   var box = dom.document.createElement('div');
   var clk = clock();
   return { dom: dom, box: box, clk: clk,
-           notes: notesmod.create({ node: box, clock: clk }) };
+           toasts: toastsmod.create({ node: box, clock: clk }) };
 }
 
 /* Весь текст поддерева: окошко собрано узлами, и innerHTML у заглушки
@@ -48,11 +48,11 @@ function textOf(node) {
   return out;
 }
 
-function boxes(box) { return box.querySelectorAll('.note'); }
+function boxes(box) { return box.querySelectorAll('.toast'); }
 
 test('окошко показывает заголовок и строки', function () {
   var s = setup();
-  s.notes.show({ kind: 'error', title: 'Не загружено: 2',
+  s.toasts.show({ kind: 'error', title: 'Не загружено: 2',
                  lines: ['a.json: это не снапшот', 'b.json: уже загружен'] });
   var list = boxes(s.box);
   assert.strictEqual(list.length, 1);
@@ -64,8 +64,8 @@ test('окошко показывает заголовок и строки', fun
 
 test('вид попадает в класс окошка', function () {
   var s = setup();
-  s.notes.show({ kind: 'error', lines: ['раз'] });
-  s.notes.show({ kind: 'warn', lines: ['два'] });
+  s.toasts.show({ kind: 'error', lines: ['раз'] });
+  s.toasts.show({ kind: 'warn', lines: ['два'] });
   var list = boxes(s.box);
   assert.ok(list[0].className.indexOf('error') !== -1, list[0].className);
   assert.ok(list[1].className.indexOf('warn') !== -1, list[1].className);
@@ -73,27 +73,27 @@ test('вид попадает в класс окошка', function () {
 
 test('незнакомый вид считается предупреждением', function () {
   var s = setup();
-  s.notes.show({ kind: 'что-то ещё', lines: ['раз'] });
+  s.toasts.show({ kind: 'что-то ещё', lines: ['раз'] });
   assert.ok(boxes(s.box)[0].className.indexOf('warn') !== -1);
 });
 
 test('пустой список ничего не показывает', function () {
   var s = setup();
-  s.notes.show({ kind: 'error', title: 'Не загружено: 0', lines: [] });
+  s.toasts.show({ kind: 'error', title: 'Не загружено: 0', lines: [] });
   assert.strictEqual(boxes(s.box).length, 0);
 });
 
 test('без заголовка окошко состоит из одних строк', function () {
   var s = setup();
-  s.notes.show({ kind: 'warn', lines: ['разные хабы'] });
-  assert.strictEqual(s.box.querySelectorAll('.note-t').length, 0);
+  s.toasts.show({ kind: 'warn', lines: ['разные хабы'] });
+  assert.strictEqual(s.box.querySelectorAll('.toast-t').length, 0);
   assert.ok(textOf(boxes(s.box)[0]).indexOf('разные хабы') !== -1);
 });
 
 test('длинный список режется и говорит, сколько строк скрыто', function () {
   var s = setup(), lines = [], i;
   for (i = 1; i <= 9; i++) lines.push('строка ' + i);
-  s.notes.show({ kind: 'error', lines: lines });
+  s.toasts.show({ kind: 'error', lines: lines });
   var text = textOf(boxes(s.box)[0]);
   assert.ok(text.indexOf('строка 6') !== -1, text);
   assert.ok(text.indexOf('строка 7') === -1, text);
@@ -104,7 +104,7 @@ test('семь строк показываются все: «и ещё 1» за�
   function () {
     var s = setup(), lines = [], i;
     for (i = 1; i <= 7; i++) lines.push('строка ' + i);
-    s.notes.show({ kind: 'error', lines: lines });
+    s.toasts.show({ kind: 'error', lines: lines });
     var text = textOf(boxes(s.box)[0]);
     assert.ok(text.indexOf('строка 7') !== -1, text);
     assert.ok(text.indexOf('и ещё') === -1, text);
@@ -112,7 +112,7 @@ test('семь строк показываются все: «и ещё 1» за�
 
 test('пятое окошко выталкивает самое старое', function () {
   var s = setup(), i;
-  for (i = 1; i <= 5; i++) s.notes.show({ kind: 'warn', lines: ['n' + i] });
+  for (i = 1; i <= 5; i++) s.toasts.show({ kind: 'warn', lines: ['n' + i] });
   var list = boxes(s.box);
   assert.strictEqual(list.length, 4);
   var text = list.map(textOf).join(' ');
@@ -122,9 +122,9 @@ test('пятое окошко выталкивает самое старое', f
 
 test('крестик убирает своё окошко и не трогает соседей', function () {
   var s = setup();
-  s.notes.show({ kind: 'warn', lines: ['первое'] });
-  s.notes.show({ kind: 'warn', lines: ['второе'] });
-  s.box.querySelectorAll('.note-x')[0].click();
+  s.toasts.show({ kind: 'warn', lines: ['первое'] });
+  s.toasts.show({ kind: 'warn', lines: ['второе'] });
+  s.box.querySelectorAll('.toast-x')[0].click();
   var list = boxes(s.box);
   assert.strictEqual(list.length, 1);
   assert.ok(textOf(list[0]).indexOf('второе') !== -1);
@@ -132,14 +132,14 @@ test('крестик убирает своё окошко и не трогает
 
 test('текст причины не становится разметкой', function () {
   var s = setup();
-  s.notes.show({ kind: 'error', lines: ['<b>bad</b>.json: не читается'] });
+  s.toasts.show({ kind: 'error', lines: ['<b>bad</b>.json: не читается'] });
   assert.strictEqual(s.box.querySelectorAll('b').length, 0);
   assert.ok(textOf(boxes(s.box)[0]).indexOf('<b>bad</b>.json') !== -1);
 });
 
 test('окошко гаснет по своему сроку и уходит из дерева', function () {
   var s = setup();
-  s.notes.show({ kind: 'error', lines: ['раз'] });
+  s.toasts.show({ kind: 'error', lines: ['раз'] });
   s.clk.tick(10000);
   assert.ok(boxes(s.box)[0].className.indexOf('fading') !== -1,
             boxes(s.box)[0].className);
@@ -149,7 +149,7 @@ test('окошко гаснет по своему сроку и уходит и�
 
 test('под курсором отсчёт стоит, а после ухода идёт заново', function () {
   var s = setup();
-  s.notes.show({ kind: 'error', lines: ['раз'] });
+  s.toasts.show({ kind: 'error', lines: ['раз'] });
   s.dom.fire(boxes(s.box)[0], 'mouseenter', {});
   s.clk.tick(10000);
   assert.strictEqual(boxes(s.box).length, 1, 'окошко ушло из-под курсора');
@@ -163,15 +163,15 @@ test('под курсором отсчёт стоит, а после ухода 
 
 test('фокус внутри окошка держит его так же, как курсор', function () {
   var s = setup();
-  s.notes.show({ kind: 'error', lines: ['раз'] });
-  s.dom.fire(s.box.querySelectorAll('.note-x')[0], 'focusin', {});
+  s.toasts.show({ kind: 'error', lines: ['раз'] });
+  s.dom.fire(s.box.querySelectorAll('.toast-x')[0], 'focusin', {});
   s.clk.tick(10000);
   assert.strictEqual(boxes(s.box).length, 1);
 });
 
 test('курсор на догорающем окошке возвращает его к жизни', function () {
   var s = setup();
-  s.notes.show({ kind: 'error', lines: ['раз'] });
+  s.toasts.show({ kind: 'error', lines: ['раз'] });
   s.clk.tick(10000);
   s.dom.fire(boxes(s.box)[0], 'mouseenter', {});
   s.clk.tick(400);
@@ -181,7 +181,7 @@ test('курсор на догорающем окошке возвращает �
 
 test('убранное окошко таймеров за собой не оставляет', function () {
   var s = setup();
-  s.notes.show({ kind: 'error', lines: ['раз'] });
-  s.box.querySelectorAll('.note-x')[0].click();
+  s.toasts.show({ kind: 'error', lines: ['раз'] });
+  s.box.querySelectorAll('.toast-x')[0].click();
   assert.strictEqual(s.clk.count(), 0);
 });

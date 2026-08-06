@@ -9,13 +9,17 @@
 
    Окошки собираются узлами, а не строкой в innerHTML: в причине отказа
    стоит имя файла, пришедшее снаружи, и textContent делает его текстом
-   по устройству, а не по дисциплине вызывающего. */
+   по устройству, а не по дисциплине вызывающего.
+
+   Окошко зовётся toast, а не note: классом note на странице уже помечена
+   приписка к значению в раскрытой строке («прямой», «унаследован»), и
+   вторая вещь под тем же именем молча перекрашивала бы первую. */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
     module.exports = factory();
   } else {
     root.KP = root.KP || {};
-    root.KP.notes = factory();
+    root.KP.toasts = factory();
   }
 }(typeof globalThis !== 'undefined' ? globalThis : this, () => {
   'use strict';
@@ -27,7 +31,7 @@
   const FADE = 400;
   /* Угол экрана — не лента: стопка в полстраницы закрывала бы её вместо
      того, чтобы о ней рассказывать. */
-  const MAX_NOTES = 4;
+  const MAX_TOASTS = 4;
   const MAX_LINES = 6;
 
   function create(deps) {
@@ -46,26 +50,26 @@
       return id;
     }
 
-    function stop(note) {
-      clock.clear(note.dim);
-      clock.clear(note.gone);
-      note.dim = null;
-      note.gone = null;
+    function stop(toast) {
+      clock.clear(toast.dim);
+      clock.clear(toast.gone);
+      toast.dim = null;
+      toast.gone = null;
     }
 
-    function drop(note) {
-      stop(note);
-      const at = live.indexOf(note);
+    function drop(toast) {
+      stop(toast);
+      const at = live.indexOf(toast);
       if (at !== -1) live.splice(at, 1);
-      if (note.el.parentNode) note.el.parentNode.removeChild(note.el);
+      if (toast.el.parentNode) toast.el.parentNode.removeChild(toast.el);
     }
 
     /* Курсор пришёл: отсчёт стоит, и класс гашения снимается сразу —
        окошко, которое уже догорало, возвращается к жизни, а не остаётся
        прозрачным до ухода курсора. */
-    function hold(note) {
-      stop(note);
-      note.el.className = `note ${note.kind}`;
+    function hold(toast) {
+      stop(toast);
+      toast.el.className = `toast ${toast.kind}`;
     }
 
     /* Два независимых таймера, а не вложенных: гашение и уборка — разные
@@ -74,12 +78,12 @@
 
        Отсчёт всегда начинается с полного срока: окошко, к которому
        вернулись, не должно гаснуть быстрее того, которое видят впервые. */
-    function arm(note) {
-      hold(note);
-      note.dim = timer(() => {
-        note.el.className = `note ${note.kind} fading`;
+    function arm(toast) {
+      hold(toast);
+      toast.dim = timer(() => {
+        toast.el.className = `toast ${toast.kind} fading`;
       }, LIFE);
-      note.gone = timer(() => drop(note), LIFE + FADE);
+      toast.gone = timer(() => drop(toast), LIFE + FADE);
     }
 
     function el(tag, cls, text) {
@@ -90,7 +94,7 @@
     }
 
     function listOf(lines) {
-      const list = el('ul', 'note-l');
+      const list = el('ul', 'toast-l');
       /* Режем, только если под «…и ещё N» уходит больше одной строки:
          иначе он занимает ровно место строки и вместо причины сообщает
          о ней. */
@@ -106,28 +110,28 @@
       const lines = (spec && spec.lines) || [];
       if (!lines.length) return;
       const kind = spec.kind === 'error' ? 'error' : 'warn';
-      const wrap = el('div', `note ${kind}`);
-      const kill = el('button', 'note-x', '✕');
+      const wrap = el('div', `toast ${kind}`);
+      const kill = el('button', 'toast-x', '✕');
       kill.setAttribute('type', 'button');
       kill.setAttribute('aria-label', 'Закрыть');
       wrap.appendChild(kill);
-      if (spec.title) wrap.appendChild(el('div', 'note-t', spec.title));
+      if (spec.title) wrap.appendChild(el('div', 'toast-t', spec.title));
       wrap.appendChild(listOf(lines));
 
-      const note = { el: wrap, kind: kind, dim: null, gone: null };
-      kill.addEventListener('click', () => drop(note));
-      wrap.addEventListener('mouseenter', () => hold(note));
-      wrap.addEventListener('mouseleave', () => arm(note));
+      const toast = { el: wrap, kind: kind, dim: null, gone: null };
+      kill.addEventListener('click', () => drop(toast));
+      wrap.addEventListener('mouseenter', () => hold(toast));
+      wrap.addEventListener('mouseleave', () => arm(toast));
       /* До крестика доходят и табом: под клавиатурой отсчёт держим так
          же, как под мышью. */
-      wrap.addEventListener('focusin', () => hold(note));
-      wrap.addEventListener('focusout', () => arm(note));
+      wrap.addEventListener('focusin', () => hold(toast));
+      wrap.addEventListener('focusout', () => arm(toast));
 
       box.appendChild(wrap);
-      live.push(note);
+      live.push(toast);
       /* Лишнее окошко выталкивается сразу, не досиживая своего срока. */
-      while (live.length > MAX_NOTES) drop(live[0]);
-      arm(note);
+      while (live.length > MAX_TOASTS) drop(live[0]);
+      arm(toast);
     }
 
     return { show };

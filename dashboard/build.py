@@ -20,12 +20,12 @@ TEMPLATE_PATH = os.path.join(ASSETS, "dashboard.html")
 SCRIPTS = ("vercmp.js", "rpms.js", "diff.js", "viewmodel.js", "store.js",
            "text.js", "labels.js", "hash.js", "page.js", "markup.js",
            "tables.js", "cards.js", "rail.js", "files.js", "tips.js",
-           "notes.js", "ui.js")
+           "toasts.js", "ui.js")
 # Порядок решает каскад: при равной специфичности выигрывает то, что ниже.
 # base идёт первым — там переменные и палитра, tip последним — он всплывает
 # поверх всего. Перестановка файлов здесь молча меняет вид страницы.
 STYLES = ("base.css", "layout.css", "rail.css", "cards.css", "table.css",
-          "notes.css", "tip.css")
+          "toasts.css", "tip.css")
 
 
 class BuildError(Exception):

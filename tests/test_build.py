@@ -151,12 +151,12 @@ class TemplateContractTest(unittest.TestCase):
         self.assertIn(".tabs[hidden] { display: none; }", self.html)
         self.assertNotIn(".sources { display: flex", self.html)
 
-    def test_notes_live_outside_the_empty_screen(self):
+    def test_toasts_live_outside_the_empty_screen(self):
         # Экран загрузки прячется, как только появились данные. Окошко
         # сообщения внутри него было бы невидимо ровно тогда, когда нужно.
         start = self.html.index('<section id="tab-empty">')
         end = self.html.index("</section>", start)
-        at = self.html.index('id="notes"')
+        at = self.html.index('id="toasts"')
         self.assertFalse(start < at < end)
 
     def test_reuses_ref_html_css_variables(self):
