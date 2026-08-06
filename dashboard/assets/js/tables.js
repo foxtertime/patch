@@ -68,7 +68,8 @@
             ? hl(row.completed, q) + (row.completed.length > 10
                 ? '<span class="note">МСК</span>' : '')
             : '<span class="none">—</span>')
-      + kv('владелец', hl(row.owner || '—', q))
+      /* Владельца здесь нет: он стоит в своей колонке той же строки, а
+         раскрытие — её продолжение, а не отдельная карточка. */
       + kv('build id', esc(row.build_id === null ? '—' : row.build_id))
       + kv('task id', esc(row.task_id === null ? '—' : row.task_id))
       + '</div>'
@@ -128,6 +129,8 @@
         + `<td class="pat">${patches}</td>`
         + `<td class="num">${row.rpms.length}</td>`
         + `<td class="built">${markup.builtHtml(row.completed, q)}</td>`
+        + `<td class="owner">${row.owner ? hl(row.owner, q)
+             : '<span class="none">—</span>'}</td>`
         + `<td class="marks">${markup.marksHtml(row.marks)}</td>`
         + `${linksCell(row)}</tr>`;
       return open ? main + detailRow(opt.cols, stateDetail(row, q), bad) : main;

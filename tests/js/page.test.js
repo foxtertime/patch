@@ -17,6 +17,14 @@ function patch(name, cls) {
            web_url: null };
 }
 
+/* Сборка с названным владельцем: у build() он всегда один и тот же, а
+   сортировке нужны разные. */
+function buildBy(name, owner) {
+  var out = build(name);
+  out.owner = owner;
+  return out;
+}
+
 function build(name, over) {
   over = over || {};
   return { nvr: name + '-1.0-1.el9', name: name, version: '1.0',
@@ -348,6 +356,36 @@ test('поиск по видимому полю не разворачивает 
   assert.strictEqual(items.length, 1);
   assert.strictEqual(items[0].open, false);
 });
+
+test('поиск по владельцу строку не разворачивает', function () {
+  /* Владелец стоит в самой строке, и разворачивать её незачем: правило
+     «развернуть» — про совпадения, которых в строке не видно. */
+  var p = make([snap('os-9.1', JUL)]);
+  p.st.q = 'builder';
+  var items = p.visibleRows();
+  assert.strictEqual(items.length, 1);
+  assert.strictEqual(items[0].open, false);
+});
+
+test('поиск по времени сборки строку тоже не разворачивает', function () {
+  var p = make([snap('os-9.1', JUL)]);
+  p.st.q = '2026-05-14';
+  var items = p.visibleRows();
+  assert.strictEqual(items.length, 1);
+  assert.strictEqual(items[0].open, false);
+});
+
+test('сортировка по владельцу собирает сборки одного человека подряд',
+  function () {
+    var p = make([snap('os-9.1', JUL, { builds: [
+      buildBy('nginx', 'zoe'), buildBy('curl', 'alice'),
+      buildBy('vim', 'zoe'), buildBy('zlib', 'alice')
+    ] })]);
+    p.sortBy('owner');
+    assert.deepStrictEqual(
+      p.sortRows(p.visibleRows()).map(function (i) { return i.row.owner; }),
+      ['alice', 'alice', 'zoe', 'zoe']);
+  });
 
 test('совпадение только в деталях разворачивает строку', function () {
   var p = make([snap('os-9.1', JUL,

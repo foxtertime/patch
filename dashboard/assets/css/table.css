@@ -61,11 +61,16 @@ td.built { font-size: .82rem; }
 td.built .tm { opacity: .65; }
 td.pat { white-space: nowrap; font-variant-numeric: tabular-nums; }
 td.pat .zero { color: var(--muted); }
+/* Владелец — koji-логин, а не имя человека: не переносим, иначе
+   разорванный посередине он перестаёт узнаваться, и приглушаем, как
+   остальную служебную часть строки. */
+td.owner { color: var(--muted); white-space: nowrap;
+  overflow-wrap: normal; font-size: .85em; }
 td.links { text-align: right; white-space: nowrap; }
 td.marks { white-space: nowrap; }
 .plus { color: var(--added); }
 .minus { color: var(--removed); }
-/* На узком экране девять колонок не помещаются. Пусть скроллится таблица,
+/* На узком экране десять колонок не помещаются. Пусть скроллится таблица,
    а не вся страница вместе с панелью поиска; sticky-шапкой жертвуем. */
 @media (max-width: 900px) {
   .tablewrap { overflow-x: auto; }

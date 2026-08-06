@@ -186,6 +186,30 @@ test('метку from-commit деталь не повторяет', function () 
   assert.doesNotMatch(tables.stateDetail(row, ''), /from-commit/);
 });
 
+test('владелец сборки стоит в строке', function () {
+  var out = tables.stateRows([{ row: stateRow(), open: false }], opts());
+  assert.match(out, /<td class="owner">builder<\/td>/);
+});
+
+test('владельца нет — в ячейке прочерк, а не пустота', function () {
+  var row = stateRow();
+  row.owner = null;
+  var out = tables.stateRows([{ row: row, open: false }], opts());
+  assert.match(out, /<td class="owner"><span class="none">—<\/span><\/td>/);
+});
+
+test('владелец подсвечивается поиском', function () {
+  var out = tables.stateRows([{ row: stateRow(), open: false }],
+                             opts({ q: 'build' }));
+  assert.match(out, /<td class="owner"><span class="hit">build<\/span>er<\/td>/);
+});
+
+test('владельца деталь не повторяет', function () {
+  /* Он стоит в своей колонке той же строки; раскрытие — продолжение
+     строки, и повторять в нём видное строчкой выше незачем. */
+  assert.doesNotMatch(tables.stateDetail(stateRow(), ''), /владелец/);
+});
+
 test('блок проблем появляется только когда они есть', function () {
   assert.doesNotMatch(tables.stateDetail(stateRow(), ''), /проблемы/);
   assert.match(tables.stateDetail(stateRow({ problems: ['нет ветки'] }), ''),

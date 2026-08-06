@@ -130,7 +130,7 @@ test('каждый запрос скрипта находит свой узел'
   var heads = dom.document.querySelectorAll('th[data-sort]'), i;
   assert.ok(dom.document.querySelector('.tabs'));
   assert.strictEqual(dom.document.querySelectorAll('.tab').length, 2);
-  assert.strictEqual(heads.length, 12);
+  assert.strictEqual(heads.length, 13);
   for (i = 0; i < heads.length; i++) {
     assert.ok(heads[i].querySelector('.arrow'),
               'у колонки ' + heads[i].getAttribute('data-sort') + ' нет стрелки');

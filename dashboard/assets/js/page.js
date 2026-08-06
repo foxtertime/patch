@@ -385,9 +385,13 @@
        иначе непонятно, почему она в выдаче. */
     function scanState(row, q) {
       if (!q) return { show: true, deep: false };
+      /* Видимое в самой строке — мелкое совпадение: разворачивать её незачем,
+         человек и так видит, за что она попала в выдачу. Владелец и время
+         сборки стоят в своих колонках, поэтому они здесь, а не ниже. */
       const shallow = has(row.name, q) || has(row.nvr, q) || has(row.branch, q)
-                 || has(row.evr, q) || has(row.tagged_in, q);
-      let deep = has(row.project, q) || has(row.completed, q) || has(row.owner, q);
+                 || has(row.evr, q) || has(row.tagged_in, q)
+                 || has(row.owner, q) || has(row.completed, q);
+      let deep = has(row.project, q);
       let i, j, p;
       for (i = 0; !deep && i < (row.koji_tags || []).length; i++) {
         if (has(row.koji_tags[i], q)) deep = true;
