@@ -39,6 +39,14 @@
         <button type="button" id="q-clear" hidden aria-label="Очистить поиск"
                 data-tip="Очистить строку поиска">✕</button>
       </div>
+      <!-- Кнопка и плашка стоят в одной обёртке: плашка позиционируется от
+           кнопки, а вся панель управления переезжает между вкладками. -->
+      <div class="filterbox" id="filterbox">
+        <button type="button" id="filters" class="toggle" aria-expanded="false"
+                aria-haspopup="true"
+                data-tip="Что показывать в таблице: признаки строки и классы патчей. У каждого признака три положения — неважно, есть, нет.">Фильтры</button>
+        <div class="filtermenu" id="filtermenu" hidden></div>
+      </div>
       <button id="expand" class="toggle" data-tip="Развернуть или свернуть все строки, которые сейчас видны. Фильтры и поиск учитываются.">Expand all</button>
       <button id="copy-nvr" class="toggle" data-tip="Скопировать NVR отфильтрованных строк">Copy NVR</button>
       <span class="count" id="count"></span>

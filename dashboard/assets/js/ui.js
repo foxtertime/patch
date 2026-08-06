@@ -13,18 +13,20 @@
                              require('./tables.js'), require('./cards.js'),
                              require('./page.js'), require('./hash.js'),
                              require('./rail.js'), require('./files.js'),
-                             require('./tips.js'), require('./toasts.js'));
+                             require('./tips.js'), require('./toasts.js'),
+                             require('./filters.js'));
   } else {
     root.KP = root.KP || {};
     root.KP.ui = factory(root.KP.viewmodel, root.KP.store, root.KP.diff,
                          root.KP.text, root.KP.labels, root.KP.markup,
                          root.KP.tables, root.KP.cards, root.KP.page,
                          root.KP.hash, root.KP.rail, root.KP.files,
-                         root.KP.tips, root.KP.toasts);
+                         root.KP.tips, root.KP.toasts, root.KP.filters);
   }
 }(typeof globalThis !== 'undefined' ? globalThis : this,
   function (viewmodel, store, diffmod, text, labels, markup, tables, cards,
-            pagemod, hash, railmod, filesmod, tipsmod, toastsmod) {
+            pagemod, hash, railmod, filesmod, tipsmod, toastsmod,
+            filtersmod) {
   'use strict';
 
   /* Состояние страницы живёт в page.js: там же и всё, что из него
@@ -129,6 +131,10 @@
 
   function renderChips() { chipsBox.innerHTML = cards.chips(activeFilters()); }
 
+  /* Меню одной вкладки на другой показывало бы чужие признаки: закрываем
+     его вместе со сменой таблицы. */
+  function closeFilters() { filters.close(); }
+
 
   /* ---------- рендер ---------- */
 
@@ -167,6 +173,7 @@
 
     syncCards();
     renderChips();
+    filters.sync();
     syncArrows();
     /* Рельс показывает текущий выбор, а он меняется и без смены состава:
        переключили тег, пару или вкладку — рельс обязан это отразить.
@@ -228,6 +235,7 @@
     const wrap = host.querySelector('.tablewrap');
     host.insertBefore(controls, wrap);
     host.insertBefore(chipsBox, wrap);
+    closeFilters();
     search.placeholder = name === 'diff'
       ? 'Компонент, версия, тег, ветка, патч, CVE, RPM…'
       : 'Компонент, тег, ветка, патч, CVE, RPM…';
@@ -464,6 +472,10 @@
                               text: text, app: app, hideTip: hideTip });
   let files = filesmod.create({ store: store, toasts: toasts,
     dom: { input: fileInput, drop: dropZone, pick: pickBtn } });
+  const filters = filtersmod.create({
+    box: document.getElementById('filtermenu'),
+    button: document.getElementById('filters'),
+    page: page, labels: labels, text: text, app: app });
   app.render = render;
   app.renderStateCards = renderStateCards;
   app.renderDiffCards = renderDiffCards;

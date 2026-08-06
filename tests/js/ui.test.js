@@ -939,6 +939,86 @@ test('фильтр по классу не переживает смену сос
             + dom.id('state-rows').innerHTML);
 });
 
+/* Кнопка фильтров: и орган управления, и единственное место, где с
+   закрытым меню видно, что фильтр вообще стоит. Раньше это говорила строка
+   чипов. */
+function filterBtn(dom) { return dom.id('filters'); }
+
+/* Кнопки меню скрипт рисует через innerHTML, а заглушка разметку из строк
+   не разбирает. Ставим такую же кнопку настоящим узлом: проверяется
+   обработчик, а не то, как браузер её отрисует. */
+function pressMenu(dom, attr, value) {
+  var node = dom.document.createElement('button');
+  node.setAttribute(attr, value);
+  dom.id('filtermenu').appendChild(node);
+  dom.fire(node, 'click', {});
+}
+
+test('кнопка фильтров считает поставленные условия', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { classes: ['CVE'],
+    builds: [build('nginx', { patches: [patch('c.patch', 'CVE')] })] })],
+    'a.json');
+  assert.strictEqual(filterBtn(dom).textContent, 'Фильтры');
+  pressCard(dom, 'tab-state', 'cve');
+  assert.strictEqual(filterBtn(dom).textContent, 'Фильтры · 1');
+});
+
+test('меню открывается кнопкой и закрывается ею же', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { builds: [build('nginx')] })], 'a.json');
+  assert.strictEqual(dom.id('filtermenu').hidden, true);
+  dom.fire(filterBtn(dom), 'click', {});
+  assert.strictEqual(dom.id('filtermenu').hidden, false);
+  assert.strictEqual(filterBtn(dom).getAttribute('aria-expanded'), 'true');
+  dom.fire(filterBtn(dom), 'click', {});
+  assert.strictEqual(dom.id('filtermenu').hidden, true);
+});
+
+test('Escape закрывает меню', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { builds: [build('nginx')] })], 'a.json');
+  dom.fire(filterBtn(dom), 'click', {});
+  dom.fire(dom.document.body, 'keydown', { key: 'Escape' });
+  assert.strictEqual(dom.id('filtermenu').hidden, true);
+});
+
+test('меню и плашка правят одно и то же состояние', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { classes: ['CVE'],
+    builds: [build('nginx', { patches: [patch('c.patch', 'CVE')] }),
+             build('curl')] })], 'a.json');
+  pressMenu(dom, 'data-fset', 'cve:-1');
+  assert.strictEqual(filterBtn(dom).textContent, 'Фильтры · 1');
+  assert.ok(dom.id('state-rows').innerHTML.indexOf('curl') !== -1,
+            dom.id('state-rows').innerHTML);
+  assert.strictEqual(dom.id('state-rows').innerHTML.indexOf('nginx'), -1,
+                     'строка с CVE-патчем осталась под фильтром «нет»');
+  /* Плашка того же признака снимает его в «неважно». */
+  pressCard(dom, 'tab-state', 'cve');
+  assert.strictEqual(filterBtn(dom).textContent, 'Фильтры');
+});
+
+test('переключатель группы уезжает в адрес', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { classes: ['CVE'],
+    builds: [build('nginx', { patches: [patch('c.patch', 'CVE')] })] })],
+    'a.json');
+  pressMenu(dom, 'data-fmode', 'classes:any');
+  assert.ok(dom.location.hash.indexOf('any=classes') !== -1,
+            dom.location.hash);
+});
+
+test('«сбросить всё» снимает фильтры вкладки', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { classes: ['CVE'],
+    builds: [build('nginx', { patches: [patch('c.patch', 'CVE')] })] })],
+    'a.json');
+  pressCard(dom, 'tab-state', 'cve');
+  pressMenu(dom, 'data-fclear', '1');
+  assert.strictEqual(filterBtn(dom).textContent, 'Фильтры');
+});
+
 /* Вкладки скрипт переключает делегированием, как карточки: кнопки в шаблоне
    есть, но обработчик один на документ. */
 function pressTab(dom, name) {
