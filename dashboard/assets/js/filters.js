@@ -131,27 +131,51 @@
       show(!open);
     });
 
+    /* Событие, которое плашка уже признала своим. Условий человек ставит
+       несколько подряд, а каждое перерисовывает меню — и узел, по которому
+       щёлкнули, уходит из дерева раньше, чем очередь дойдёт до обработчика
+       на документе. От оторванного узла до плашки не дойти, и клик выглядел
+       бы внешним: меню закрывалось бы после первого же нажатия. Помним само
+       событие, а не узел: оно живо ровно столько, сколько идёт всплытие. */
+    let ours = null;
+
+    /* Разметка меню перерисовывается на каждое нажатие, и кнопка, по которой
+       щёлкнули, исчезает вместе с фокусом. Возвращаем его на её замену:
+       иначе с клавиатуры второе условие пришлось бы искать табом с начала
+       плашки. Так же поступает и рельс — там выбор тоже двухшаговый. */
+    function refocus(attr, value) {
+      for (const node of box.querySelectorAll(`[${attr}]`)) {
+        if (node.getAttribute(attr) === value) { node.focus(); return; }
+      }
+    }
+
+    function apply(e, attr, value, fn) {
+      ours = e;
+      fn();
+      app.render();
+      refocus(attr, value);
+    }
+
     box.addEventListener('click', (e) => {
       let node = e.target, bits;
       while (node && node !== box) {
         if (node.getAttribute) {
           if (node.getAttribute('data-fclear')) {
-            page.toggleFilter('all');
-            app.render();
+            apply(e, 'data-fclear', '1', () => page.toggleFilter('all'));
             return;
           }
           const set = node.getAttribute('data-fset');
           if (set) {
             bits = set.split(':');
-            page.setFilter(bits[0], parseInt(bits[1], 10));
-            app.render();
+            apply(e, 'data-fset', set,
+                  () => page.setFilter(bits[0], parseInt(bits[1], 10)));
             return;
           }
           const mode = node.getAttribute('data-fmode');
           if (mode) {
             bits = mode.split(':');
-            page.setGroupMode(bits[0], bits[1]);
-            app.render();
+            apply(e, 'data-fmode', mode,
+                  () => page.setGroupMode(bits[0], bits[1]));
             return;
           }
         }
@@ -164,7 +188,7 @@
        ему то, ради чего он фильтр и ставил. Свои клики доходят до документа
        тоже, поэтому спрашиваем, откуда пришло событие. */
     document.addEventListener('click', (e) => {
-      if (!open) return;
+      if (!open || e === ours) return;
       let node = e.target;
       while (node && node !== document) {
         if (node === box || node === button) return;

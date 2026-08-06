@@ -639,12 +639,10 @@ test('по умолчанию открыт диапазон во всю цепо
    заново, пройдя весь рельс сначала.
 
    Что из этого проверяет тест: после клика фокус стоит на узле с тем же
-   номером — значит, focusNode() зовут, и свой узел он находит. Отличить
-   «фокус вернули на перерисованный узел» от «фокус никуда и не уходил»
-   тест не может: innerHTML в заглушке — обычная строка, рельс от неё не
-   перерисовывается, и подставная кнопка из clickNode остаётся живым
-   узлом, который focusNode и находит. Само исчезновение узла живёт в
-   браузере, и заглушкой его не изобразить. */
+   номером. Узел при этом настоящий, перерисованный: запись в innerHTML
+   заглушка разбирает тем же разбором, что и шаблон, поэтому подставная
+   кнопка из clickNode до проверки не доживает — её уносит перерисовка
+   рельса, ровно как в браузере. */
 test('после клика фокус остаётся на том же узле', function () {
   var dom = load();
   threeChain(dom);
@@ -943,15 +941,72 @@ test('фильтр по классу не переживает смену сос
    чипов. */
 function filterBtn(dom) { return dom.id('filters'); }
 
-/* Кнопки меню скрипт рисует через innerHTML, а заглушка разметку из строк
-   не разбирает. Ставим такую же кнопку настоящим узлом: проверяется
-   обработчик, а не то, как браузер её отрисует. */
-function pressMenu(dom, attr, value) {
-  var node = dom.document.createElement('button');
-  node.setAttribute(attr, value);
-  dom.id('filtermenu').appendChild(node);
-  dom.fire(node, 'click', {});
+/* Кнопку меню нажимаем настоящую — ту, которую нарисовал сам модуль.
+   Заодно проверяется, что он её нарисовал: подставной узел сказал бы
+   только про обработчик. Меню при этом обязано быть открыто. */
+function menuBtn(dom, attr, value) {
+  var list = dom.id('filtermenu').querySelectorAll('[' + attr + ']'), i;
+  for (i = 0; i < list.length; i++) {
+    if (list[i].getAttribute(attr) === value) return list[i];
+  }
+  throw new Error('в меню нет ' + attr + '="' + value + '"');
 }
+
+function pressMenu(dom, attr, value) {
+  if (dom.id('filtermenu').hidden) dom.fire(filterBtn(dom), 'click', {});
+  dom.fire(menuBtn(dom, attr, value), 'click', {});
+}
+
+test('меню не закрывается после клика по признаку', function () {
+  /* Условий человек ставит несколько подряд, и переоткрывать меню на
+     каждое — работа, которой он не просил. Своя разметка при этом
+     перерисовывается, и узел, по которому щёлкнули, уходит из дерева: от
+     него до плашки уже не дойти, и клик выглядит внешним. */
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { classes: ['CVE', 'SAST'],
+    builds: [build('nginx', { patches: [patch('c.patch', 'CVE')] })] })],
+    'a.json');
+  dom.fire(filterBtn(dom), 'click', {});
+  dom.fire(menuBtn(dom, 'data-fset', 'cve:1'), 'click', {});
+  assert.strictEqual(dom.id('filtermenu').hidden, false,
+                     'меню закрылось после первого же клика');
+  dom.fire(menuBtn(dom, 'data-fset', 'sast:-1'), 'click', {});
+  assert.strictEqual(dom.id('filtermenu').hidden, false);
+  assert.strictEqual(filterBtn(dom).textContent, 'Фильтры · 2');
+});
+
+test('переключатель группы меню тоже не закрывает', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { classes: ['CVE'],
+    builds: [build('nginx', { patches: [patch('c.patch', 'CVE')] })] })],
+    'a.json');
+  dom.fire(filterBtn(dom), 'click', {});
+  dom.fire(menuBtn(dom, 'data-fmode', 'classes:any'), 'click', {});
+  assert.strictEqual(dom.id('filtermenu').hidden, false);
+  dom.fire(menuBtn(dom, 'data-fclear', '1'), 'click', {});
+  assert.strictEqual(dom.id('filtermenu').hidden, false);
+});
+
+test('после нажатия фокус остаётся на той же кнопке меню', function () {
+  /* Разметка меню перерисовывается целиком, и нажатая кнопка исчезает
+     вместе с фокусом: с клавиатуры второе условие пришлось бы искать табом
+     с начала плашки. */
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { classes: ['CVE'],
+    builds: [build('nginx', { patches: [patch('c.patch', 'CVE')] })] })],
+    'a.json');
+  dom.fire(filterBtn(dom), 'click', {});
+  dom.fire(menuBtn(dom, 'data-fset', 'cve:1'), 'click', {});
+  assert.strictEqual(dom.focused().getAttribute('data-fset'), 'cve:1');
+});
+
+test('клик мимо меню его закрывает', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { builds: [build('nginx')] })], 'a.json');
+  dom.fire(filterBtn(dom), 'click', {});
+  dom.fire(dom.id('state-rows'), 'click', {});
+  assert.strictEqual(dom.id('filtermenu').hidden, true);
+});
 
 test('кнопка фильтров считает поставленные условия', function () {
   var dom = load();
