@@ -50,9 +50,11 @@
   /* ---------- вкладка «Состояние» ---------- */
 
   function stateDetail(row, q) {
+    /* Метка from-commit сюда не ставится: она уже стоит в колонке меток той
+       же строки, а раскрытие — продолжение строки, а не отдельная карточка,
+       и повторять в нём то, что видно строчкой выше, незачем. */
     const branch = row.branch
       ? `<span class="mono">${hl(row.branch, q)}</span>`
-        + (row.ref_kind === 'commit' ? ` ${markup.markHtml('from-commit')}` : '')
       : '<span class="none">источник неизвестен</span>';
     const dir = row.patch_dir_present === true ? 'есть'
               : (row.patch_dir_present === false ? 'нет' : 'не проверялся');

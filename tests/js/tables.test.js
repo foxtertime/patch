@@ -178,12 +178,12 @@ test('деталь состояния показывает оба источни
   assert.match(out, /<div class="bl">gitlab<\/div>/);
 });
 
-test('сборка с коммита помечена прямо в детали', function () {
-  var out = tables.stateDetail(stateRow({ }), '');
-  assert.doesNotMatch(out, /from-commit/);
+test('метку from-commit деталь не повторяет', function () {
+  /* Она уже стоит в колонке меток той же строки, и вторая такая же внутри
+     раскрытия сообщает то же самое второй раз. */
   var row = stateRow();
   row.ref_kind = 'commit';
-  assert.match(tables.stateDetail(row, ''), /data-filter="from-commit"/);
+  assert.doesNotMatch(tables.stateDetail(row, ''), /from-commit/);
 });
 
 test('блок проблем появляется только когда они есть', function () {
