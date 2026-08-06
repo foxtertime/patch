@@ -35,7 +35,9 @@ function diffRow(over) {
   over = over || {};
   return { name: 'nginx', status: over.status || 'upgraded',
            old_evr: '1.24.0-3.el9', new_evr: '1.24.0-4.el9',
-           old_branch: 'os-9.2', new_branch: 'os-9.3',
+           old_branch: 'os-9.2', new_branch: over.new_branch || 'os-9.3',
+           old_ref_kind: over.old_ref_kind || 'branch',
+           new_ref_kind: over.new_ref_kind || 'branch',
            old_tagged_in: 'os-9.2', new_tagged_in: 'os-9.3',
            old_inherited: false, new_inherited: false,
            old_patches: [], new_patches: [], rpm_rows: [],
@@ -230,6 +232,20 @@ test('в блоке koji стоят все поля билда', function () {
   assert.match(out, /buildinfo\?buildID=1/, 'нет ссылки на билд в koji');
 });
 
+/* Билд из готового SRPM: в GitLab он не бывал вовсе, и блок раскрытия
+   зовётся своим именем — иначе пустые «проект» и «ссылка» в блоке gitlab
+   читались бы как недосмотр. */
+test('билд из SRPM подписан srpm, а блок назван srpm', function () {
+  var row = stateRow();
+  row.ref_kind = 'srpm';
+  row.branch = 'mc-4.8-1.el9.src.rpm';
+  row.project = null;
+  var out = tables.stateDetail(row, '');
+  assert.match(out, /<span class="k">srpm<\/span>/, out);
+  assert.match(out, /<div class="bl">srpm<\/div>/, out);
+  assert.doesNotMatch(out, /<div class="bl">gitlab<\/div>/, out);
+});
+
 test('билд с коммита назван коммитом, а не веткой', function () {
   /* Значение в этой строке — не имя ветки, а хеш; подписать его «веткой»
      значит соврать. Метка from-commit сюда не ставится: она стоит в
@@ -258,6 +274,18 @@ test('сводка стороны диффа несёт всю карточку 
   assert.match(out, /buildID=2/, 'нет ссылки на новый билд');
   assert.match(out, /tree\/os-9\.2/, 'нет ссылки на старую ветку');
   assert.match(out, /tree\/os-9\.3/, 'нет ссылки на новую ветку');
+});
+
+/* Пересобранный из SRPM компонент рядом с прежним, собранным из ветки, —
+   законная пара, и подпись у каждой стороны своя: одна «ветка», другая
+   «srpm». Одним словом их не назвать, не соврав про одну из двух. */
+test('стороны диффа подписаны каждая своим видом источника', function () {
+  var out = tables.diffDetail(diffRow({ old_ref_kind: 'branch',
+                                        new_ref_kind: 'srpm',
+                                        new_branch: 'mc-4.8-1.el9.src.rpm' }),
+                              '', 'os-9.1', 'os-9.4');
+  assert.match(out, /<span class="k">ветка<\/span>/, out);
+  assert.match(out, /<span class="k">srpm<\/span>/, out);
 });
 
 test('сменившийся владелец помечен на стороне «стало»', function () {

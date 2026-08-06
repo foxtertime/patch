@@ -55,9 +55,14 @@
        заставлять читать в двух местах сразу. Метки — исключение: у них своя
        колонка и своя же полоса в раскрытии не нужна.
 
-       Подпись зависит от вида ссылки: значение здесь — либо имя ветки, либо
-       хеш коммита, и назвать хеш веткой значит соврать. */
-    const refName = row.ref_kind === 'commit' ? 'коммит' : 'ветка';
+       Подпись зависит от вида источника: значение здесь — имя ветки, хеш
+       коммита или имя SRPM, и назвать одно другим значит соврать. Блок у
+       сборки из SRPM зовётся своим именем по той же причине: GitLab в ней
+       не участвовал вовсе, а строки «проект» и «ссылка» в нём пустые не по
+       недосмотру. */
+    const srpm = row.ref_kind === 'srpm';
+    const refName = srpm ? 'srpm'
+                  : (row.ref_kind === 'commit' ? 'коммит' : 'ветка');
     const branch = row.branch
       ? `<span class="mono">${hl(row.branch, q)}</span>`
       : '<span class="none">источник неизвестен</span>';
@@ -82,7 +87,7 @@
             : '<span class="none">—</span>')
       + '</div>'
 
-      + `<div class="block">${blockHead('gitlab')}`
+      + `<div class="block">${blockHead(srpm ? 'srpm' : 'gitlab')}`
       + kv('проект', row.project
             ? `<span class="mono">${hl(row.project, q)}</span>`
             : '<span class="none">—</span>')
@@ -170,6 +175,14 @@
     return cls ? `<span class="${cls}">${hl(value, q)}</span>` : hl(value, q);
   }
 
+  /* Чем значение в строке приходится билду: имя ветки, хеш коммита или имя
+     SRPM. Подпись у каждой стороны своя — пересобранный из SRPM компонент
+     рядом с прежним, собранным из ветки, законная пара. */
+  function refName(kind) {
+    if (kind === 'srpm') return 'srpm';
+    return kind === 'commit' ? 'коммит' : 'ветка';
+  }
+
   /* Сводка стороны — полная карточка билда, а не выжимка: «было» и «стало»
      это две карточки одного компонента, и уходить за остальным из раскрытия
      человеку негде. markCls пуст у «было» и назван у «стало».
@@ -187,7 +200,8 @@
                 ? '<span class="note">МСК</span>' : '')
             : '<span class="none">—</span>')
       + kv('владелец', sideValue(s.owner, s.ownerChanged, q, markCls, false))
-      + kv('ветка', sideValue(s.branch, s.branchChanged, q, markCls, true))
+      + kv(refName(s.refKind),
+           sideValue(s.branch, s.branchChanged, q, markCls, true))
       + kv('проект', sideValue(s.project, s.projectChanged, q, markCls, true))
       + kv('ссылки', (s.kojiUrl || s.sourceUrl)
             ? markup.linkHtml(s.kojiUrl, 'koji')
@@ -218,13 +232,13 @@
       taggedIn: row.old_tagged_in, inherited: row.old_inherited,
       owner: row.old_owner, completed: row.old_completed,
       project: row.old_project, kojiUrl: row.old_koji_url,
-      sourceUrl: row.old_source_url }, shared);
+      sourceUrl: row.old_source_url, refKind: row.old_ref_kind }, shared);
     const now = Object.assign({
       evr: row.new_evr, branch: row.new_branch,
       taggedIn: row.new_tagged_in, inherited: row.new_inherited,
       owner: row.new_owner, completed: row.new_completed,
       project: row.new_project, kojiUrl: row.new_koji_url,
-      sourceUrl: row.new_source_url }, shared);
+      sourceUrl: row.new_source_url, refKind: row.new_ref_kind }, shared);
     const oldRpms = markup.rpmSideList(row.rpm_rows, 0);
     const newRpms = markup.rpmSideList(row.rpm_rows, 1);
     return '<div class="sides">'

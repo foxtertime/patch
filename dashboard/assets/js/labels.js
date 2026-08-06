@@ -17,7 +17,8 @@
     "all": "все",
     "has-patch": "с патчами", "problem": "с проблемами",
     "no-patch": "нет каталога PATCH", "no-source": "нет источника",
-    "from-commit": "собран с коммита", "gitlab-error": "ошибка GitLab",
+    "from-commit": "собран с коммита", "from-srpm": "собран из SRPM",
+    "gitlab-error": "ошибка GitLab",
     "internal-error": "внутренняя ошибка",
     "inherited": "унаследован из другого тега",
     "tag-changed": "переехал между тегами",
@@ -36,7 +37,8 @@
   const KNOWN_CLASS = { "autogen": 1, "cve": 1, "sast": 1, "dast": 1,
                         "coverage": 1, "distsuffix": 1, "license": 1, "spec": 1,
                         "changelog": 1, "files": 1, "other": 1 };
-  const CALM_MARKS = { "from-commit": "warn", "no-patch": "calm",
+  const CALM_MARKS = { "from-commit": "warn", "from-srpm": "warn",
+                       "no-patch": "calm",
                        "no-source": "bad", "gitlab-error": "bad",
                        "internal-error": "bad", "inherited": "calm" };
   const STATUS_MARKS = { "added": 1, "removed": 1, "unchanged": 1,
@@ -57,7 +59,7 @@
     state: [
       { id: "classes", label: "классы патчей", keys: null },
       { id: "build", label: "свойства билда",
-        keys: ["has-patch", "inherited", "from-commit"] },
+        keys: ["has-patch", "inherited", "from-commit", "from-srpm"] },
       { id: "trouble", label: "проблемы",
         keys: ["problem", "no-patch", "no-source", "gitlab-error",
                "internal-error"] }

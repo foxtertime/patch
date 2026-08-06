@@ -55,6 +55,8 @@ def marks_of(build, tag):
         marks.add("no-source")
     elif build.source.ref_kind == "commit":
         marks.add("from-commit")
+    elif build.source.ref_kind == "srpm":
+        marks.add("from-srpm")
     if build.patch_dir_present is False:
         marks.add("no-patch")
     for problem in build.problems:
@@ -106,6 +108,22 @@ class InterestingCasesTest(unittest.TestCase):
         # Ветка та же: карточка должна показать переезд проекта, но не
         # выставить метку «сменилась ветка».
         self.assertEqual(old.source.ref, new.source.ref)
+
+    def test_a_component_is_rebuilt_from_a_plain_srpm(self):
+        # Собрать можно и не из git. У такого билда нет ни ветки, ни
+        # каталога PATCH — и это не проблема, а другой способ сборки:
+        # в problems ничего не уезжает.
+        again = snapshot("rich-again.json")
+        build = again.by_name()["zlib"]
+        self.assertEqual(build.source.ref_kind, "srpm")
+        self.assertIsNone(build.source.project)
+        self.assertIsNone(build.patch_dir_present)
+        self.assertEqual(build.problems, [])
+        self.assertIn("from-srpm", marks_of(build, again.tag))
+        # На прежнем конце тот же компонент собран из ветки: пара
+        # «ветка → srpm» и есть то, ради чего случай заведён.
+        before = snapshot("rich-newest.json").by_name()["zlib"]
+        self.assertEqual(before.source.ref_kind, "branch")
 
     def test_a_build_without_an_owner(self):
         build = snapshot("rich-again.json").by_name()["openssl"]

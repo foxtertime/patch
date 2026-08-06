@@ -226,6 +226,34 @@ class CollectTagTest(unittest.TestCase):
         self.assertTrue(build.problems[0].startswith("bad source url"))
         self.assertIsNone(build.patch_dir_present)
 
+    def test_build_from_srpm_is_not_a_broken_url(self):
+        # Собрать можно и не из git, а из готового SRPM. Ветки у такого
+        # билда нет, каталог PATCH читать негде — и в GitLab за ним никто не
+        # ходит, — но это другой способ собрать, а не поломка.
+        tagged = {"os-9.2": [{"build_id": 1, "name": "mc"}]}
+        builds = {
+            1: {"build_id": 1, "task_id": 1, "name": "mc", "version": "4.8",
+                "release": "1.el9", "epoch": None, "nvr": "mc-4.8-1.el9",
+                "owner_name": "builder", "completion_time": "2026-01-01 00:00:00",
+                "extra": {"source": {"original_url":
+                                     "cli-build/1699999999.9/mc-4.8-1.el9.src.rpm"}}},
+        }
+        session = FakeKojiSession(tagged=tagged, builds=builds, rpms={1: []})
+        transport = FakeTransport({})
+        gitlab = GitlabClient(HOSTS, token=None, transport=transport,
+                              sleeper=lambda _s: None)
+        snap = collect_tag("os-9.2", config(), KojiClient(session), gitlab,
+                           jobs=1, now="n")
+        build = snap.by_name()["mc"]
+        self.assertEqual(build.source.ref_kind, "srpm")
+        self.assertEqual(build.source.ref, "mc-4.8-1.el9.src.rpm")
+        self.assertIsNone(build.source.project)
+        self.assertIsNone(build.source.web_url)
+        self.assertEqual(build.problems, [])
+        # «неизвестно», а не «нет патчей»: каталог никто не смотрел.
+        self.assertIsNone(build.patch_dir_present)
+        self.assertEqual(transport.requests, [])
+
     def test_unexpected_gitlab_exception_does_not_abort_collection(self):
         session = FakeKojiSession(tagged=TAGGED, builds=BUILDS, rpms=RPMS)
         koji_client = KojiClient(session)

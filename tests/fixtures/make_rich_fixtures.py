@@ -40,6 +40,18 @@ def src(project, ref, kind="branch"):
                   web_url="https://gl/%s/-/tree/%s" % (project, ref))
 
 
+def srpm(name):
+    """Источник билда, собранного не из git, а из готового SRPM.
+
+    Ни хоста, ни проекта у такого источника нет и быть не может: koji
+    пишет сюда путь загруженного файла. Каталог PATCH читать негде, и
+    patch_dir_present у такого билда остаётся None — «неизвестно», а не
+    «патчей нет».
+    """
+    return Source(raw="cli-build/1730000000.5/" + name, project=None,
+                  ref=name, ref_kind="srpm")
+
+
 def patch(name, cls, cves=()):
     return Patch(path="PATCH/" + name, name=name, cls=cls, cves=list(cves),
                  web_url="https://gl/blob/PATCH/" + name)
@@ -408,8 +420,17 @@ def again_snapshot():
                   source=src("apps/httpd", "abc123", kind="commit"),
                   patch_dir_present=False, patches=[],
                   rpms=["httpd-2.4.62-2.el9.x86_64"]),
-            # не менялся
-            same(prev, "zlib", "os-9.4"),
+            # пересобран руками из готового SRPM: ветки у такого билда
+            # нет, каталог PATCH читать негде, и патчи из строки уходят
+            # вместе с источником. Это не проблема, а другой способ
+            # собрать, и метка в строке говорит именно это
+            Build(nvr="zlib-1.3-3.el9", name="zlib", version="1.3",
+                  release="3.el9", build_id=144, task_id=244,
+                  owner="builder", completed="2026-09-29 07:30:00",
+                  tag_name="os-9.4", tags=["os-9.4"],
+                  source=srpm("zlib-1.3-3.el9.src.rpm"),
+                  patch_dir_present=None, patches=[],
+                  rpms=["zlib-1.3-3.el9.x86_64", "zlib-1.3-3.el9.src"]),
             # не менялся
             same(prev, "vim", "os-9.4", tag_name=None, tags=[]),
             # тот же NVR, но подпакеты пересобраны иначе — «переупакован», и

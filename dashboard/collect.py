@@ -176,6 +176,14 @@ def _attach_patches(build: Build, info: dict, cfg, gitlab_client,
         build.problems.append("bad source url: %s" % exc)
         return
 
+    # Сборка из готового SRPM: ветки нет, каталог PATCH читать негде и не у
+    # кого. Это не проблема билда, а другой способ его собрать, поэтому в
+    # problems ничего не уезжает — вид источника скажет метка в строке.
+    # patch_dir_present остаётся None: «неизвестно», а не «нет патчей».
+    if parsed.ref_kind == "srpm":
+        build.source = Source(raw=raw_url, ref=parsed.ref, ref_kind="srpm")
+        return
+
     build.source = Source(
         raw=raw_url, host=parsed.host, project=parsed.project, ref=parsed.ref,
         ref_kind=parsed.ref_kind,

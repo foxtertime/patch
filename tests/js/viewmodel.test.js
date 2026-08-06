@@ -333,6 +333,16 @@ test('метка билда с коммита', function () {
   assert.ok(rows[0].marks.indexOf('from-commit') !== -1);
 });
 
+/* Собрать можно и не из git: у билда из готового SRPM ветки нет, каталог
+   PATCH читать негде — но источник у него как раз известен, поэтому метка
+   своя, а не «нет источника». */
+test('метка билда из SRPM', function () {
+  var srpm = build('s', { ref: 'mc-4.8-1.el9.src.rpm', ref_kind: 'srpm' });
+  var rows = data([snap('t', [srpm])]).snapshots[0].builds;
+  assert.ok(rows[0].marks.indexOf('from-srpm') !== -1, rows[0].marks.join(','));
+  assert.strictEqual(rows[0].marks.indexOf('no-source'), -1);
+});
+
 test('метка внутренней ошибки', function () {
   // tests/test_render.py: test_internal_error_tag
   var broken = build('bad', { problems: ['internal error: boom'],

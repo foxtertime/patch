@@ -47,6 +47,37 @@ class ParseSourceUrlTest(unittest.TestCase):
         got = parse_source_url("git+ssh://git@h.example/g/r?#origin/origin-fix")
         self.assertEqual(got.ref, "origin-fix")
 
+    def test_srpm_upload_is_a_source_of_its_own(self):
+        # Собрать можно и не из git: koji пишет сюда путь загруженного
+        # SRPM. Ни хоста, ни проекта у такого источника нет, и это не
+        # поломка ссылки, а другой способ собрать билд.
+        got = parse_source_url(
+            "cli-build/1699999999.9/nginx-1.24.0-3.el9.src.rpm")
+        self.assertEqual(got.ref_kind, "srpm")
+        self.assertEqual(got.ref, "nginx-1.24.0-3.el9.src.rpm")
+        self.assertIsNone(got.host)
+        self.assertIsNone(got.project)
+
+    def test_srpm_by_bare_name(self):
+        got = parse_source_url("nginx-1.24.0-3.el9.src.rpm")
+        self.assertEqual(got.ref_kind, "srpm")
+        self.assertEqual(got.ref, "nginx-1.24.0-3.el9.src.rpm")
+
+    def test_srpm_by_url(self):
+        # Именем считаем последний кусок пути: всё, что левее, к патчам
+        # отношения не имеет.
+        got = parse_source_url(
+            "https://hub.example/packages/nginx/nginx-1.24.0-3.el9.src.rpm")
+        self.assertEqual(got.ref_kind, "srpm")
+        self.assertEqual(got.ref, "nginx-1.24.0-3.el9.src.rpm")
+
+    def test_git_url_that_merely_mentions_rpm_stays_git(self):
+        # Правило смотрит на конец имени, а не на вхождение: проект с
+        # «rpm» в названии — обычный git-источник.
+        got = parse_source_url("git+ssh://git@h.example/g/src.rpm.tools?#br")
+        self.assertEqual(got.ref_kind, "branch")
+        self.assertEqual(got.project, "g/src.rpm.tools")
+
     def test_garbage_raises(self):
         for bad in ["", "   ", "not a url", "git+ssh://", "git+ssh://host-only"]:
             with self.assertRaises(SourceUrlError, msg=bad):
