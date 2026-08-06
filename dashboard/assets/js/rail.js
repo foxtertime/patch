@@ -66,9 +66,16 @@
 
        На «Состоянии» чип — выбор из ряда, и aria-pressed говорит, какой
        снапшот открыт. На «Изменениях» нажатого чипа нет: там выбирают не
-       узел, а отрезок, и концы диапазона показаны заливкой. */
-    function stopHtml(at, item, when, here, live, hot) {
-      const cls = `pick${here ? ' on' : ''}`
+       узел, а отрезок, и концы диапазона показаны заливкой.
+
+       Узел, через который диапазон прошёл, помечен отдельно: линия под ним
+       горит, а сам он до сих пор выглядел как всякий невыбранный, и отрезок
+       от os-9.1 до os-9.5 читался как «сравниваются первый и пятый» вместо
+       «а вот эти три между ними в сравнение не попали, но лежат в его
+       сроке». Помечается только рамка: точка внутри — это «здесь вы
+       сейчас», а человек здесь не стоит. */
+    function stopHtml(at, item, when, here, live, hot, inside) {
+      const cls = `pick${here ? ' on' : ''}${inside ? ' inside' : ''}`
         + `${page.anchor() === at ? ' anchor' : ''}`;
       const body = `<span class="node"></span><span class="nm">${esc(item.tag)}`
         + `</span><span class="when">${esc(when)}</span>`;
@@ -114,8 +121,9 @@
                           ends && i > ends[0] && i <= ends[1]);
         }
         const here = ends ? (i === ends[0] || i === ends[1]) : i === st.tag;
+        const inside = Boolean(ends) && i > ends[0] && i < ends[1];
         out += stopHtml(i, items[i], stampOf(items[i].generated), here,
-                        live, items.length > 1);
+                        live, items.length > 1, inside);
       }
       /* Призрак идёт последним и всегда: добавить снапшот можно в любой
          момент, а место, где это делают, не должно ни появляться, ни

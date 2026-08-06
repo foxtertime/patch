@@ -413,6 +413,58 @@ test('выбор снапшота не мешает следующему выб�
                dom.location.hash);
 });
 
+/* Классы чипа по номеру узла: рельс рисуется строкой, и читать её удобнее
+   разобранной. */
+function nodeClass(dom, at) {
+  var re = new RegExp('class="([^"]*)"[^>]*data-node="' + at + '"');
+  var m = re.exec(chain(dom));
+  return m ? m[1] : null;
+}
+
+/* Диапазон проходит не только через свои концы: снапшоты между ними в
+   сравнение не попали, но лежат в его сроке, и рельс их помечает. */
+test('узлы внутри диапазона помечены', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL)], 'a.json');
+  store.add([snap('os-9.2', AUG)], 'b.json');
+  store.add([snap('os-9.3', SEP)], 'c.json');
+  store.add([snap('os-9.4', '2026-10-01T00:00:00+03:00')], 'd.json');
+  pressTab(dom, 'diff');
+  clickNode(dom, 0);
+  clickNode(dom, 2);
+  assert.doesNotMatch(nodeClass(dom, 0), /inside/, nodeClass(dom, 0));
+  assert.match(nodeClass(dom, 1), /inside/, nodeClass(dom, 1));
+  assert.doesNotMatch(nodeClass(dom, 2), /inside/, nodeClass(dom, 2));
+  /* Узел за концом диапазона в него не входит. */
+  assert.doesNotMatch(nodeClass(dom, 3), /inside/, nodeClass(dom, 3));
+});
+
+/* Соседние концы не оставляют между собой ничего, и помечать нечего. */
+test('у соседней пары внутри диапазона пусто', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL)], 'a.json');
+  store.add([snap('os-9.2', AUG)], 'b.json');
+  pressTab(dom, 'diff');
+  clickNode(dom, 0);
+  clickNode(dom, 1);
+  assert.strictEqual(chain(dom).indexOf('inside'), -1, chain(dom));
+});
+
+/* На «Состоянии» диапазона нет вовсе: там открыт один снапшот, и метка
+   принадлежала бы выбору, которого на этой вкладке не делают. */
+test('на «Состоянии» узлы внутри диапазона не помечаются', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL)], 'a.json');
+  store.add([snap('os-9.2', AUG)], 'b.json');
+  store.add([snap('os-9.3', SEP)], 'c.json');
+  pressTab(dom, 'diff');
+  clickNode(dom, 0);
+  clickNode(dom, 2);
+  assert.match(nodeClass(dom, 1), /inside/, nodeClass(dom, 1));
+  pressTab(dom, 'state');
+  assert.strictEqual(chain(dom).indexOf('inside'), -1, chain(dom));
+});
+
 /* Полосы прокрутки под рельсом нет — катят его колесом. Размеров у заглушки
    своих нет, поэтому тесная цепочка задаётся руками: рельсу тысяча
    пикселей, а видно четыреста. */
