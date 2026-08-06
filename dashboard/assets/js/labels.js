@@ -42,6 +42,35 @@
   const STATUS_MARKS = { "added": 1, "removed": 1, "unchanged": 1,
                          "upgraded": 1, "downgraded": 1, "repackaged": 1 };
 
+  /* Группы фильтров: чем признак является, а не где он нарисован. Группа —
+     это и заголовок в меню, и область действия переключателя «все / любой
+     из», поэтому её id уезжает в ссылку и меняться не может.
+
+     Живут они здесь, а не в page.js, по той же причине, что и подписи:
+     «к чему относится этот ключ» — вопрос словаря страницы, а не её
+     состояния.
+
+     keys: null — группа набирается из данных. Классы приходят со снапшотом
+     и уходят вместе с ним, поэтому список собирается на каждый вызов, а не
+     один раз при загрузке. */
+  const GROUPS = {
+    state: [
+      { id: "classes", label: "классы патчей", keys: null },
+      { id: "build", label: "свойства сборки",
+        keys: ["has-patch", "inherited", "from-commit"] },
+      { id: "trouble", label: "проблемы",
+        keys: ["problem", "no-patch", "no-source", "gitlab-error",
+               "internal-error"] }
+    ],
+    diff: [
+      { id: "status", label: "статус",
+        keys: ["added", "removed", "upgraded", "downgraded", "unchanged"] },
+      { id: "change", label: "что изменилось",
+        keys: ["changed", "patches+", "patches-", "repackaged",
+               "branch-changed", "tag-changed"] }
+    ]
+  };
+
   /* Классы патчей задаются конфигом, поэтому подписи для них берём из
      данных. Ключ — тот же slug(), что стоит в метке строки и в карточке
      класса: имя вроде «C++» иначе дало бы три разных ключа и карточку
@@ -87,8 +116,21 @@
     return out;
   }
 
+  /* Порядок классов тот же, что у плашек классов: classOrder начинает с
+     CLASSES, и слаги здесь идут оттуда же. */
+  function groups(tab) {
+    const out = [];
+    for (const group of (GROUPS[tab] || [])) {
+      const keys = group.keys || CLASSES.map((name) => text.slug(name));
+      if (keys.length) {
+        out.push({ id: group.id, label: group.label, keys: keys });
+      }
+    }
+    return out;
+  }
+
   return { setClasses: setClasses, classes: classes, label: label,
-           classCls: classCls, classOrder: classOrder,
+           classCls: classCls, classOrder: classOrder, groups: groups,
            LABELS: LABELS, ARROW: ARROW, KNOWN_CLASS: KNOWN_CLASS,
            CALM_MARKS: CALM_MARKS, STATUS_MARKS: STATUS_MARKS };
 }));
