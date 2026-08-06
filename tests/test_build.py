@@ -197,6 +197,15 @@ class TemplateContractTest(unittest.TestCase):
         self.assertNotRegex(self.html, r"\.gap \{[^}]*position: absolute")
         self.assertNotRegex(self.html, r"\n\.rl \{[^}]*min-width")
 
+    def test_the_only_snapshot_looks_open_like_any_other(self):
+        # Чип единственного снапшота — не кнопка: переключать не на что. Но
+        # открыт он ровно так же, и вид ему нужен тот же — рамка и заливка.
+        # Раньше и то и другое стояло на кнопке с aria-pressed, и рельс из
+        # одного узла показывал третий, нигде больше не встречающийся вид.
+        self.assertRegex(self.html, r"\.pick\.on \{[^}]*border-color: var\(--fg\)")
+        self.assertRegex(self.html,
+                         r"span\.pick\.on[^{]*\{[^}]*background: var\(--card\)")
+
     def test_the_rail_has_no_scrollbar(self):
         # Полосу прокрутки под рельсом заменило колесо мыши; обработчик
         # живёт в rail.js, и без него рельс стал бы непрокручиваемым.
