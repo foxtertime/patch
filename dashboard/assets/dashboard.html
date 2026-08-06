@@ -18,11 +18,6 @@
     </div>
     <div class="chain" id="chain"></div>
   </div>
-  <div class="warnings" id="warnings"></div>
-  <!-- Список ошибок загрузки стоит снаружи «пустого» экрана: как только
-       появились данные, экран прячется, и отказ файла внутри него никто
-       бы не увидел. -->
-  <ul class="problems loaderrors" id="load-errors" role="status"></ul>
   <section id="tab-empty">
     <div class="drop" id="drop">
       <p class="dropmain">Перетащите снапшоты сюда</p>
@@ -83,6 +78,11 @@
 </div>
 <button type="button" id="totop" hidden aria-label="Наверх"
         data-tip="Вернуться к началу страницы">↑</button>
+<!-- Сообщения лежат поверх страницы, а не в её потоке, и снаружи «пустого»
+     экрана: как только появились данные, экран прячется, и отказ файла
+     внутри него никто бы не увидел. Строка же в потоке увозила таблицу
+     сначала вниз, а через десять секунд обратно. -->
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
 <div id="tip" role="tooltip"></div>
 <!--__SCRIPTS__-->
 </body>
