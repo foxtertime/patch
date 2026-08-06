@@ -34,6 +34,12 @@ patch_classes:
   # правит он спек, но затем, чтобы переклеить суффикс сборки, а класс
   # отвечает на вопрос «зачем патч». Расширение в шаблоне обязательно.
   - { name: DISTSUFFIX, pattern: '(?i)distsuffix\.patch' }
+  # Лицензия: license.patch, nginx-license.patch, LICENSE.txt. Стоит перед
+  # SPEC по той же причине: правит такой патч обычно поле License в спеке,
+  # но затем, чтобы разобраться с лицензией. Расширение не нужно — файл с
+  # «license» в имени про лицензию и есть; британское licence ловится тем
+  # же правилом.
+  - { name: LICENSE, pattern: '(?i)licen[cs]e' }
   # Патч на спек: nginx.spec.patch, httpd-2.4.62.spec.patch.new. Точки в
   # шаблоне обязательны, иначе сюда уедут specialcase.patch и respec-fix.patch.
   # Правило стоит после CVE/SAST/DAST: спек-патч, закрывающий CVE, — прежде

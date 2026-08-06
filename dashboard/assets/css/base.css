@@ -32,6 +32,12 @@
      же. Синий стоит между индиго и циановым, но отличается от обоих
      насыщенностью. */
   --distsuffix: #60a5fa;
+  /* Одиннадцатый — зелёный: незанятым оставался только этот промежуток
+     круга, между лаймовым покрытия и бирюзовым файлов. Взят глубже и
+     насыщеннее, чем зелёный «прибавилось», чтобы метка license и метка
+     patches+ не читались одной; в полоске состава они не встречаются
+     вовсе — там стоят одни классы патчей. */
+  --license: #22c55e;
   /* высоту панели фильтров проставляет JS — от неё зависит смещение
      «липкой» шапки таблицы. Значение здесь — запасное, до первого замера. */
   --controls-h: 3.4rem;
@@ -103,6 +109,8 @@ h1 .ver { color: var(--muted); font-size: .68em; font-weight: 400;
 .meter i.c-coverage { color: var(--coverage); }
 .card .l.c-distsuffix, .mark.c-distsuffix, .pgroup.c-distsuffix,
 .meter i.c-distsuffix { color: var(--distsuffix); }
+.card .l.c-license, .mark.c-license, .pgroup.c-license,
+.meter i.c-license { color: var(--license); }
 .card .l.c-spec, .mark.c-spec, .pgroup.c-spec, .meter i.c-spec { color: var(--spec); }
 .card .l.c-changelog, .mark.c-changelog, .pgroup.c-changelog,
 .meter i.c-changelog { color: var(--changelog); }

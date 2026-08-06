@@ -384,6 +384,7 @@
    "DAST",
    "COVERAGE",
    "DISTSUFFIX",
+   "LICENSE",
    "SPEC",
    "CHANGELOG",
    "FILES",

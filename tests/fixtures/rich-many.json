@@ -411,6 +411,13 @@
       "web_url": "https://gl/blob/PATCH/chromium-distsuffix.patch"
      },
      {
+      "class": "LICENSE",
+      "cves": [],
+      "name": "chromium-license.patch",
+      "path": "PATCH/chromium-license.patch",
+      "web_url": "https://gl/blob/PATCH/chromium-license.patch"
+     },
+     {
       "class": "SPEC",
       "cves": [],
       "name": "chromium.spec.patch",
@@ -708,11 +715,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "SPEC",
+      "class": "LICENSE",
       "cves": [],
-      "name": "spec-make.patch",
-      "path": "PATCH/spec-make.patch",
-      "web_url": "https://gl/blob/PATCH/spec-make.patch"
+      "name": "license-make.patch",
+      "path": "PATCH/license-make.patch",
+      "web_url": "https://gl/blob/PATCH/license-make.patch"
      },
      {
       "class": "SPEC",
@@ -788,11 +795,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "FILES",
+      "class": "CHANGELOG",
       "cves": [],
-      "name": "files-perl.patch",
-      "path": "PATCH/files-perl.patch",
-      "web_url": "https://gl/blob/PATCH/files-perl.patch"
+      "name": "changelog-perl.patch",
+      "path": "PATCH/changelog-perl.patch",
+      "web_url": "https://gl/blob/PATCH/changelog-perl.patch"
      }
     ],
     "problems": [],
@@ -826,11 +833,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "other",
+      "class": "FILES",
       "cves": [],
-      "name": "other-ruby.patch",
-      "path": "PATCH/other-ruby.patch",
-      "web_url": "https://gl/blob/PATCH/other-ruby.patch"
+      "name": "files-ruby.patch",
+      "path": "PATCH/files-ruby.patch",
+      "web_url": "https://gl/blob/PATCH/files-ruby.patch"
      }
     ],
     "problems": [],
@@ -933,11 +940,13 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "SAST",
-      "cves": [],
-      "name": "sast-nodejs.patch",
-      "path": "PATCH/sast-nodejs.patch",
-      "web_url": "https://gl/blob/PATCH/sast-nodejs.patch"
+      "class": "CVE",
+      "cves": [
+       "CVE-2025-5012"
+      ],
+      "name": "CVE-2025-5012.patch",
+      "path": "PATCH/CVE-2025-5012.patch",
+      "web_url": "https://gl/blob/PATCH/CVE-2025-5012.patch"
      },
      {
       "class": "SPEC",
@@ -1002,11 +1011,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "COVERAGE",
+      "class": "DAST",
       "cves": [],
-      "name": "coverage-lua.patch",
-      "path": "PATCH/coverage-lua.patch",
-      "web_url": "https://gl/blob/PATCH/coverage-lua.patch"
+      "name": "dast-lua.patch",
+      "path": "PATCH/dast-lua.patch",
+      "web_url": "https://gl/blob/PATCH/dast-lua.patch"
      }
     ],
     "problems": [],
@@ -1105,11 +1114,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "CHANGELOG",
+      "class": "LICENSE",
       "cves": [],
-      "name": "changelog-krb5.patch",
-      "path": "PATCH/changelog-krb5.patch",
-      "web_url": "https://gl/blob/PATCH/changelog-krb5.patch"
+      "name": "license-krb5.patch",
+      "path": "PATCH/license-krb5.patch",
+      "web_url": "https://gl/blob/PATCH/license-krb5.patch"
      }
     ],
     "problems": [],
@@ -1145,11 +1154,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "FILES",
+      "class": "SPEC",
       "cves": [],
-      "name": "files-pam.patch",
-      "path": "PATCH/files-pam.patch",
-      "web_url": "https://gl/blob/PATCH/files-pam.patch"
+      "name": "spec-pam.patch",
+      "path": "PATCH/spec-pam.patch",
+      "web_url": "https://gl/blob/PATCH/spec-pam.patch"
      },
      {
       "class": "SPEC",
@@ -1227,11 +1236,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "AUTOGEN",
+      "class": "FILES",
       "cves": [],
-      "name": "autogen-sudo.patch",
-      "path": "PATCH/autogen-sudo.patch",
-      "web_url": "https://gl/blob/PATCH/autogen-sudo.patch"
+      "name": "files-sudo.patch",
+      "path": "PATCH/files-sudo.patch",
+      "web_url": "https://gl/blob/PATCH/files-sudo.patch"
      }
     ],
     "problems": [],
@@ -1265,13 +1274,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "CVE",
-      "cves": [
-       "CVE-2025-5021"
-      ],
-      "name": "CVE-2025-5021.patch",
-      "path": "PATCH/CVE-2025-5021.patch",
-      "web_url": "https://gl/blob/PATCH/CVE-2025-5021.patch"
+      "class": "other",
+      "cves": [],
+      "name": "other-audit.patch",
+      "path": "PATCH/other-audit.patch",
+      "web_url": "https://gl/blob/PATCH/other-audit.patch"
      }
     ],
     "problems": [],
@@ -1366,11 +1373,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "COVERAGE",
+      "class": "SAST",
       "cves": [],
-      "name": "coverage-libselinux.patch",
-      "path": "PATCH/coverage-libselinux.patch",
-      "web_url": "https://gl/blob/PATCH/coverage-libselinux.patch"
+      "name": "sast-libselinux.patch",
+      "path": "PATCH/sast-libselinux.patch",
+      "web_url": "https://gl/blob/PATCH/sast-libselinux.patch"
      },
      {
       "class": "SPEC",
@@ -1443,11 +1450,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "SPEC",
+      "class": "COVERAGE",
       "cves": [],
-      "name": "spec-rpm.patch",
-      "path": "PATCH/spec-rpm.patch",
-      "web_url": "https://gl/blob/PATCH/spec-rpm.patch"
+      "name": "coverage-rpm.patch",
+      "path": "PATCH/coverage-rpm.patch",
+      "web_url": "https://gl/blob/PATCH/coverage-rpm.patch"
      }
     ],
     "problems": [],
@@ -1546,11 +1553,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "other",
+      "class": "SPEC",
       "cves": [],
-      "name": "other-librepo.patch",
-      "path": "PATCH/other-librepo.patch",
-      "web_url": "https://gl/blob/PATCH/other-librepo.patch"
+      "name": "spec-librepo.patch",
+      "path": "PATCH/spec-librepo.patch",
+      "web_url": "https://gl/blob/PATCH/spec-librepo.patch"
      }
     ],
     "problems": [],
@@ -1585,11 +1592,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "AUTOGEN",
+      "class": "CHANGELOG",
       "cves": [],
-      "name": "autogen-createrepo_c.patch",
-      "path": "PATCH/autogen-createrepo_c.patch",
-      "web_url": "https://gl/blob/PATCH/autogen-createrepo_c.patch"
+      "name": "changelog-createrepo_c.patch",
+      "path": "PATCH/changelog-createrepo_c.patch",
+      "web_url": "https://gl/blob/PATCH/changelog-createrepo_c.patch"
      },
      {
       "class": "SPEC",
@@ -1661,11 +1668,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "SAST",
+      "class": "other",
       "cves": [],
-      "name": "sast-sqlite.patch",
-      "path": "PATCH/sast-sqlite.patch",
-      "web_url": "https://gl/blob/PATCH/sast-sqlite.patch"
+      "name": "other-sqlite.patch",
+      "path": "PATCH/other-sqlite.patch",
+      "web_url": "https://gl/blob/PATCH/other-sqlite.patch"
      }
     ],
     "problems": [],
@@ -1699,11 +1706,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "DAST",
+      "class": "AUTOGEN",
       "cves": [],
-      "name": "dast-libxml2.patch",
-      "path": "PATCH/dast-libxml2.patch",
-      "web_url": "https://gl/blob/PATCH/dast-libxml2.patch"
+      "name": "autogen-libxml2.patch",
+      "path": "PATCH/autogen-libxml2.patch",
+      "web_url": "https://gl/blob/PATCH/autogen-libxml2.patch"
      }
     ],
     "problems": [
@@ -1805,11 +1812,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "SPEC",
+      "class": "DAST",
       "cves": [],
-      "name": "spec-json-c.patch",
-      "path": "PATCH/spec-json-c.patch",
-      "web_url": "https://gl/blob/PATCH/spec-json-c.patch"
+      "name": "dast-json-c.patch",
+      "path": "PATCH/dast-json-c.patch",
+      "web_url": "https://gl/blob/PATCH/dast-json-c.patch"
      },
      {
       "class": "SPEC",
@@ -1881,11 +1888,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "FILES",
+      "class": "DISTSUFFIX",
       "cves": [],
-      "name": "files-openssh.patch",
-      "path": "PATCH/files-openssh.patch",
-      "web_url": "https://gl/blob/PATCH/files-openssh.patch"
+      "name": "distsuffix-openssh.patch",
+      "path": "PATCH/distsuffix-openssh.patch",
+      "web_url": "https://gl/blob/PATCH/distsuffix-openssh.patch"
      }
     ],
     "problems": [],
@@ -1978,13 +1985,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "CVE",
-      "cves": [
-       "CVE-2025-5041"
-      ],
-      "name": "CVE-2025-5041.patch",
-      "path": "PATCH/CVE-2025-5041.patch",
-      "web_url": "https://gl/blob/PATCH/CVE-2025-5041.patch"
+      "class": "CHANGELOG",
+      "cves": [],
+      "name": "changelog-libgcrypt.patch",
+      "path": "PATCH/changelog-libgcrypt.patch",
+      "web_url": "https://gl/blob/PATCH/changelog-libgcrypt.patch"
      }
     ],
     "problems": [],
@@ -2019,11 +2024,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "SAST",
+      "class": "FILES",
       "cves": [],
-      "name": "sast-gpgme.patch",
-      "path": "PATCH/sast-gpgme.patch",
-      "web_url": "https://gl/blob/PATCH/sast-gpgme.patch"
+      "name": "files-gpgme.patch",
+      "path": "PATCH/files-gpgme.patch",
+      "web_url": "https://gl/blob/PATCH/files-gpgme.patch"
      },
      {
       "class": "SPEC",
@@ -2099,11 +2104,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "COVERAGE",
+      "class": "AUTOGEN",
       "cves": [],
-      "name": "coverage-postgresql.patch",
-      "path": "PATCH/coverage-postgresql.patch",
-      "web_url": "https://gl/blob/PATCH/coverage-postgresql.patch"
+      "name": "autogen-postgresql.patch",
+      "path": "PATCH/autogen-postgresql.patch",
+      "web_url": "https://gl/blob/PATCH/autogen-postgresql.patch"
      }
     ],
     "problems": [
@@ -2140,11 +2145,13 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "DISTSUFFIX",
-      "cves": [],
-      "name": "distsuffix-mariadb.patch",
-      "path": "PATCH/distsuffix-mariadb.patch",
-      "web_url": "https://gl/blob/PATCH/distsuffix-mariadb.patch"
+      "class": "CVE",
+      "cves": [
+       "CVE-2025-5045"
+      ],
+      "name": "CVE-2025-5045.patch",
+      "path": "PATCH/CVE-2025-5045.patch",
+      "web_url": "https://gl/blob/PATCH/CVE-2025-5045.patch"
      }
     ],
     "problems": [],
@@ -2245,11 +2252,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "FILES",
+      "class": "COVERAGE",
       "cves": [],
-      "name": "files-rabbitmq-server.patch",
-      "path": "PATCH/files-rabbitmq-server.patch",
-      "web_url": "https://gl/blob/PATCH/files-rabbitmq-server.patch"
+      "name": "coverage-rabbitmq-server.patch",
+      "path": "PATCH/coverage-rabbitmq-server.patch",
+      "web_url": "https://gl/blob/PATCH/coverage-rabbitmq-server.patch"
      },
      {
       "class": "SPEC",
@@ -2314,11 +2321,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "AUTOGEN",
+      "class": "LICENSE",
       "cves": [],
-      "name": "autogen-java-17-openjdk.patch",
-      "path": "PATCH/autogen-java-17-openjdk.patch",
-      "web_url": "https://gl/blob/PATCH/autogen-java-17-openjdk.patch"
+      "name": "license-java-17-openjdk.patch",
+      "path": "PATCH/license-java-17-openjdk.patch",
+      "web_url": "https://gl/blob/PATCH/license-java-17-openjdk.patch"
      }
     ],
     "problems": [],
@@ -2418,11 +2425,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "DAST",
+      "class": "FILES",
       "cves": [],
-      "name": "dast-log4j.patch",
-      "path": "PATCH/dast-log4j.patch",
-      "web_url": "https://gl/blob/PATCH/dast-log4j.patch"
+      "name": "files-log4j.patch",
+      "path": "PATCH/files-log4j.patch",
+      "web_url": "https://gl/blob/PATCH/files-log4j.patch"
      }
     ],
     "problems": [],
@@ -2457,11 +2464,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "COVERAGE",
+      "class": "other",
       "cves": [],
-      "name": "coverage-dbus.patch",
-      "path": "PATCH/coverage-dbus.patch",
-      "web_url": "https://gl/blob/PATCH/coverage-dbus.patch"
+      "name": "other-dbus.patch",
+      "path": "PATCH/other-dbus.patch",
+      "web_url": "https://gl/blob/PATCH/other-dbus.patch"
      },
      {
       "class": "SPEC",
@@ -2539,11 +2546,13 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "SPEC",
-      "cves": [],
-      "name": "spec-udisks2.patch",
-      "path": "PATCH/spec-udisks2.patch",
-      "web_url": "https://gl/blob/PATCH/spec-udisks2.patch"
+      "class": "CVE",
+      "cves": [
+       "CVE-2025-5056"
+      ],
+      "name": "CVE-2025-5056.patch",
+      "path": "PATCH/CVE-2025-5056.patch",
+      "web_url": "https://gl/blob/PATCH/CVE-2025-5056.patch"
      }
     ],
     "problems": [],
@@ -2577,11 +2586,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "CHANGELOG",
+      "class": "SAST",
       "cves": [],
-      "name": "changelog-upower.patch",
-      "path": "PATCH/changelog-upower.patch",
-      "web_url": "https://gl/blob/PATCH/changelog-upower.patch"
+      "name": "sast-upower.patch",
+      "path": "PATCH/sast-upower.patch",
+      "web_url": "https://gl/blob/PATCH/sast-upower.patch"
      }
     ],
     "problems": [
@@ -2677,11 +2686,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "AUTOGEN",
+      "class": "DISTSUFFIX",
       "cves": [],
-      "name": "autogen-iproute.patch",
-      "path": "PATCH/autogen-iproute.patch",
-      "web_url": "https://gl/blob/PATCH/autogen-iproute.patch"
+      "name": "distsuffix-iproute.patch",
+      "path": "PATCH/distsuffix-iproute.patch",
+      "web_url": "https://gl/blob/PATCH/distsuffix-iproute.patch"
      },
      {
       "class": "SPEC",
@@ -2753,11 +2762,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "SAST",
+      "class": "SPEC",
       "cves": [],
-      "name": "sast-nftables.patch",
-      "path": "PATCH/sast-nftables.patch",
-      "web_url": "https://gl/blob/PATCH/sast-nftables.patch"
+      "name": "spec-nftables.patch",
+      "path": "PATCH/spec-nftables.patch",
+      "web_url": "https://gl/blob/PATCH/spec-nftables.patch"
      }
     ],
     "problems": [],
@@ -2856,11 +2865,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "DISTSUFFIX",
+      "class": "other",
       "cves": [],
-      "name": "distsuffix-chrony.patch",
-      "path": "PATCH/distsuffix-chrony.patch",
-      "web_url": "https://gl/blob/PATCH/distsuffix-chrony.patch"
+      "name": "other-chrony.patch",
+      "path": "PATCH/other-chrony.patch",
+      "web_url": "https://gl/blob/PATCH/other-chrony.patch"
      }
     ],
     "problems": [],
@@ -2895,11 +2904,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "SPEC",
+      "class": "AUTOGEN",
       "cves": [],
-      "name": "spec-grub2.patch",
-      "path": "PATCH/spec-grub2.patch",
-      "web_url": "https://gl/blob/PATCH/spec-grub2.patch"
+      "name": "autogen-grub2.patch",
+      "path": "PATCH/autogen-grub2.patch",
+      "web_url": "https://gl/blob/PATCH/autogen-grub2.patch"
      },
      {
       "class": "SPEC",
@@ -2971,11 +2980,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "FILES",
+      "class": "SAST",
       "cves": [],
-      "name": "files-dracut.patch",
-      "path": "PATCH/files-dracut.patch",
-      "web_url": "https://gl/blob/PATCH/files-dracut.patch"
+      "name": "sast-dracut.patch",
+      "path": "PATCH/sast-dracut.patch",
+      "web_url": "https://gl/blob/PATCH/sast-dracut.patch"
      }
     ],
     "problems": [],
@@ -3009,11 +3018,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "other",
+      "class": "DAST",
       "cves": [],
-      "name": "other-kmod.patch",
-      "path": "PATCH/other-kmod.patch",
-      "web_url": "https://gl/blob/PATCH/other-kmod.patch"
+      "name": "dast-kmod.patch",
+      "path": "PATCH/dast-kmod.patch",
+      "web_url": "https://gl/blob/PATCH/dast-kmod.patch"
      }
     ],
     "problems": [],
@@ -3115,11 +3124,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "SAST",
+      "class": "LICENSE",
       "cves": [],
-      "name": "sast-e2fsprogs.patch",
-      "path": "PATCH/sast-e2fsprogs.patch",
-      "web_url": "https://gl/blob/PATCH/sast-e2fsprogs.patch"
+      "name": "license-e2fsprogs.patch",
+      "path": "PATCH/license-e2fsprogs.patch",
+      "web_url": "https://gl/blob/PATCH/license-e2fsprogs.patch"
      },
      {
       "class": "SPEC",
@@ -3192,11 +3201,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "COVERAGE",
+      "class": "CHANGELOG",
       "cves": [],
-      "name": "coverage-btrfs-progs.patch",
-      "path": "PATCH/coverage-btrfs-progs.patch",
-      "web_url": "https://gl/blob/PATCH/coverage-btrfs-progs.patch"
+      "name": "changelog-btrfs-progs.patch",
+      "path": "PATCH/changelog-btrfs-progs.patch",
+      "web_url": "https://gl/blob/PATCH/changelog-btrfs-progs.patch"
      }
     ],
     "problems": [],
@@ -3288,11 +3297,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "CHANGELOG",
+      "class": "AUTOGEN",
       "cves": [],
-      "name": "changelog-tar.patch",
-      "path": "PATCH/changelog-tar.patch",
-      "web_url": "https://gl/blob/PATCH/changelog-tar.patch"
+      "name": "autogen-tar.patch",
+      "path": "PATCH/autogen-tar.patch",
+      "web_url": "https://gl/blob/PATCH/autogen-tar.patch"
      }
     ],
     "problems": [
@@ -3329,11 +3338,13 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "FILES",
-      "cves": [],
-      "name": "files-gzip.patch",
-      "path": "PATCH/files-gzip.patch",
-      "web_url": "https://gl/blob/PATCH/files-gzip.patch"
+      "class": "CVE",
+      "cves": [
+       "CVE-2025-5078"
+      ],
+      "name": "CVE-2025-5078.patch",
+      "path": "PATCH/CVE-2025-5078.patch",
+      "web_url": "https://gl/blob/PATCH/CVE-2025-5078.patch"
      },
      {
       "class": "SPEC",
@@ -3409,11 +3420,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "AUTOGEN",
+      "class": "DAST",
       "cves": [],
-      "name": "autogen-xz.patch",
-      "path": "PATCH/autogen-xz.patch",
-      "web_url": "https://gl/blob/PATCH/autogen-xz.patch"
+      "name": "dast-xz.patch",
+      "path": "PATCH/dast-xz.patch",
+      "web_url": "https://gl/blob/PATCH/dast-xz.patch"
      }
     ],
     "problems": [],
@@ -3448,13 +3459,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "CVE",
-      "cves": [
-       "CVE-2025-5081"
-      ],
-      "name": "CVE-2025-5081.patch",
-      "path": "PATCH/CVE-2025-5081.patch",
-      "web_url": "https://gl/blob/PATCH/CVE-2025-5081.patch"
+      "class": "COVERAGE",
+      "cves": [],
+      "name": "coverage-zstd.patch",
+      "path": "PATCH/coverage-zstd.patch",
+      "web_url": "https://gl/blob/PATCH/coverage-zstd.patch"
      }
     ],
     "problems": [],
@@ -3556,11 +3565,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "COVERAGE",
+      "class": "SPEC",
       "cves": [],
-      "name": "coverage-vim-enhanced.patch",
-      "path": "PATCH/coverage-vim-enhanced.patch",
-      "web_url": "https://gl/blob/PATCH/coverage-vim-enhanced.patch"
+      "name": "spec-vim-enhanced.patch",
+      "path": "PATCH/spec-vim-enhanced.patch",
+      "web_url": "https://gl/blob/PATCH/spec-vim-enhanced.patch"
      },
      {
       "class": "SPEC",
@@ -3625,11 +3634,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "SPEC",
+      "class": "FILES",
       "cves": [],
-      "name": "spec-nano.patch",
-      "path": "PATCH/spec-nano.patch",
-      "web_url": "https://gl/blob/PATCH/spec-nano.patch"
+      "name": "files-nano.patch",
+      "path": "PATCH/files-nano.patch",
+      "web_url": "https://gl/blob/PATCH/files-nano.patch"
      }
     ],
     "problems": [],
@@ -3731,11 +3740,13 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "other",
-      "cves": [],
-      "name": "other-sed.patch",
-      "path": "PATCH/other-sed.patch",
-      "web_url": "https://gl/blob/PATCH/other-sed.patch"
+      "class": "CVE",
+      "cves": [
+       "CVE-2025-5089"
+      ],
+      "name": "CVE-2025-5089.patch",
+      "path": "PATCH/CVE-2025-5089.patch",
+      "web_url": "https://gl/blob/PATCH/CVE-2025-5089.patch"
      }
     ],
     "problems": [],
@@ -3770,11 +3781,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "AUTOGEN",
+      "class": "SAST",
       "cves": [],
-      "name": "autogen-gawk.patch",
-      "path": "PATCH/autogen-gawk.patch",
-      "web_url": "https://gl/blob/PATCH/autogen-gawk.patch"
+      "name": "sast-gawk.patch",
+      "path": "PATCH/sast-gawk.patch",
+      "web_url": "https://gl/blob/PATCH/sast-gawk.patch"
      },
      {
       "class": "SPEC",
@@ -3850,11 +3861,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "SAST",
+      "class": "COVERAGE",
       "cves": [],
-      "name": "sast-diffutils.patch",
-      "path": "PATCH/sast-diffutils.patch",
-      "web_url": "https://gl/blob/PATCH/sast-diffutils.patch"
+      "name": "coverage-diffutils.patch",
+      "path": "PATCH/coverage-diffutils.patch",
+      "web_url": "https://gl/blob/PATCH/coverage-diffutils.patch"
      }
     ],
     "problems": [],
@@ -3888,11 +3899,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "DAST",
+      "class": "DISTSUFFIX",
       "cves": [],
-      "name": "dast-patch.patch",
-      "path": "PATCH/dast-patch.patch",
-      "web_url": "https://gl/blob/PATCH/dast-patch.patch"
+      "name": "distsuffix-patch.patch",
+      "path": "PATCH/distsuffix-patch.patch",
+      "web_url": "https://gl/blob/PATCH/distsuffix-patch.patch"
      }
     ],
     "problems": [],
@@ -3986,11 +3997,11 @@
     "patch_dir_present": true,
     "patches": [
      {
-      "class": "SPEC",
+      "class": "CHANGELOG",
       "cves": [],
-      "name": "spec-procps-ng.patch",
-      "path": "PATCH/spec-procps-ng.patch",
-      "web_url": "https://gl/blob/PATCH/spec-procps-ng.patch"
+      "name": "changelog-procps-ng.patch",
+      "path": "PATCH/changelog-procps-ng.patch",
+      "web_url": "https://gl/blob/PATCH/changelog-procps-ng.patch"
      },
      {
       "class": "SPEC",
@@ -4035,6 +4046,7 @@
    "DAST",
    "COVERAGE",
    "DISTSUFFIX",
+   "LICENSE",
    "SPEC",
    "CHANGELOG",
    "FILES",

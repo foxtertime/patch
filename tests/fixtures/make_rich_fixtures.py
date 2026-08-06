@@ -26,6 +26,12 @@ CLASSES = ["AUTOGEN", "CVE", "SAST", "DAST", "COVERAGE", "SPEC",
 CLASSES_WITH_DISTSUFFIX = ["AUTOGEN", "CVE", "SAST", "DAST", "COVERAGE",
                            "DISTSUFFIX", "SPEC", "CHANGELOG", "FILES",
                            "other"]
+# У пятого и дальше — свой: LICENSE появился ещё позже DISTSUFFIX, и в
+# снапшотах, собранных до него, его нет. Так же выглядит и жизнь: снапшоты
+# копятся годами, а классы в дашборд добавляют по ходу.
+CLASSES_WITH_LICENSE = ["AUTOGEN", "CVE", "SAST", "DAST", "COVERAGE",
+                        "DISTSUFFIX", "LICENSE", "SPEC", "CHANGELOG",
+                        "FILES", "other"]
 
 
 def src(project, ref, kind="branch"):
@@ -367,7 +373,7 @@ def again_snapshot():
     return Snapshot(
         tag="os-9.4", generated="2026-10-01T09:00:00+03:00",
         koji_hub="https://hub/kojihub", koji_web="https://hub/koji",
-        patch_classes=list(CLASSES_WITH_DISTSUFFIX),
+        patch_classes=list(CLASSES_WITH_LICENSE),
         builds=[
             # пересобран внутри того же тега: релиз вырос, закрылась ещё
             # одна дыра
@@ -450,7 +456,7 @@ def mirror_snapshot():
     return Snapshot(
         tag="os-9.5", generated="2026-10-15T12:00:00+03:00",
         koji_hub="https://mirror/kojihub", koji_web="https://mirror/koji",
-        patch_classes=list(CLASSES_WITH_DISTSUFFIX),
+        patch_classes=list(CLASSES_WITH_LICENSE),
         builds=[
             # версия выросла
             Build(nvr="nginx-1.27.0-1.el9", name="nginx", version="1.27.0",
@@ -498,7 +504,7 @@ def wide_snapshot():
     return Snapshot(
         tag="os-9.6", generated="2026-11-01T00:00:00+03:00",
         koji_hub="https://hub/kojihub", koji_web="https://hub/koji",
-        patch_classes=list(CLASSES_WITH_DISTSUFFIX),
+        patch_classes=list(CLASSES_WITH_LICENSE),
         builds=[
             same(prev, "nginx", "os-9.6"),
             same(prev, "httpd", "os-9.6", tag_name="os-9.4",
@@ -526,6 +532,7 @@ def wide_snapshot():
                            patch("dast-chromium-fuzz.patch", "DAST"),
                            patch("coverage-chromium.patch", "COVERAGE"),
                            patch("chromium-distsuffix.patch", "DISTSUFFIX"),
+                           patch("chromium-license.patch", "LICENSE"),
                            patch("chromium.spec.patch", "SPEC"),
                            patch("changelog.yaml", "CHANGELOG"),
                            patch("chromium-131.0.6778.204.tar.xz", "FILES"),
@@ -607,7 +614,7 @@ def many_builds():
         # патчей», а «неизвестно», и патчей у неё не бывает вовсе.
         has_dir = None if source is None else i % 4 != 3
         if has_dir and i % 3 != 1:
-            cls = CLASSES_WITH_DISTSUFFIX[i % len(CLASSES_WITH_DISTSUFFIX)]
+            cls = CLASSES_WITH_LICENSE[i % len(CLASSES_WITH_LICENSE)]
             if cls == "CVE":
                 patches.append(patch("CVE-2025-%04d.patch" % (5000 + i), "CVE",
                                      ["CVE-2025-%04d" % (5000 + i)]))
@@ -664,7 +671,7 @@ def many_snapshot():
     return Snapshot(
         tag="os-9.7", generated="2026-12-01T00:00:00+03:00",
         koji_hub="https://hub/kojihub", koji_web="https://hub/koji",
-        patch_classes=list(CLASSES_WITH_DISTSUFFIX),
+        patch_classes=list(CLASSES_WITH_LICENSE),
         builds=builds + many_builds())
 
 

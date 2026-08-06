@@ -4,8 +4,8 @@
 (с учётом наследования тегов), по `extra.source.original_url` определяет
 ветку GitLab, с которой собран каждый билд, читает в этой ветке каталог
 `PATCH`, классифицирует найденные файлы (AUTOGEN / CVE / SAST / DAST /
-COVERAGE / DISTSUFFIX / SPEC / CHANGELOG / FILES / other) и показывает всё это в
-HTML-дашборде с вкладкой «Состояние» по каждому тегу и вкладкой «Изменения»,
+COVERAGE / DISTSUFFIX / LICENSE / SPEC / CHANGELOG / FILES / other) и
+показывает всё это в HTML-дашборде с вкладкой «Состояние» по каждому тегу и вкладкой «Изменения»,
 сравнивающей теги между собой.
 
 Данные и представление в проекте разделены, и делают их разные команды.
@@ -184,7 +184,9 @@ os-9.4 честно говорит «не изменилось», пока св�
 первых трёх его нет — их `patch_classes` оставлен прежним нарочно, из них
 порождён эталон `page-data.golden.json`, пересобрать который уже нечем.
 Так же выглядела бы страница, на которую положили снапшоты, собранные
-разными версиями dashboard: класс, известный не всем, дописывается в конец.
+разными версиями dashboard: класс, известный не всем, дописывается в
+конец. Тем же хвостом встаёт и LICENSE — он появился ещё позже, и его
+знают только четыре последних снапшота.
 
 Рядом лежат `snapshot-os-9.1.json` и `snapshot-os-9.2.json`: они старого
 формата, без `patch_classes` и тегов билдов, и годятся разве что затем,
@@ -252,7 +254,7 @@ python3 -m dashboard page -o dashboard.html
 | `gitlab.hosts.<host>.api` | да для каждого описанного хоста | — | база REST v4, например `https://gitlab.example.com/api/v4` |
 | `gitlab.hosts.<host>.web` | нет | `api` до `/api/...` | база для веб-ссылок на дерево и файлы репозитория |
 | `patch_dir` | нет | `PATCH` | имя каталога патчей в корне репозитория; можно перекрыть `--patch-dir` |
-| `patch_classes` | нет | правила для AUTOGEN, CVE, SAST, DAST, COVERAGE, DISTSUFFIX, SPEC, CHANGELOG, FILES + `other: '.*'` | список правил `{name, pattern}` — регулярка по имени файла патча → класс |
+| `patch_classes` | нет | правила для AUTOGEN, CVE, SAST, DAST, COVERAGE, DISTSUFFIX, LICENSE, SPEC, CHANGELOG, FILES + `other: '.*'` | список правил `{name, pattern}` — регулярка по имени файла патча → класс |
 
 Правила `patch_classes` применяются по порядку, побеждает первое совпадение
 (`re.search`, без привязки к началу строки). Первым идёт AUTOGEN — имена,
@@ -277,6 +279,11 @@ DISTSUFFIX — по `distsuffix.patch` (`nginx-distsuffix.patch`,
 правило стоит выше SPEC — правит он и правда спек, но класс отвечает на
 вопрос «зачем патч». Расширение в правиле обязательно, иначе в класс уехал
 бы и `distsuffix.inc`.
+LICENSE — по слову `license` в любом месте имени (`nginx-license.patch`,
+`LICENSE.txt`, британское `licence` тоже): такой патч обычно правит поле
+`License` в спеке, и правило стоит выше SPEC по той же причине, что и
+предыдущее. Расширения оно не требует — файл с этим словом в каталоге
+патчей про лицензию и есть, чем бы он ни был.
 SPEC опознаётся по `.spec.` с точками
 (`nginx.spec.patch`, `httpd-2.4.62.spec.patch.new`), CHANGELOG — по
 `changelog.yaml` (короткое `.yml` тоже ловится), а FILES — по `.tar.gz`.
@@ -748,7 +755,8 @@ python3 -m dashboard --config dashboard.yaml --log-level debug collect \
   "koji_hub": "https://hub/kojihub",
   "koji_web": "https://hub/koji",
   "patch_classes": ["AUTOGEN", "CVE", "SAST", "DAST", "COVERAGE",
-                    "DISTSUFFIX", "SPEC", "CHANGELOG", "FILES", "other"],
+                    "DISTSUFFIX", "LICENSE", "SPEC", "CHANGELOG", "FILES",
+                    "other"],
   "builds": [
    {
     "nvr": "nginx-1.24.0-1.el9",

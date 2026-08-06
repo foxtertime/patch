@@ -411,6 +411,13 @@
       "web_url": "https://gl/blob/PATCH/chromium-distsuffix.patch"
      },
      {
+      "class": "LICENSE",
+      "cves": [],
+      "name": "chromium-license.patch",
+      "path": "PATCH/chromium-license.patch",
+      "web_url": "https://gl/blob/PATCH/chromium-license.patch"
+     },
+     {
       "class": "SPEC",
       "cves": [],
       "name": "chromium.spec.patch",
@@ -494,6 +501,7 @@
    "DAST",
    "COVERAGE",
    "DISTSUFFIX",
+   "LICENSE",
    "SPEC",
    "CHANGELOG",
    "FILES",
