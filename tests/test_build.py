@@ -173,6 +173,21 @@ class TemplateContractTest(unittest.TestCase):
         # перестаёт читаться как метка.
         self.assertRegex(self.html, r"\.mark \{[^}]*white-space: nowrap")
 
+    def test_the_rail_gap_label_holds_its_own_width(self):
+        # Подпись над отрезком стояла absolute и ширины ему не добавляла:
+        # отрезок сжимался до предела, а подпись, торчащая из него в обе
+        # стороны, ложилась на соседние узлы. Теперь она в потоке, и
+        # собственного min-width у отрезка нет — его держит содержимое.
+        self.assertRegex(self.html, r"\.gap \{[^}]*grid-row: 1")
+        self.assertNotRegex(self.html, r"\.gap \{[^}]*position: absolute")
+        self.assertNotRegex(self.html, r"\n\.rl \{[^}]*min-width")
+
+    def test_the_rail_has_no_scrollbar(self):
+        # Полосу прокрутки под рельсом заменило колесо мыши; обработчик
+        # живёт в rail.js, и без него рельс стал бы непрокручиваемым.
+        self.assertRegex(self.html, r"\.chain \{[^}]*scrollbar-width: none")
+        self.assertIn("box.addEventListener('wheel'", self.html)
+
     def test_reuses_ref_html_css_variables(self):
         for name in ("--bg", "--fg", "--muted", "--line", "--card",
                      "--accent", "--added", "--removed", "--hit"):

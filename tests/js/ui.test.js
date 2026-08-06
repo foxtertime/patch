@@ -413,6 +413,86 @@ test('выбор снапшота не мешает следующему выб�
                dom.location.hash);
 });
 
+/* Полосы прокрутки под рельсом нет — катят его колесом. Размеров у заглушки
+   своих нет, поэтому тесная цепочка задаётся руками: рельсу тысяча
+   пикселей, а видно четыреста. */
+function tightRail(dom, at) {
+  var chainBox = dom.id('chain');
+  chainBox.scrollWidth = 1000;
+  chainBox.clientWidth = 400;
+  chainBox.scrollLeft = at || 0;
+  return chainBox;
+}
+
+function wheel(dom, node, delta, over) {
+  var event = { deltaY: delta, deltaX: 0, deltaMode: 0 };
+  var key;
+  for (key in over || {}) {
+    if (Object.prototype.hasOwnProperty.call(over, key)) event[key] = over[key];
+  }
+  return dom.fire(node, 'wheel', event);
+}
+
+test('колесо катит рельс вбок', function () {
+  var dom = load();
+  var chainBox = tightRail(dom, 0);
+  var event = wheel(dom, chainBox, 50);
+  assert.strictEqual(event.defaultPrevented, true);
+  assert.ok(chainBox.scrollLeft > 0, 'рельс не поехал: ' + chainBox.scrollLeft);
+});
+
+test('колесо назад катит рельс обратно', function () {
+  var dom = load();
+  var chainBox = tightRail(dom, 300);
+  wheel(dom, chainBox, -50);
+  assert.ok(chainBox.scrollLeft < 300,
+            'рельс не поехал назад: ' + chainBox.scrollLeft);
+});
+
+/* Строчный шаг — то, чем колесо меряет в Firefox: в пикселях там приезжает
+   не всё. Считать его пикселем значило бы возить рельс по три пикселя за
+   щелчок. */
+test('строчный шаг колеса считается строками, а не пикселями', function () {
+  var dom = load();
+  var chainBox = tightRail(dom, 0);
+  wheel(dom, chainBox, 3, { deltaMode: 1 });
+  var byLines = chainBox.scrollLeft;
+  chainBox.scrollLeft = 0;
+  wheel(dom, chainBox, 3, { deltaMode: 0 });
+  assert.ok(byLines > chainBox.scrollLeft,
+            byLines + ' против ' + chainBox.scrollLeft);
+});
+
+/* Рельс перехватывает колесо, только пока ему есть куда ехать. Иначе курсор,
+   прошедший над ним по пути вниз, останавливал бы страницу. */
+test('на краю цепочки колесо остаётся странице', function () {
+  var dom = load();
+  var chainBox = tightRail(dom, 600);
+  var event = wheel(dom, chainBox, 50);
+  assert.strictEqual(event.defaultPrevented, false);
+  assert.strictEqual(chainBox.scrollLeft, 600);
+});
+
+test('влезшую целиком цепочку колесо не трогает', function () {
+  var dom = load();
+  var chainBox = dom.id('chain');
+  chainBox.scrollWidth = 400;
+  chainBox.clientWidth = 400;
+  var event = wheel(dom, chainBox, 50);
+  assert.strictEqual(event.defaultPrevented, false);
+  assert.strictEqual(chainBox.scrollLeft, 0);
+});
+
+/* Боком крутят тачпадом и с шифтом — такое колесо браузер разложит по
+   рельсу сам, и перехватывать его значило бы считать шаг дважды. */
+test('горизонтальное колесо рельс не перехватывает', function () {
+  var dom = load();
+  var chainBox = tightRail(dom, 100);
+  var event = wheel(dom, chainBox, 5, { deltaX: 60 });
+  assert.strictEqual(event.defaultPrevented, false);
+  assert.strictEqual(chainBox.scrollLeft, 100);
+});
+
 /* Единственный снапшот переключать не на что, и узел там не кнопка:
    нажимается лишь то, что и правда что-то делает. */
 test('на одном снапшоте узел рельса не нажимается', function () {
