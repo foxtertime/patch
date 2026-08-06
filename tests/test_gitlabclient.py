@@ -140,7 +140,7 @@ class PatchFilesTest(unittest.TestCase):
 
     def test_project_not_found_makes_no_second_request(self):
         # проект недоступен — уточнять ветку бессмысленно, лишний запрос
-        # на большом теге умножился бы на число сборок
+        # на большом теге умножился бы на число билдов
         cli, transport = client(
             {TREE_URL: Response(404, {"message": "404 Project Not Found"}, {})})
         cli.patch_files("gitlab.example.com", "g/r", "br")

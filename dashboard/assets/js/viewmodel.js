@@ -276,7 +276,7 @@
       // и NVRA не дублируются в данных страницы
       rpm_rows: diff.alignRpms(old, fresh),
       // Своё у каждой стороны: раскрытая строка показывает не сравнение, а
-      // две карточки одной сборки, и «кто собрал» с «когда» у них разные.
+      // две карточки одного билда, и «кто собрал» с «когда» у них разные.
       old_owner: old ? orNull(old.owner) : null,
       new_owner: fresh ? orNull(fresh.owner) : null,
       old_completed: old ? toMsk(old.completed) : null,

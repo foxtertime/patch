@@ -9,7 +9,7 @@ _ORIGIN = "origin/"
 
 
 class SourceUrlError(ValueError):
-    """URL сборки не удалось разобрать."""
+    """URL билда не удалось разобрать."""
 
 
 def parse_source_url(url) -> ParsedSource:

@@ -367,7 +367,7 @@ test('поиск по владельцу строку не разворачив�
   assert.strictEqual(items[0].open, false);
 });
 
-test('поиск по времени сборки строку тоже не разворачивает', function () {
+test('поиск по времени сборки билда строку тоже не разворачивает', function () {
   var p = make([snap('os-9.1', JUL)]);
   p.st.q = '2026-05-14';
   var items = p.visibleRows();
@@ -375,7 +375,7 @@ test('поиск по времени сборки строку тоже не р�
   assert.strictEqual(items[0].open, false);
 });
 
-test('сортировка по владельцу собирает сборки одного человека подряд',
+test('сортировка по владельцу собирает билды одного человека подряд',
   function () {
     var p = make([snap('os-9.1', JUL, { builds: [
       buildBy('nginx', 'zoe'), buildBy('curl', 'alice'),

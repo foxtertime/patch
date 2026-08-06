@@ -301,7 +301,7 @@ class CollectTagTest(unittest.TestCase):
         self.assertIn(HOST, build.problems[0])
 
 class CompletedTimeTest(unittest.TestCase):
-    """Время сборки. koji отдаёт его в нескольких видах, наружу нужен один."""
+    """Время сборки билда. koji отдаёт его в нескольких видах, наружу нужен один."""
 
     def test_plain_string(self):
         self.assertEqual(_completed("2026-05-14 10:11:12"),

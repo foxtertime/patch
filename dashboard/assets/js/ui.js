@@ -175,7 +175,7 @@
     const body = st.tab === 'diff' ? diffBody : stateBody;
     const word = st.tab === 'diff'
       ? plural(total, 'компонент', 'компонента', 'компонентов')
-      : plural(total, 'сборка', 'сборки', 'сборок');
+      : plural(total, 'билд', 'билда', 'билдов');
 
     counter.textContent = items.length + ' / ' + total + ' ' + word;
     expandBtn.textContent = allOpen(items) ? 'Collapse all' : 'Expand all';
@@ -414,7 +414,7 @@
   }
 
   /* Каждое нажатие перестраивает весь tbody вместе с раскрытыми деталями, а
-     тег — это тысячи сборок. Ждём паузы в наборе. */
+     тег — это тысячи билдов. Ждём паузы в наборе. */
   const SEARCH_DELAY = 120;
   let searchTimer = null;
 
@@ -439,7 +439,7 @@
     /* Отложенный поиск отменяем не ради правильности — сработав, он
        прочитал бы уже пустое поле и ничего не испортил, — а ради работы:
        это лишняя перерисовка всей таблицы через 120 мс после той, что мы
-       делаем прямо сейчас. На теге в тысячу сборок она заметна. */
+       делаем прямо сейчас. На теге в тысячу билдов она заметна. */
     if (searchTimer) { clearTimeout(searchTimer); searchTimer = null; }
     search.value = '';
     st.q = '';

@@ -31,11 +31,11 @@ test('ключ constructor не отвечает функцией Object', funct
 });
 
 test('склонение по русским правилам', function () {
-  assert.strictEqual(text.plural(1, 'сборка', 'сборки', 'сборок'), 'сборка');
-  assert.strictEqual(text.plural(3, 'сборка', 'сборки', 'сборок'), 'сборки');
-  assert.strictEqual(text.plural(11, 'сборка', 'сборки', 'сборок'), 'сборок');
-  assert.strictEqual(text.plural(21, 'сборка', 'сборки', 'сборок'), 'сборка');
-  assert.strictEqual(text.plural(0, 'сборка', 'сборки', 'сборок'), 'сборок');
+  assert.strictEqual(text.plural(1, 'билд', 'билда', 'билдов'), 'билд');
+  assert.strictEqual(text.plural(3, 'билд', 'билда', 'билдов'), 'билда');
+  assert.strictEqual(text.plural(11, 'билд', 'билда', 'билдов'), 'билдов');
+  assert.strictEqual(text.plural(21, 'билд', 'билда', 'билдов'), 'билд');
+  assert.strictEqual(text.plural(0, 'билд', 'билда', 'билдов'), 'билдов');
 });
 
 test('время сбора режется до минуты, а не разбирается', function () {

@@ -43,7 +43,7 @@ test('большие карточки — кнопки со своим филь�
   assert.match(out, /data-filter="problem"/);
 });
 
-test('карточка «в теге» считает RPM по всем сборкам', function () {
+test('карточка «в теге» считает RPM по всем билдам', function () {
   var out = cards.stateCards(snapshot()).big;
   assert.match(out, /<div class="rpm">2 RPM<\/div>/);
 });
@@ -51,8 +51,8 @@ test('карточка «в теге» считает RPM по всем сбор
 test('счётчик склоняется вместе с числом', function () {
   var one = cards.stateCards(snapshot({ counts: { builds: 1 } })).big;
   var few = cards.stateCards(snapshot({ counts: { builds: 3 } })).big;
-  assert.match(one, /<span class="unit">сборка<\/span>/);
-  assert.match(few, /<span class="unit">сборки<\/span>/);
+  assert.match(one, /<span class="unit">билд<\/span>/);
+  assert.match(few, /<span class="unit">билда<\/span>/);
 });
 
 test('карточка класса патчей красится его цветом', function () {
@@ -128,11 +128,11 @@ test('под числом стороны стоят тег и время сбо�
 
 test('разница считается со знаком и склоняется', function () {
   var more = cards.pairCards(pair(), side('a', '', 4), side('b', '', 6));
-  assert.match(more, /class="n">\+2 <span class="unit">сборки</, more);
+  assert.match(more, /class="n">\+2 <span class="unit">билда</, more);
   var less = cards.pairCards(pair(), side('a', '', 6), side('b', '', 4));
-  assert.match(less, /class="n">−2 <span class="unit">сборки</, less);
+  assert.match(less, /class="n">−2 <span class="unit">билда</, less);
   var same = cards.pairCards(pair(), side('a', '', 4), side('b', '', 4));
-  assert.match(same, /class="n">0 <span class="unit">сборок</, same);
+  assert.match(same, /class="n">0 <span class="unit">билдов</, same);
 });
 
 /* Под разницей стоит то, из чего она сложилась: ноль в ней не значит

@@ -326,7 +326,7 @@ test('метка ошибки gitlab', function () {
   assert.ok(rows[0].marks.indexOf('gitlab-error') !== -1);
 });
 
-test('метка сборки с коммита', function () {
+test('метка билда с коммита', function () {
   // tests/test_render.py: test_from_commit_tag
   var commit = build('c', { ref: 'a1b2c3d', ref_kind: 'commit' });
   var rows = data([snap('t', [commit])]).snapshots[0].builds;
@@ -524,7 +524,7 @@ function readJson(rel) {
 test('строка диффа несёт карточку каждой стороны, а не только сравнение',
   function () {
     /* Раскрытие показывает «было» и «стало» двумя карточками одной
-       сборки, поэтому кто собрал, когда, из какого проекта и куда вели
+       билда, поэтому кто собрал, когда, из какого проекта и куда вели
        ссылки — своё у каждой стороны. */
     var pair = vm.buildPageData([
       snap('os-9.1', [build('nginx', { owner: 'alice' })]),

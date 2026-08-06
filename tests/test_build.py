@@ -174,7 +174,7 @@ class TemplateContractTest(unittest.TestCase):
         self.assertRegex(self.html, r"\.mark \{[^}]*white-space: nowrap")
 
     def test_diff_tab_has_a_row_for_both_sides(self):
-        # Сколько сборок было и сколько стало — крупным первым рядом, как
+        # Сколько билдов было и сколько стало — крупным первым рядом, как
         # итоги тега на «Состоянии»: разрезы под ним про то, что
         # изменилось, а эти два числа про то, между чем считали.
         self.assertIn('id="diff-pair"', self.html)

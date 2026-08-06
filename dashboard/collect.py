@@ -20,7 +20,7 @@ def _now_iso() -> str:
 
 
 def _completed(raw) -> Optional[str]:
-    """Время сборки в виде «YYYY-MM-DD HH:MM:SS».
+    """Когда билд собран, в виде «YYYY-MM-DD HH:MM:SS».
 
     koji отдаёт completion_time то строкой ('2026-05-14 10:00:00.123456+00:00'
     или через 'T'), то числом epoch — приводим к одному виду. Доли секунды

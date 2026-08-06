@@ -54,7 +54,7 @@
 
     function source(item) {
       return `${item.builds} `
-        + `${plural(item.builds, 'сборка', 'сборки', 'сборок')}, файл `
+        + `${plural(item.builds, 'билд', 'билда', 'билдов')}, файл `
         + `${item.file}`;
     }
 
@@ -83,7 +83,7 @@
       if (!hot) chip = `<span class="${cls}">${body}</span>`;
       else {
         /* Подсказка называет сперва то, что сделает клик, а следом — то, что
-           раньше стояло строкой в списке источников: сколько сборок и из
+           раньше стояло строкой в списке источников: сколько билдов и из
            какого файла снапшот приехал. */
         const tip = `${nodeTip(at, here, live)} ${source(item)}`;
         chip = `<button type="button" class="${cls}" data-node="${at}"`
