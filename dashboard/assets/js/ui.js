@@ -45,7 +45,6 @@
   const stateSection = document.getElementById('tab-state');
   const diffSection = document.getElementById('tab-diff');
   let controls = document.getElementById('controls');
-  const chipsBox = document.getElementById('chips');
   const search = document.getElementById('q');
   const clearBtn = document.getElementById('q-clear');
   const counter = document.getElementById('count');
@@ -118,18 +117,23 @@
     document.getElementById('diff-cards').innerHTML = cards.diffCards(curPair());
   }
 
+  /* Плашка показывает все три положения признака: нажата — «есть», класс
+     is-no — «нет», ничего — «неважно». «Нет» нажатием быть не может: это не
+     выбор этой плашки, а запрет, и показывать его тем же, чем показан
+     выбор, значило бы называть разные вещи одним.
+
+     Плашка «все» нажата, когда на вкладке не стоит ни одного фильтра. */
   function syncCards() {
-    const set = activeFilters();
     const host = st.tab === 'diff' ? diffSection : stateSection;
-    const empty = !keys(set).length;
+    const empty = !keys(activeFilters()).length;
     for (const node of host.querySelectorAll('.card[data-filter]')) {
       const key = node.getAttribute('data-filter');
-      node.setAttribute('aria-pressed',
-        String(key === 'all' ? empty : Boolean(own(set, key))));
+      const state = key === 'all' ? (empty ? 1 : 0) : page.filterState(key);
+      node.setAttribute('aria-pressed', String(state === 1));
+      const base = String(node.className).replace(/\s*is-no\b/g, '');
+      node.className = state === -1 ? `${base} is-no` : base;
     }
   }
-
-  function renderChips() { chipsBox.innerHTML = cards.chips(activeFilters()); }
 
   /* Меню одной вкладки на другой показывало бы чужие признаки: закрываем
      его вместе со сменой таблицы. */
@@ -172,7 +176,6 @@
     copyBtn.disabled = !items.length;
 
     syncCards();
-    renderChips();
     filters.sync();
     syncArrows();
     /* Рельс показывает текущий выбор, а он меняется и без смены состава:
@@ -234,7 +237,6 @@
        с тем же именем забирала бы себе его сброс строкой выше. */
     const wrap = host.querySelector('.tablewrap');
     host.insertBefore(controls, wrap);
-    host.insertBefore(chipsBox, wrap);
     closeFilters();
     search.placeholder = name === 'diff'
       ? 'Компонент, версия, тег, ветка, патч, CVE, RPM…'
@@ -357,13 +359,12 @@
   bindBody(stateBody);
   bindBody(diffBody);
 
-  /* Карточки, чипы и селекторы — делегированием: их разметка перерисовывается. */
+  /* Плашки и узлы рельса — делегированием: их разметку страница
+     перерисовывает целиком. */
   document.addEventListener('click', (e) => {
     let node = e.target;
     while (node && node !== document) {
       if (node.getAttribute) {
-        const chip = node.getAttribute('data-chip');
-        if (chip !== null && chip !== undefined) { toggleFilter(chip); return; }
         if (node.className && String(node.className).indexOf('card') !== -1) {
           const f = node.getAttribute('data-filter');
           if (f) { toggleFilter(f); return; }

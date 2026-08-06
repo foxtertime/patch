@@ -107,8 +107,12 @@ class TemplateContractTest(unittest.TestCase):
         self.assertIn('id="q"', self.html)
         self.assertIn('id="expand"', self.html)
 
-    def test_has_active_filter_chip_bar(self):
-        self.assertIn('id="chips"', self.html)
+    def test_has_a_filter_menu(self):
+        # Поставленные фильтры больше не стоят строкой чипов под панелью:
+        # их показывает и правит меню под кнопкой.
+        self.assertIn('id="filters"', self.html)
+        self.assertIn('id="filtermenu"', self.html)
+        self.assertNotIn('id="chips"', self.html)
 
     def test_has_copy_nvr_button(self):
         self.assertIn('id="copy-nvr"', self.html)

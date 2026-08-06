@@ -81,21 +81,3 @@ test('карточки диффа перечисляют все одиннадц
 test('карточка диффа подписана «из скольких»', function () {
   assert.match(cards.diffCards(pair()), /<span class="unit">из 2<\/span>/);
 });
-
-test('чип несёт ключ фильтра и его подпись', function () {
-  var out = cards.chips({ 'no-patch': 1 });
-  assert.match(out, /data-chip="no-patch"/);
-  assert.match(out, /нет каталога PATCH/);
-});
-
-test('один фильтр обходится без кнопки сброса', function () {
-  assert.doesNotMatch(cards.chips({ 'no-patch': 1 }), /сбросить всё/);
-});
-
-test('второй фильтр добавляет кнопку сброса', function () {
-  assert.match(cards.chips({ 'no-patch': 1, 'inherited': 1 }), /сбросить всё/);
-});
-
-test('без фильтров чипов нет вовсе', function () {
-  assert.strictEqual(cards.chips({}), '');
-});

@@ -896,7 +896,7 @@ test('подписи классов не переживают выгрузку �
   await dom.tick();
   dom.location.hash = '#tab=state&f=sast';
   dom.fireWindow('hashchange');
-  assert.strictEqual(dom.id('chips').innerHTML, '',
+  assert.strictEqual(filterBtn(dom).textContent, 'Фильтры',
                      'фильтр класса из выгруженного снапшота остался живым');
 });
 
@@ -924,15 +924,14 @@ test('фильтр по классу не переживает смену сос
             'a.json');
   await dom.tick();
   pressCard(dom, 'tab-state', 'sast');            /* человек включил фильтр */
-  assert.ok(dom.id('chips').innerHTML.indexOf('sast') !== -1,
-            dom.id('chips').innerHTML);
+  assert.strictEqual(filterBtn(dom).textContent, 'Фильтры · 1');
   store.remove(0);
   store.add([snap('os-9.2', AUG,
                   { classes: ['CVE'],
                     builds: [build('nginx', { patches: [patch('c.patch', 'CVE')] })] })],
             'b.json');
   await dom.tick();
-  assert.strictEqual(dom.id('chips').innerHTML, '',
+  assert.strictEqual(filterBtn(dom).textContent, 'Фильтры',
                      'фильтр класса из выгруженного снапшота остался живым');
   assert.ok(dom.id('state-rows').innerHTML.indexOf('nginx') !== -1,
             'таблица пуста под фильтр, которого нет ни на одной карточке: '
@@ -1035,7 +1034,7 @@ function pressTab(dom, name) {
 /* Фильтры у вкладок свои, и мёртвым фильтр остаётся молча: пока человек на
    «Изменениях», отсев по одной текущей вкладке ничего не делает с
    «Состоянием», а один клик по вкладке возвращает и пустую таблицу, и
-   «sast · sast» в чипе. */
+   поставленный фильтр на кнопке. */
 test('мёртвый фильтр отсеивается и на той вкладке, где человека сейчас нет',
      async function () {
   var dom = load();
@@ -1063,7 +1062,7 @@ test('мёртвый фильтр отсеивается и на той вкла
   assert.strictEqual(dom.id('tab-diff').hidden, false,
                      'человек уехал с «Изменений», сценарий проверяет не то');
   pressTab(dom, 'state');
-  assert.strictEqual(dom.id('chips').innerHTML, '',
+  assert.strictEqual(filterBtn(dom).textContent, 'Фильтры',
                      'на невидимой вкладке фильтр пережил свой снапшот');
   assert.ok(dom.id('state-rows').innerHTML.indexOf('nginx') !== -1,
             'таблица пуста под фильтр, которого нет ни на одной карточке: '
@@ -1730,3 +1729,31 @@ test('повторный выбор того же диапазона не счи
    проверка живёт в page.test.js, где сам кэш и стоит. Со страницы её было
    видно по метке «итог» на рельсе; метки больше нет, а другого следа кэш
    на странице не оставляет. */
+
+test('плашка показывает все три положения признака', function () {
+  /* Плашки страница рисует через innerHTML, а состояние расставляет по
+     готовым узлам: разметка карточек пересобирается только со сменой
+     данных. Поэтому и здесь узел настоящий. */
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { classes: ['CVE'],
+    builds: [build('nginx', { patches: [patch('c.patch', 'CVE')] })] })],
+    'a.json');
+  var node = dom.document.createElement('div');
+  node.setAttribute('class', 'card');
+  node.setAttribute('data-filter', 'cve');
+  dom.id('tab-state').appendChild(node);
+
+  pressMenu(dom, 'data-fset', 'cve:-1');
+  assert.ok(String(node.className).indexOf('is-no') !== -1, node.className);
+  assert.strictEqual(node.getAttribute('aria-pressed'), 'false');
+
+  pressMenu(dom, 'data-fset', 'cve:1');
+  assert.strictEqual(String(node.className).indexOf('is-no'), -1,
+                     node.className);
+  assert.strictEqual(node.getAttribute('aria-pressed'), 'true');
+
+  pressMenu(dom, 'data-fset', 'cve:0');
+  assert.strictEqual(String(node.className).indexOf('is-no'), -1,
+                     node.className);
+  assert.strictEqual(node.getAttribute('aria-pressed'), 'false');
+});

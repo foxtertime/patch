@@ -34,3 +34,9 @@
 .card[aria-pressed=true] { border-color: var(--fg);
   box-shadow: inset 0 0 0 1px var(--fg), var(--shadow); }
 .card[aria-pressed=true] .l { color: var(--fg); }
+
+/* Признак, поставленный в «нет»: плашка приглушена и обведена цветом
+   убранного. Нажатой она быть не может — «нет» это не выбор этой плашки, а
+   запрет, и показывать его тем же, чем показан выбор, значило бы называть
+   разные вещи одним. */
+.card.is-no { border-color: var(--removed); opacity: .65; }
