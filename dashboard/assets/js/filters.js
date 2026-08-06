@@ -88,11 +88,40 @@
       if (open) draw();
     }
 
+    /* Плашка длинная — классов патчей бывает десяток, — а панель управления
+       липкая. Не влезает вниз: двигаем страницу ровно на недостачу, панель
+       доезжает до верха окна и утягивает плашку за собой. Не в начало
+       страницы: человек смотрел на свои строки, и терять это место незачем. */
+    function fit() {
+      if (!box.getBoundingClientRect || !window.scrollBy) return;
+      /* Меряем от исходного места: прошлое открытие могло сдвинуть плашку,
+         а окно с тех пор изменилось. */
+      box.style.left = '0px';
+      box.style.maxHeight = '';
+      let rect = box.getBoundingClientRect();
+      const under = rect.bottom - window.innerHeight + 8;
+      if (under > 0) window.scrollBy(0, under);
+      rect = box.getBoundingClientRect();
+      /* Что не отыграла прокрутка, забирает высота: на короткой странице
+         двигать нечего, и плашка обязана ужаться сама, а не уехать за край
+         окна. Нижний предел — чтобы в самом тесном окне она осталась
+         плашкой, а не щелью. */
+      box.style.maxHeight = Math.max(140, window.innerHeight - rect.top - 12)
+        + 'px';
+      /* Плашка шире кнопки, и от её левого края на узком окне уходит за
+         правый край страницы. Двигаем влево ровно на недостачу и не дальше
+         левого края окна: вылезти с другой стороны — не починка. */
+      const past = rect.right - window.innerWidth + 8;
+      if (past > 0) {
+        box.style.left = -Math.min(past, Math.max(0, rect.left - 8)) + 'px';
+      }
+    }
+
     function show(on) {
       open = Boolean(on);
       box.hidden = !open;
       button.setAttribute('aria-expanded', String(open));
-      if (open) draw();
+      if (open) { draw(); fit(); }
     }
 
     function close() { if (open) show(false); }
