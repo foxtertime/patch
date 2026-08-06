@@ -173,6 +173,13 @@ class TemplateContractTest(unittest.TestCase):
         # перестаёт читаться как метка.
         self.assertRegex(self.html, r"\.mark \{[^}]*white-space: nowrap")
 
+    def test_built_column_stands_in_two_levels(self):
+        # «2026-11-03 13:46:00» одной строкой держало девятнадцать знаков
+        # ширины там, где колонку сканируют по десяти, — а не хватало их
+        # имени компонента слева, и оно разрывалось посередине.
+        self.assertRegex(self.html, r"td\.built \.tm \{[^}]*display: block")
+        self.assertRegex(self.html, r"td\.src \{[^}]*white-space: nowrap")
+
     def test_diff_tab_has_a_row_for_both_sides(self):
         # Сколько билдов было и сколько стало — крупным первым рядом, как
         # итоги тега на «Состоянии»: разрезы под ним про то, что
