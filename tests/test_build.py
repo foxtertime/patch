@@ -163,6 +163,16 @@ class TemplateContractTest(unittest.TestCase):
         at = self.html.index('id="toasts"')
         self.assertFalse(start < at < end)
 
+    def test_marks_wrap_inside_their_cell(self):
+        # Меток у строки бывает полтора десятка, и в одну строку они
+        # растягивали таблицу за край окна вместе со всей страницей:
+        # обёртка таблицы не прокручивается, поэтому уезжала вся страница.
+        self.assertIn("td.marks { white-space: normal; }", self.html)
+        self.assertNotIn("td.marks { white-space: nowrap", self.html)
+        # А сама метка не переносится: разорванная посередине, она
+        # перестаёт читаться как метка.
+        self.assertRegex(self.html, r"\.mark \{[^}]*white-space: nowrap")
+
     def test_reuses_ref_html_css_variables(self):
         for name in ("--bg", "--fg", "--muted", "--line", "--card",
                      "--accent", "--added", "--removed", "--hit"):

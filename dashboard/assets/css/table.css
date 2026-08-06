@@ -38,11 +38,17 @@ tr.main-row.bad > td:first-child,
 tr.detail-row.bad > td { box-shadow: inset 3px 0 0 var(--removed); }
 /* break-word, а не anywhere: последний рвёт версию посередине, и 'el10'
    превращается в 'el1 0'. */
-td.src { font-weight: 600; overflow-wrap: break-word; }
-td.ver { color: var(--muted); overflow-wrap: break-word; }
+/* anywhere, а не break-word: они отличаются ровно тем, что нужно здесь —
+   anywhere уменьшает минимальную ширину колонки, break-word нет. Сборка с
+   коммита кладёт в «ветку» сороказначный хеш, и с break-word колонка
+   держала под него 270 пикселей всегда, растягивая таблицу за край окна
+   вместе со всей страницей. Рвать имя посреди слова браузер всё равно
+   станет только тогда, когда места не осталось. */
+td.src { font-weight: 600; overflow-wrap: anywhere; }
+td.ver { color: var(--muted); overflow-wrap: anywhere; }
 td.ver.new { color: var(--fg); }
 td.branch, td.tagged { font-size: .85em; color: var(--muted);
-  overflow-wrap: break-word; }
+  overflow-wrap: anywhere; }
 /* Имя koji-тега не переносим: разорванное посередине, оно перестаёт быть
    именем, а искать его глазами приходится в каждой унаследованной строке.
    Колонка при auto-раскладке возьмёт ширину самого длинного тега — а он
@@ -67,18 +73,28 @@ td.pat .zero { color: var(--muted); }
 td.owner { color: var(--muted); white-space: nowrap;
   overflow-wrap: normal; font-size: .85em; }
 td.links { text-align: right; white-space: nowrap; }
-td.marks { white-space: nowrap; }
+/* Метки переносятся: их у строки бывает полтора десятка — все классы
+   патчей разом плюс метки проблем, — и в одну строку они растягивали
+   колонку на тысячу пикселей, а вместе с ней и всю таблицу за край окна.
+   Обёртка таблицы не прокручивается (иначе от неё стала бы отсчитываться
+   липкая шапка), поэтому уезжала вся страница целиком, и заголовки с
+   карточками оставались левее таблицы.
+
+   Строка от этого выше, и это дешевле: высота лишней строки видна только
+   у тех, у кого меток много, а ширина ломала таблицу для всех. */
+td.marks { white-space: normal; }
 .plus { color: var(--added); }
 .minus { color: var(--removed); }
-/* На узком экране десять колонок не помещаются. Пусть скроллится таблица,
-   а не вся страница вместе с панелью поиска; sticky-шапкой жертвуем. */
-@media (max-width: 900px) {
+/* Десять колонок перестают помещаться раньше, чем кажется: даже с
+   переносом меток и хеша минимум таблицы — около 1060 пикселей, и до этого
+   порога уезжала вся страница вместе с заголовком и карточками. Пусть
+   вместо неё скроллится таблица; sticky-шапкой на этих ширинах жертвуем.
+
+   Порог измерен, а не выбран: на обычных данных таблица укладывается в
+   1060, и 1100 даёт ей запас на пару лишних меток. */
+@media (max-width: 1100px) {
   .tablewrap { overflow-x: auto; }
   thead th { position: static; }
-  /* td.tagged здесь не трогаем: таблица уже скроллится, и целое имя тега
-     полезнее сэкономленных пикселей. */
-  td.src, td.ver, td.branch { overflow-wrap: anywhere; }
-  td.marks { white-space: normal; }
 }
 a.link { display: inline-block; padding: .1rem .5rem; border-radius: 999px;
   border: 1px solid var(--line); color: var(--accent); text-decoration: none;
@@ -98,8 +114,12 @@ tr.main-row:hover .chev { color: var(--fg); }
    них встают табом, и рамка фокуса им нужна такая же, как настоящим. */
 .chev:focus-visible, .mark[data-filter]:focus-visible {
   outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+/* Сама метка не переносится никогда: разорванная посередине, она перестаёт
+   читаться как метка. Переносится ряд меток, а не буквы в них. Отбивка
+   снизу — для второго ряда: без неё пилюли слипаются краями. */
 .mark { display: inline-block; font-size: .72rem; padding: .1rem .45rem; border-radius: 999px;
-  border: 1px solid currentColor; white-space: nowrap; margin-right: .2rem; }
+  border: 1px solid currentColor; white-space: nowrap;
+  margin: 0 .2rem .15rem 0; }
 /* Метки строк — те же фильтры, что и карточки: клик включает. */
 .mark[data-filter] { cursor: pointer; }
 .mark[data-filter]:hover { box-shadow: 0 0 0 1px currentColor; }
