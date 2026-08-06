@@ -115,7 +115,8 @@
 
   /* Порядок меток состояния после классов патчей. Он же порядок в колонке
      «метки»: сперва откуда билд, потом что не так с патчами, потом ошибки. */
-  const STATE_TAG_ORDER = ['inherited', 'no-source', 'from-commit', 'no-patch',
+  const STATE_TAG_ORDER = ['inherited', 'no-source', 'from-commit',
+                           'from-srpm', 'no-patch',
                            'gitlab-error', 'internal-error'];
 
   /* Позиция метки в строке. Классы патчей идут первыми, в порядке списка
@@ -154,6 +155,10 @@
     if (inheritedIn(build, tag)) marks.push('inherited');
     if (!build.source) marks.push('no-source');
     else if (build.source.ref_kind === 'commit') marks.push('from-commit');
+    /* Собран не из git, а из готового SRPM: ветки у такого билда нет, и
+       каталог PATCH читать негде — но это не «нет источника», источник
+       у него как раз известен, просто другого рода. */
+    else if (build.source.ref_kind === 'srpm') marks.push('from-srpm');
     if (build.patch_dir_present === false) marks.push('no-patch');
     for (i = 0; i < problems.length; i++) {
       if (problems[i].indexOf('gitlab:') === 0
@@ -265,6 +270,12 @@
       new_evr: fresh ? evrOf(fresh) : null,
       old_branch: (old && old.source) ? orNull(old.source.ref) : null,
       new_branch: (fresh && fresh.source) ? orNull(fresh.source.ref) : null,
+      // Чем ветка приходится билду, у каждой стороны своё: пересобранный из
+      // SRPM компонент рядом с прежним, собранным из ветки, — законная
+      // пара, и подписать оба «веткой» значило бы соврать про одну из них.
+      old_ref_kind: (old && old.source) ? orNull(old.source.ref_kind) : null,
+      new_ref_kind: (fresh && fresh.source)
+        ? orNull(fresh.source.ref_kind) : null,
       patches_added: component.patches_added.slice(),
       patches_removed: component.patches_removed.slice(),
       rpms_added: component.rpms_added.slice(),
@@ -276,7 +287,7 @@
       // и NVRA не дублируются в данных страницы
       rpm_rows: diff.alignRpms(old, fresh),
       // Своё у каждой стороны: раскрытая строка показывает не сравнение, а
-      // две карточки одной сборки, и «кто собрал» с «когда» у них разные.
+      // две карточки одного билда, и «кто собрал» с «когда» у них разные.
       old_owner: old ? orNull(old.owner) : null,
       new_owner: fresh ? orNull(fresh.owner) : null,
       old_completed: old ? toMsk(old.completed) : null,

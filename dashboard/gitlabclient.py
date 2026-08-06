@@ -156,7 +156,7 @@ class GitlabClient:
             return TreeResult(None, [], "gitlab: ref not found")
         if 200 <= response.status < 300:
             logger.debug("%s: ветка %s есть, каталога %s в ней нет — это не "
-                         "ошибка, патчей у сборки просто нет",
+                         "ошибка, патчей у билда просто нет",
                          project, ref, self._patch_dir)
             return TreeResult(False, [], None)
         logger.debug("%s: ветка %s — не удалось выяснить, есть ли она: %s %s",

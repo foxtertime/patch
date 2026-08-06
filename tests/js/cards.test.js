@@ -43,7 +43,7 @@ test('большие карточки — кнопки со своим филь�
   assert.match(out, /data-filter="problem"/);
 });
 
-test('карточка «в теге» считает RPM по всем сборкам', function () {
+test('карточка «в теге» считает RPM по всем билдам', function () {
   var out = cards.stateCards(snapshot()).big;
   assert.match(out, /<div class="rpm">2 RPM<\/div>/);
 });
@@ -51,8 +51,8 @@ test('карточка «в теге» считает RPM по всем сбор
 test('счётчик склоняется вместе с числом', function () {
   var one = cards.stateCards(snapshot({ counts: { builds: 1 } })).big;
   var few = cards.stateCards(snapshot({ counts: { builds: 3 } })).big;
-  assert.match(one, /<span class="unit">сборка<\/span>/);
-  assert.match(few, /<span class="unit">сборки<\/span>/);
+  assert.match(one, /<span class="unit">билд<\/span>/);
+  assert.match(few, /<span class="unit">билда<\/span>/);
 });
 
 test('карточка класса патчей красится его цветом', function () {
@@ -80,4 +80,110 @@ test('карточки диффа перечисляют все одиннадц
 
 test('карточка диффа подписана «из скольких»', function () {
   assert.match(cards.diffCards(pair()), /<span class="unit">из 2<\/span>/);
+});
+
+/* Раскладка среза по строкам. Одиннадцать карточек, из которых в строку
+   влезает десять, дают вторую строку из одной штуки и пустоту за ней;
+   считалка делит их на строки поровну. Ширину меряет тот, у кого есть
+   раскладка, — здесь её задаёт тест. */
+test('карточки делятся на строки поровну', function () {
+  // влезает десять, карточек одиннадцать: две строки по шесть и пять
+  assert.strictEqual(cards.columnsFor(11, 1360, 122, 10), 6);
+  // влезает десять, карточек десять: одна строка
+  assert.strictEqual(cards.columnsFor(10, 1360, 122, 10), 10);
+  // влезает четыре, карточек одиннадцать: три строки по четыре
+  assert.strictEqual(cards.columnsFor(11, 550, 122, 10), 4);
+});
+
+test('карточек меньше, чем влезает в строку — строка одна', function () {
+  assert.strictEqual(cards.columnsFor(3, 1360, 122, 10), 3);
+  assert.strictEqual(cards.columnsFor(1, 1360, 122, 10), 1);
+});
+
+/* Узкое окно: даже одна карточка в строку — это строка, а не деление на
+   ноль. */
+test('в узком окне остаётся один столбец', function () {
+  assert.strictEqual(cards.columnsFor(11, 100, 122, 10), 1);
+});
+
+test('без карточек столбцов нет', function () {
+  assert.strictEqual(cards.columnsFor(0, 1360, 122, 10), 0);
+});
+
+/* Итоги перехода: стороны, разница и срок. Числа сторон берём у снапшотов,
+   а не по строкам таблицы: строка — это компонент перехода, и компонент,
+   которого на этой стороне нет, в ней всё равно стоит. */
+function side(tag, generated, builds) {
+  return { tag: tag, generated: generated, builds: [],
+           counts: { builds: builds } };
+}
+
+test('без концов перехода итогов нет', function () {
+  assert.strictEqual(cards.pairCards(pair(), null, null), '');
+  assert.strictEqual(cards.pairCards(null, side('os-9.1', '', 1),
+                                     side('os-9.2', '', 2)), '');
+});
+
+/* Четыре, как итоги тега на «Состоянии»: ряд из двух в ширину полосы не
+   ложится ничем — либо узкие плашки и пустота справа, либо два числа,
+   растянутые в плакат. */
+test('итоги перехода — четыре большие карточки', function () {
+  var out = cards.pairCards(pair(),
+    side('os-9.1', '2026-07-01T00:00:00+03:00', 4),
+    side('os-9.2', '2026-08-01T00:00:00+03:00', 6));
+  assert.match(out, /class="l">было<\/div><div class="n">4 /, out);
+  assert.match(out, /class="l">стало<\/div><div class="n">6 /, out);
+  assert.strictEqual((out.match(/card big/g) || []).length, 4, out);
+});
+
+/* Фильтра у них нет: итог перехода — не срез таблицы, а то, между чем
+   считали. Кнопка обещала бы клик, которому нечего делать. */
+test('карточки итогов не кнопки', function () {
+  var out = cards.pairCards(pair(), side('os-9.1', '', 1), side('os-9.2', '', 1));
+  assert.strictEqual(out.indexOf('data-filter'), -1, out);
+  assert.strictEqual(out.indexOf('<button'), -1, out);
+});
+
+/* Тега мало: два прогона одного тега — законный случай, и без времени сбора
+   «было os-9.4 → стало os-9.4» не сказало бы, какой из них какой. */
+test('под числом стороны стоят тег и время сбора', function () {
+  var out = cards.pairCards(pair(),
+    side('os-9.4', '2026-09-01T08:15:00+03:00', 6),
+    side('os-9.4', '2026-10-01T09:00:00+03:00', 7));
+  assert.match(out, /class="rpm">os-9\.4, 2026-09-01 08:15</, out);
+  assert.match(out, /class="rpm">os-9\.4, 2026-10-01 09:00</, out);
+});
+
+test('разница считается со знаком и склоняется', function () {
+  var more = cards.pairCards(pair(), side('a', '', 4), side('b', '', 6));
+  assert.match(more, /class="n">\+2 <span class="unit">билда</, more);
+  var less = cards.pairCards(pair(), side('a', '', 6), side('b', '', 4));
+  assert.match(less, /class="n">−2 <span class="unit">билда</, less);
+  var same = cards.pairCards(pair(), side('a', '', 4), side('b', '', 4));
+  assert.match(same, /class="n">0 <span class="unit">билдов</, same);
+});
+
+/* Под разницей стоит то, из чего она сложилась: ноль в ней не значит
+   «ничего не менялось» — сколько ушло, столько могло и прийти. */
+test('под разницей стоят появившиеся и исчезнувшие', function () {
+  var out = cards.pairCards(pair({ counts: { added: 3, removed: 3 } }),
+    side('a', '', 4), side('b', '', 4));
+  assert.match(out, /class="rpm">появилось 3, исчезло 3</, out);
+});
+
+/* Срок — та же мера, что подписывает отрезок рельса: одна вещь в двух
+   местах должна называться одинаково. */
+test('срок между сборами считается как на рельсе', function () {
+  var out = cards.pairCards(pair(),
+    side('a', '2026-07-01T00:00:00+03:00', 1),
+    side('b', '2026-08-01T00:00:00+03:00', 1));
+  assert.match(out, /class="n">31 <span class="unit">дн<\/span>/, out);
+  assert.match(out, /class="l">срок<\/div>/, out);
+});
+
+/* Время бывает и непрочитанным: у снапшота старого формата его нет вовсе,
+   и карточка должна остаться карточкой. */
+test('нечитаемое время сбора не роняет срок', function () {
+  var out = cards.pairCards(pair(), side('a', '', 1), side('b', 'никогда', 1));
+  assert.match(out, /class="n">—<\/div>/, out);
 });
