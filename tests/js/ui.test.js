@@ -463,14 +463,14 @@ test('строчный шаг колеса считается строками, 
             byLines + ' против ' + chainBox.scrollLeft);
 });
 
-/* Рельс перехватывает колесо, только пока ему есть куда ехать. Иначе курсор,
-   прошедший над ним по пути вниз, останавливал бы страницу. */
-test('на краю цепочки колесо остаётся странице', function () {
+/* Докрученная до конца цепочка колесо странице не отдаёт: прокрутка,
+   перескакивающая на страницу с последнего узла, уводит из-под курсора то
+   самое, что человек разглядывает. */
+test('на краю цепочки колесо остаётся рельсу', function () {
   var dom = load();
   var chainBox = tightRail(dom, 600);
   var event = wheel(dom, chainBox, 50);
-  assert.strictEqual(event.defaultPrevented, false);
-  assert.strictEqual(chainBox.scrollLeft, 600);
+  assert.strictEqual(event.defaultPrevented, true);
 });
 
 test('влезшую целиком цепочку колесо не трогает', function () {
