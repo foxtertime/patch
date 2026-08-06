@@ -413,6 +413,170 @@ test('выбор снапшота не мешает следующему выб�
                dom.location.hash);
 });
 
+/* Стороны перехода стоят над разрезами: сколько билдов в теге было и
+   сколько стало. Считает их не таблица переходов, а сами снапшоты. */
+test('над карточками диффа стоят стороны перехода', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { builds: [build('nginx')] })], 'a.json');
+  store.add([snap('os-9.2', AUG,
+                  { builds: [build('nginx'), build('curl')] })], 'b.json');
+  pressTab(dom, 'diff');
+  var sides = dom.id('diff-pair').innerHTML;
+  assert.match(sides, /class="l">было<\/div><div class="n">1 /, sides);
+  assert.match(sides, /class="l">стало<\/div><div class="n">2 /, sides);
+  assert.match(sides, /os-9\.1, 2026-07-01 00:00/, sides);
+});
+
+/* Выбор другого диапазона меняет и стороны: они про его концы, а не про
+   цепочку целиком. */
+test('смена диапазона переписывает стороны', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { builds: [build('nginx')] })], 'a.json');
+  store.add([snap('os-9.2', AUG,
+                  { builds: [build('nginx'), build('curl')] })], 'b.json');
+  store.add([snap('os-9.3', SEP,
+                  { builds: [build('nginx'), build('curl'),
+                             build('zlib')] })], 'c.json');
+  pressTab(dom, 'diff');
+  clickNode(dom, 1);
+  clickNode(dom, 2);
+  var sides = dom.id('diff-pair').innerHTML;
+  assert.match(sides, /class="l">было<\/div><div class="n">2 /, sides);
+  assert.match(sides, /class="l">стало<\/div><div class="n">3 /, sides);
+});
+
+/* Классы чипа по номеру узла: рельс рисуется строкой, и читать её удобнее
+   разобранной. */
+function nodeClass(dom, at) {
+  var re = new RegExp('class="([^"]*)"[^>]*data-node="' + at + '"');
+  var m = re.exec(chain(dom));
+  return m ? m[1] : null;
+}
+
+/* Диапазон проходит не только через свои концы: снапшоты между ними в
+   сравнение не попали, но лежат в его сроке, и рельс их помечает. */
+test('узлы внутри диапазона помечены', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL)], 'a.json');
+  store.add([snap('os-9.2', AUG)], 'b.json');
+  store.add([snap('os-9.3', SEP)], 'c.json');
+  store.add([snap('os-9.4', '2026-10-01T00:00:00+03:00')], 'd.json');
+  pressTab(dom, 'diff');
+  clickNode(dom, 0);
+  clickNode(dom, 2);
+  assert.doesNotMatch(nodeClass(dom, 0), /inside/, nodeClass(dom, 0));
+  assert.match(nodeClass(dom, 1), /inside/, nodeClass(dom, 1));
+  assert.doesNotMatch(nodeClass(dom, 2), /inside/, nodeClass(dom, 2));
+  /* Узел за концом диапазона в него не входит. */
+  assert.doesNotMatch(nodeClass(dom, 3), /inside/, nodeClass(dom, 3));
+});
+
+/* Соседние концы не оставляют между собой ничего, и помечать нечего. */
+test('у соседней пары внутри диапазона пусто', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL)], 'a.json');
+  store.add([snap('os-9.2', AUG)], 'b.json');
+  pressTab(dom, 'diff');
+  clickNode(dom, 0);
+  clickNode(dom, 1);
+  assert.strictEqual(chain(dom).indexOf('inside'), -1, chain(dom));
+});
+
+/* На «Состоянии» диапазона нет вовсе: там открыт один снапшот, и метка
+   принадлежала бы выбору, которого на этой вкладке не делают. */
+test('на «Состоянии» узлы внутри диапазона не помечаются', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL)], 'a.json');
+  store.add([snap('os-9.2', AUG)], 'b.json');
+  store.add([snap('os-9.3', SEP)], 'c.json');
+  pressTab(dom, 'diff');
+  clickNode(dom, 0);
+  clickNode(dom, 2);
+  assert.match(nodeClass(dom, 1), /inside/, nodeClass(dom, 1));
+  pressTab(dom, 'state');
+  assert.strictEqual(chain(dom).indexOf('inside'), -1, chain(dom));
+});
+
+/* Полосы прокрутки под рельсом нет — катят его колесом. Размеров у заглушки
+   своих нет, поэтому тесная цепочка задаётся руками: рельсу тысяча
+   пикселей, а видно четыреста. */
+function tightRail(dom, at) {
+  var chainBox = dom.id('chain');
+  chainBox.scrollWidth = 1000;
+  chainBox.clientWidth = 400;
+  chainBox.scrollLeft = at || 0;
+  return chainBox;
+}
+
+function wheel(dom, node, delta, over) {
+  var event = { deltaY: delta, deltaX: 0, deltaMode: 0 };
+  var key;
+  for (key in over || {}) {
+    if (Object.prototype.hasOwnProperty.call(over, key)) event[key] = over[key];
+  }
+  return dom.fire(node, 'wheel', event);
+}
+
+test('колесо катит рельс вбок', function () {
+  var dom = load();
+  var chainBox = tightRail(dom, 0);
+  var event = wheel(dom, chainBox, 50);
+  assert.strictEqual(event.defaultPrevented, true);
+  assert.ok(chainBox.scrollLeft > 0, 'рельс не поехал: ' + chainBox.scrollLeft);
+});
+
+test('колесо назад катит рельс обратно', function () {
+  var dom = load();
+  var chainBox = tightRail(dom, 300);
+  wheel(dom, chainBox, -50);
+  assert.ok(chainBox.scrollLeft < 300,
+            'рельс не поехал назад: ' + chainBox.scrollLeft);
+});
+
+/* Строчный шаг — то, чем колесо меряет в Firefox: в пикселях там приезжает
+   не всё. Считать его пикселем значило бы возить рельс по три пикселя за
+   щелчок. */
+test('строчный шаг колеса считается строками, а не пикселями', function () {
+  var dom = load();
+  var chainBox = tightRail(dom, 0);
+  wheel(dom, chainBox, 3, { deltaMode: 1 });
+  var byLines = chainBox.scrollLeft;
+  chainBox.scrollLeft = 0;
+  wheel(dom, chainBox, 3, { deltaMode: 0 });
+  assert.ok(byLines > chainBox.scrollLeft,
+            byLines + ' против ' + chainBox.scrollLeft);
+});
+
+/* Докрученная до конца цепочка колесо странице не отдаёт: прокрутка,
+   перескакивающая на страницу с последнего узла, уводит из-под курсора то
+   самое, что человек разглядывает. */
+test('на краю цепочки колесо остаётся рельсу', function () {
+  var dom = load();
+  var chainBox = tightRail(dom, 600);
+  var event = wheel(dom, chainBox, 50);
+  assert.strictEqual(event.defaultPrevented, true);
+});
+
+test('влезшую целиком цепочку колесо не трогает', function () {
+  var dom = load();
+  var chainBox = dom.id('chain');
+  chainBox.scrollWidth = 400;
+  chainBox.clientWidth = 400;
+  var event = wheel(dom, chainBox, 50);
+  assert.strictEqual(event.defaultPrevented, false);
+  assert.strictEqual(chainBox.scrollLeft, 0);
+});
+
+/* Боком крутят тачпадом и с шифтом — такое колесо браузер разложит по
+   рельсу сам, и перехватывать его значило бы считать шаг дважды. */
+test('горизонтальное колесо рельс не перехватывает', function () {
+  var dom = load();
+  var chainBox = tightRail(dom, 100);
+  var event = wheel(dom, chainBox, 5, { deltaX: 60 });
+  assert.strictEqual(event.defaultPrevented, false);
+  assert.strictEqual(chainBox.scrollLeft, 100);
+});
+
 /* Единственный снапшот переключать не на что, и узел там не кнопка:
    нажимается лишь то, что и правда что-то делает. */
 test('на одном снапшоте узел рельса не нажимается', function () {
@@ -420,6 +584,16 @@ test('на одном снапшоте узел рельса не нажимае
   store.add([snap('os-9.1', JUL)], 'a.json');
   assert.strictEqual(chain(dom).indexOf('data-node'), -1, chain(dom));
   assert.ok(chain(dom).indexOf('os-9.1') !== -1, chain(dom));
+});
+
+/* Ненажимаемый — не значит невыбранный: единственный снапшот открыт, и
+   помечен он тем же классом, что открытый узел в цепочке из многих. Вид
+   ему даёт стиль по этому классу; без пометки чип оставался бы бледным
+   третьим видом узла, которого больше нигде нет. */
+test('единственный снапшот всё равно помечен открытым', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL)], 'a.json');
+  assert.match(chain(dom), /<span class="pick on"/, chain(dom));
 });
 
 test('пары одинаковых тегов различимы в адресе', function () {
@@ -674,14 +848,14 @@ test('подсказка узла говорит то, что клик и сде
 });
 
 /* Список источников ушёл, и то, что он один умел говорить, теперь говорит
-   подсказка узла: сколько в снапшоте сборок и из какого файла он приехал. */
-test('подсказка узла называет число сборок и файл', function () {
+   подсказка узла: сколько в снапшоте билдов и из какого файла он приехал. */
+test('подсказка узла называет число билдов и файл', function () {
   var dom = load();
   store.add([snap('os-9.1', JUL, { builds: [build('nginx')] })], 'a.json');
   store.add([snap('os-9.2', AUG, { builds: [build('nginx'), build('httpd')] })],
             'b.json');
-  assert.match(chain(dom), /1 сборка, файл a\.json/, chain(dom));
-  assert.match(chain(dom), /2 сборки, файл b\.json/, chain(dom));
+  assert.match(chain(dom), /1 билд, файл a\.json/, chain(dom));
+  assert.match(chain(dom), /2 билда, файл b\.json/, chain(dom));
 });
 
 /* Призрак стоит в конце рельса всегда: добавить снапшот можно в любой

@@ -28,6 +28,12 @@ function Node(tag, attrs) {
   this.className = this.attrs['class'] || '';
   this.disabled = false;
   this.value = '';
+  /* Прокрутки заглушка не изображает, но помнит: рельс катят колесом, и
+     тесту важно, куда он уехал и на сколько. Размеры ставит сам тест —
+     раскладки здесь нет, и взять их неоткуда. */
+  this.scrollLeft = 0;
+  this.scrollWidth = 0;
+  this.clientWidth = 0;
   this.placeholder = this.attrs.placeholder || '';
   this.style = { setProperty: function () {} };
   this.handlers = {};

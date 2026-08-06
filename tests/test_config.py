@@ -245,6 +245,28 @@ class DefaultRulesOnRealNamesTest(unittest.TestCase):
         self.assertEqual(
             self.classifier.classify("cve-2024-42516-distsuffix.patch"), "CVE")
 
+    def test_license_patch(self):
+        self.assertEqual(self.classifier.classify("nginx-license.patch"),
+                         "LICENSE")
+
+    def test_license_marker_anywhere_in_the_name(self):
+        # Расширения правило не требует: файл с «license» в имени, лежащий
+        # в каталоге патчей, про лицензию и есть — патч это, текст или
+        # список.
+        for name in ("LICENSE", "LICENSE.txt", "add-license-header.patch.new",
+                     "chromium-licence.patch"):
+            self.assertEqual(self.classifier.classify(name), "LICENSE", name)
+
+    def test_license_wins_over_spec(self):
+        # Правит такой патч поле License в спеке, но затем, чтобы
+        # разобраться с лицензией: класс отвечает на вопрос «зачем патч».
+        self.assertEqual(
+            self.classifier.classify("nginx.spec.license.patch"), "LICENSE")
+
+    def test_cve_still_wins_over_license(self):
+        self.assertEqual(
+            self.classifier.classify("cve-2024-42516-license.patch"), "CVE")
+
     def test_spec_patch(self):
         self.assertEqual(self.classifier.classify("nginx.spec.patch"), "SPEC")
 

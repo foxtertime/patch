@@ -41,6 +41,7 @@
       }
      ],
      "new_project": "core/curl",
+     "new_ref_kind": "branch",
      "new_source_url": "https://gl/core/curl/-/tree/os-9.2",
      "new_tagged_in": "os-9.2",
      "old_branch": null,
@@ -51,6 +52,7 @@
      "old_owner": null,
      "old_patches": [],
      "old_project": null,
+     "old_ref_kind": null,
      "old_source_url": null,
      "old_tagged_in": null,
      "patches_added": [],
@@ -82,6 +84,7 @@
      "new_owner": "apache",
      "new_patches": [],
      "new_project": "web/httpd",
+     "new_ref_kind": "commit",
      "new_source_url": "https://gl/web/httpd/-/tree/abc123",
      "new_tagged_in": "os-9.2",
      "old_branch": "abc123",
@@ -92,6 +95,7 @@
      "old_owner": "apache",
      "old_patches": [],
      "old_project": "web/httpd",
+     "old_ref_kind": "commit",
      "old_source_url": "https://gl/web/httpd/-/tree/abc123",
      "old_tagged_in": "os-9.0",
      "patches_added": [],
@@ -150,6 +154,7 @@
       }
      ],
      "new_project": "web/nginx",
+     "new_ref_kind": "branch",
      "new_source_url": "https://gl/web/nginx/-/tree/os-9.2",
      "new_tagged_in": "os-9.2",
      "old_branch": "os-9.1",
@@ -184,6 +189,7 @@
       }
      ],
      "old_project": "web/nginx",
+     "old_ref_kind": "branch",
      "old_source_url": "https://gl/web/nginx/-/tree/os-9.1",
      "old_tagged_in": "os-9.1",
      "patches_added": [
@@ -240,6 +246,7 @@
      "new_owner": null,
      "new_patches": [],
      "new_project": null,
+     "new_ref_kind": null,
      "new_source_url": null,
      "new_tagged_in": null,
      "old_branch": null,
@@ -258,6 +265,7 @@
       }
      ],
      "old_project": null,
+     "old_ref_kind": null,
      "old_source_url": null,
      "old_tagged_in": null,
      "patches_added": [],
@@ -303,6 +311,7 @@
       }
      ],
      "new_project": "core/zlib",
+     "new_ref_kind": "branch",
      "new_source_url": "https://gl/core/zlib/-/tree/os-9.1",
      "new_tagged_in": "os-9.2",
      "old_branch": "os-9.1",
@@ -328,6 +337,7 @@
       }
      ],
      "old_project": "core/zlib",
+     "old_ref_kind": "branch",
      "old_source_url": "https://gl/core/zlib/-/tree/os-9.1",
      "old_tagged_in": "os-9.1",
      "patches_added": [],

@@ -173,6 +173,45 @@ class TemplateContractTest(unittest.TestCase):
         # перестаёт читаться как метка.
         self.assertRegex(self.html, r"\.mark \{[^}]*white-space: nowrap")
 
+    def test_built_column_stands_in_two_levels(self):
+        # «2026-11-03 13:46:00» одной строкой держало девятнадцать знаков
+        # ширины там, где колонку сканируют по десяти, — а не хватало их
+        # имени компонента слева, и оно разрывалось посередине.
+        self.assertRegex(self.html, r"td\.built \.tm \{[^}]*display: block")
+        self.assertRegex(self.html, r"td\.src \{[^}]*white-space: nowrap")
+
+    def test_diff_tab_has_a_row_for_both_sides(self):
+        # Сколько билдов было и сколько стало — крупным первым рядом, как
+        # итоги тега на «Состоянии»: разрезы под ним про то, что
+        # изменилось, а эти два числа про то, между чем считали.
+        self.assertIn('id="diff-pair"', self.html)
+        self.assertLess(self.html.index('id="diff-pair"'),
+                        self.html.index('id="diff-cards"'))
+
+    def test_the_rail_gap_label_holds_its_own_width(self):
+        # Подпись над отрезком стояла absolute и ширины ему не добавляла:
+        # отрезок сжимался до предела, а подпись, торчащая из него в обе
+        # стороны, ложилась на соседние узлы. Теперь она в потоке, и
+        # собственного min-width у отрезка нет — его держит содержимое.
+        self.assertRegex(self.html, r"\.gap \{[^}]*grid-row: 1")
+        self.assertNotRegex(self.html, r"\.gap \{[^}]*position: absolute")
+        self.assertNotRegex(self.html, r"\n\.rl \{[^}]*min-width")
+
+    def test_the_only_snapshot_looks_open_like_any_other(self):
+        # Чип единственного снапшота — не кнопка: переключать не на что. Но
+        # открыт он ровно так же, и вид ему нужен тот же — рамка и заливка.
+        # Раньше и то и другое стояло на кнопке с aria-pressed, и рельс из
+        # одного узла показывал третий, нигде больше не встречающийся вид.
+        self.assertRegex(self.html, r"\.pick\.on \{[^}]*border-color: var\(--fg\)")
+        self.assertRegex(self.html,
+                         r"span\.pick\.on[^{]*\{[^}]*background: var\(--card\)")
+
+    def test_the_rail_has_no_scrollbar(self):
+        # Полосу прокрутки под рельсом заменило колесо мыши; обработчик
+        # живёт в rail.js, и без него рельс стал бы непрокручиваемым.
+        self.assertRegex(self.html, r"\.chain \{[^}]*scrollbar-width: none")
+        self.assertIn("box.addEventListener('wheel'", self.html)
+
     def test_reuses_ref_html_css_variables(self):
         for name in ("--bg", "--fg", "--muted", "--line", "--card",
                      "--accent", "--added", "--removed", "--hit"):

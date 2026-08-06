@@ -107,14 +107,57 @@
 
   /* ---------- карточки, селекторы, чипы ---------- */
 
+  /* Ширина карточки-среза. Браузер набивает строку под завязку и про
+     остаток не думает: одиннадцать срезов при десяти влезающих дают строку
+     из одной карточки. Считаем, на сколько строк они делятся поровну, и
+     задаём ширину числом — строка флексов растягивает то, что в ней стоит,
+     поэтому короткая последняя строка занята целиком.
+
+     Меряет тот, у кого есть раскладка: без неё (в тестах, у спрятанной
+     вкладки) ширина нулевая, и трогать нечего — карточки останутся при
+     своём минимуме из стилей. */
+  function fitCards(box) {
+    if (!box || !window.getComputedStyle || !box.clientWidth) return;
+    const list = box.querySelectorAll('.card');
+    if (!list.length) return;
+    const style = window.getComputedStyle(box);
+    const gap = parseFloat(style.columnGap) || 0;
+    const min = parseFloat(style.getPropertyValue('--card-min')) || 1;
+    const cols = cards.columnsFor(list.length, box.clientWidth, min, gap);
+    /* Минус пиксель: при точном делении браузер иногда не пускает последнюю
+       карточку в строку, и она уезжает вниз одна — ровно то, от чего
+       считали. */
+    const width = (box.clientWidth - (cols - 1) * gap) / cols - 1;
+    box.style.setProperty('--card-w', Math.max(min, width) + 'px');
+  }
+
+  /* Все четыре ряда карточек: итоги и срезы на обеих вкладках. Правило одно
+     на всех, и минимум своей ширины каждый ряд несёт в своих стилях. */
+  const CARD_BOXES = ['state-cards', 'class-cards', 'diff-pair', 'diff-cards'];
+
+  function fitAllCards() {
+    for (const id of CARD_BOXES) fitCards(document.getElementById(id));
+  }
+
   function renderStateCards() {
     const out = cards.stateCards(curSnap());
     document.getElementById('state-cards').innerHTML = out.big;
     document.getElementById('class-cards').innerHTML = out.classes;
+    fitCards(document.getElementById('state-cards'));
+    fitCards(document.getElementById('class-cards'));
   }
 
   function renderDiffCards() {
-    document.getElementById('diff-cards').innerHTML = cards.diffCards(curPair());
+    const pair = curPair();
+    /* Концы перехода берём у страницы, а не у самой пары: пара знает свои
+       теги, но не то, каким сбором каждого из них она посчитана, — а именно
+       это отличает два прогона одного тега друг от друга. */
+    const ends = page.currentEnds(), snaps = snapshots();
+    document.getElementById('diff-pair').innerHTML = ends
+      ? cards.pairCards(pair, snaps[ends[0]], snaps[ends[1]]) : '';
+    document.getElementById('diff-cards').innerHTML = cards.diffCards(pair);
+    fitCards(document.getElementById('diff-pair'));
+    fitCards(document.getElementById('diff-cards'));
   }
 
   /* Плашка показывает все три положения признака: нажата — «есть», класс
@@ -168,7 +211,7 @@
     const body = st.tab === 'diff' ? diffBody : stateBody;
     const word = st.tab === 'diff'
       ? plural(total, 'компонент', 'компонента', 'компонентов')
-      : plural(total, 'сборка', 'сборки', 'сборок');
+      : plural(total, 'билд', 'билда', 'билдов');
 
     counter.textContent = items.length + ' / ' + total + ' ' + word;
     expandBtn.textContent = allOpen(items) ? 'Collapse all' : 'Expand all';
@@ -230,6 +273,9 @@
     }
     stateSection.hidden = name !== 'state';
     diffSection.hidden = name !== 'diff';
+    /* У спрятанной вкладки ширины нет, и посчитанная при её отрисовке
+       ширина карточки была бы взята из нуля. Считаем, когда показали. */
+    fitAllCards();
     /* Панель поиска одна на страницу и переезжает к активной таблице:
        два одинаковых поля с разными id путали бы и пользователя, и hash. */
     const host = name === 'diff' ? diffSection : stateSection;
@@ -407,7 +453,7 @@
   }
 
   /* Каждое нажатие перестраивает весь tbody вместе с раскрытыми деталями, а
-     тег — это тысячи сборок. Ждём паузы в наборе. */
+     тег — это тысячи билдов. Ждём паузы в наборе. */
   const SEARCH_DELAY = 120;
   let searchTimer = null;
 
@@ -432,7 +478,7 @@
     /* Отложенный поиск отменяем не ради правильности — сработав, он
        прочитал бы уже пустое поле и ничего не испортил, — а ради работы:
        это лишняя перерисовка всей таблицы через 120 мс после той, что мы
-       делаем прямо сейчас. На теге в тысячу сборок она заметна. */
+       делаем прямо сейчас. На теге в тысячу билдов она заметна. */
     if (searchTimer) { clearTimeout(searchTimer); searchTimer = null; }
     search.value = '';
     st.q = '';
@@ -494,6 +540,9 @@
   } else {
     window.addEventListener('resize', syncStickyOffset);
   }
+  /* Ширина карточки посчитана от ширины окна и переживает её изменение не
+     сама: окно сузили — в строку влезает меньше, и делить надо заново. */
+  window.addEventListener('resize', fitAllCards);
 
   /* ---------- кнопка «наверх» ---------- */
 

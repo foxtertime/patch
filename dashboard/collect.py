@@ -20,7 +20,7 @@ def _now_iso() -> str:
 
 
 def _completed(raw) -> Optional[str]:
-    """Время сборки в виде «YYYY-MM-DD HH:MM:SS».
+    """Когда билд собран, в виде «YYYY-MM-DD HH:MM:SS».
 
     koji отдаёт completion_time то строкой ('2026-05-14 10:00:00.123456+00:00'
     или через 'T'), то числом epoch — приводим к одному виду. Доли секунды
@@ -174,6 +174,14 @@ def _attach_patches(build: Build, info: dict, cfg, gitlab_client,
     except SourceUrlError as exc:
         build.source = Source(raw=raw_url)
         build.problems.append("bad source url: %s" % exc)
+        return
+
+    # Сборка из готового SRPM: ветки нет, каталог PATCH читать негде и не у
+    # кого. Это не проблема билда, а другой способ его собрать, поэтому в
+    # problems ничего не уезжает — вид источника скажет метка в строке.
+    # patch_dir_present остаётся None: «неизвестно», а не «нет патчей».
+    if parsed.ref_kind == "srpm":
+        build.source = Source(raw=raw_url, ref=parsed.ref, ref_kind="srpm")
         return
 
     build.source = Source(
