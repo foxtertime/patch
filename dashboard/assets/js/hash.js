@@ -28,7 +28,7 @@
      Ничего не проверяется по данным: годится ли эта вкладка, есть ли такой
      снапшот и жив ли такой фильтр, решает тот, у кого данные есть. */
   function parse(raw) {
-    let out = { tab: null, tag: null, pair: null, filters: null,
+    let out = { tab: null, tag: null, pair: null, filters: null, any: null,
                 q: null, sort: null };
     const body = String(raw === null || raw === undefined ? '' : raw)
       .replace(/^#/, '');
@@ -43,6 +43,10 @@
       else if (key === 'tag') out.tag = val;
       else if (key === 'pair') out.pair = val;
       else if (key === 'f') out.filters = val ? val.split(',') : [];
+      /* Группы, переключённые в «любой из». Отсутствие ключа и пустой
+         список — разные вещи: первое значит «ссылка о режимах молчит»,
+         второе — «все группы по И». */
+      else if (key === 'any') out.any = val ? val.split(',') : [];
       else if (key === 'q') out.q = val.trim().toLowerCase();
       else if (key === 'sort') {
         bits = val.split(':');
@@ -66,6 +70,11 @@
        умолчанию непустой, и без явного «фильтров нет» ссылка на таблицу со
        снятым фильтром при открытии снова показывала бы только изменившиеся. */
     out.push('f=' + encodeURIComponent((parts.filters || []).join(',')));
+    /* any= пишем, только когда есть что писать: умолчание — все группы по И,
+       и пустой ключ в каждой ссылке был бы шумом. */
+    if ((parts.any || []).length) {
+      out.push('any=' + encodeURIComponent(parts.any.join(',')));
+    }
     if (parts.q) out.push('q=' + encodeURIComponent(parts.q));
     out.push('sort=' + parts.sort.key + (parts.sort.asc ? '' : ':desc'));
     return '#' + out.join('&');

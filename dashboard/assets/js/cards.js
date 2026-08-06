@@ -1,5 +1,8 @@
-/* Карточки-счётчики над таблицами и чипы поставленных фильтров. Возвращают
-   строки: куда их положить, знает корень страницы, а не они. */
+/* Карточки-счётчики над таблицами. Возвращают строки: куда их положить,
+   знает корень страницы, а не они. Какое из трёх положений сейчас у
+   признака, плашка тоже не решает — это расставляет корень по готовым
+   узлам, потому что разметка карточек пересобирается только со сменой
+   данных, а фильтр меняется куда чаще. */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
     module.exports = factory(require('./text.js'), require('./labels.js'));
@@ -111,20 +114,5 @@
                label, `${tip} Клик — фильтр.`)).join('');
   }
 
-  /* Чипы поставленных фильтров. Набор приходит доводом: какая вкладка
-     открыта, знает страница. */
-  function chips(set) {
-    const list = text.keys(set).sort();
-    let out = list.map((key) =>
-      `<button type="button" class="chip" data-chip="${esc(key)}"`
-      + ` data-tip="Снять фильтр">${esc(key)} · `
-      + `${esc(labels.label(key))} ✕</button>`).join('');
-    if (list.length > 1) {
-      out += '<button type="button" class="chip clear" data-chip="all"'
-          + ' data-tip="Снять все фильтры">сбросить всё</button>';
-    }
-    return out;
-  }
-
-  return { stateCards, diffCards, chips };
+  return { stateCards, diffCards };
 }));

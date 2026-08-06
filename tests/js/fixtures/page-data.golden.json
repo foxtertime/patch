@@ -21,10 +21,16 @@
     {
      "changed": true,
      "koji_url": "https://hub/koji/search?match=exact&type=build&terms=curl-8.0-1.el9",
+     "marks": [
+      "added"
+     ],
      "name": "curl",
      "new_branch": "os-9.2",
+     "new_completed": "2026-07-31 03:10:00",
      "new_evr": "8.0-1.el9",
      "new_inherited": false,
+     "new_koji_url": "https://hub/koji/search?match=exact&type=build&terms=curl-8.0-1.el9",
+     "new_owner": "net",
      "new_patches": [
       {
        "class": "FILES",
@@ -34,11 +40,18 @@
        "url": "https://gl/blob/PATCH/source.tar.gz"
       }
      ],
+     "new_project": "core/curl",
+     "new_source_url": "https://gl/core/curl/-/tree/os-9.2",
      "new_tagged_in": "os-9.2",
      "old_branch": null,
+     "old_completed": null,
      "old_evr": null,
      "old_inherited": null,
+     "old_koji_url": null,
+     "old_owner": null,
      "old_patches": [],
+     "old_project": null,
+     "old_source_url": null,
      "old_tagged_in": null,
      "patches_added": [],
      "patches_removed": [],
@@ -51,24 +64,35 @@
      "rpms_added": [],
      "rpms_removed": [],
      "source_url": "https://gl/core/curl/-/tree/os-9.2",
-     "status": "added",
-     "marks": [
-      "added"
-     ]
+     "status": "added"
     },
     {
      "changed": true,
      "koji_url": "https://hub/koji/search?match=exact&type=build&terms=httpd-2.4.62-1.el9",
+     "marks": [
+      "unchanged",
+      "tag-changed"
+     ],
      "name": "httpd",
      "new_branch": "abc123",
+     "new_completed": "2026-04-01 13:00:00",
      "new_evr": "1:2.4.62-1.el9",
      "new_inherited": false,
+     "new_koji_url": "https://hub/koji/search?match=exact&type=build&terms=httpd-2.4.62-1.el9",
+     "new_owner": "apache",
      "new_patches": [],
+     "new_project": "web/httpd",
+     "new_source_url": "https://gl/web/httpd/-/tree/abc123",
      "new_tagged_in": "os-9.2",
      "old_branch": "abc123",
+     "old_completed": "2026-04-01 13:00:00",
      "old_evr": "1:2.4.62-1.el9",
      "old_inherited": true,
+     "old_koji_url": "https://hub/koji/search?match=exact&type=build&terms=httpd-2.4.62-1.el9",
+     "old_owner": "apache",
      "old_patches": [],
+     "old_project": "web/httpd",
+     "old_source_url": "https://gl/web/httpd/-/tree/abc123",
      "old_tagged_in": "os-9.0",
      "patches_added": [],
      "patches_removed": [],
@@ -81,19 +105,25 @@
      "rpms_added": [],
      "rpms_removed": [],
      "source_url": "https://gl/web/httpd/-/tree/abc123",
-     "status": "unchanged",
-     "marks": [
-      "unchanged",
-      "tag-changed"
-     ]
+     "status": "unchanged"
     },
     {
      "changed": true,
      "koji_url": "https://hub/koji/search?match=exact&type=build&terms=nginx-1.26.0-1.el9",
+     "marks": [
+      "upgraded",
+      "repackaged",
+      "patches+",
+      "patches-",
+      "branch-changed"
+     ],
      "name": "nginx",
      "new_branch": "os-9.2",
+     "new_completed": "2026-07-31 02:45:00",
      "new_evr": "1.26.0-1.el9",
      "new_inherited": false,
+     "new_koji_url": "https://hub/koji/search?match=exact&type=build&terms=nginx-1.26.0-1.el9",
+     "new_owner": "builder",
      "new_patches": [
       {
        "class": "CVE",
@@ -119,10 +149,15 @@
        "url": "https://gl/blob/PATCH/dast-fuzz.patch"
       }
      ],
+     "new_project": "web/nginx",
+     "new_source_url": "https://gl/web/nginx/-/tree/os-9.2",
      "new_tagged_in": "os-9.2",
      "old_branch": "os-9.1",
+     "old_completed": "2026-05-15 00:30:00",
      "old_evr": "1.24.0-3.el9",
      "old_inherited": false,
+     "old_koji_url": "https://hub/koji/search?match=exact&type=build&terms=nginx-1.24.0-3.el9",
+     "old_owner": "builder",
      "old_patches": [
       {
        "class": "CVE",
@@ -148,6 +183,8 @@
        "url": "https://gl/blob/PATCH/nginx.spec.patch"
       }
      ],
+     "old_project": "web/nginx",
+     "old_source_url": "https://gl/web/nginx/-/tree/os-9.1",
      "old_tagged_in": "os-9.1",
      "patches_added": [
       "PATCH/changelog.yaml",
@@ -186,27 +223,31 @@
       "nginx-filesystem-1.24.0-3.el9.noarch"
      ],
      "source_url": "https://gl/web/nginx/-/tree/os-9.2",
-     "status": "upgraded",
-     "marks": [
-      "upgraded",
-      "repackaged",
-      "patches+",
-      "patches-",
-      "branch-changed"
-     ]
+     "status": "upgraded"
     },
     {
      "changed": true,
      "koji_url": "https://hub/koji/search?match=exact&type=build&terms=vim-9.0-1.el9",
+     "marks": [
+      "removed"
+     ],
      "name": "vim",
      "new_branch": null,
+     "new_completed": null,
      "new_evr": null,
      "new_inherited": null,
+     "new_koji_url": null,
+     "new_owner": null,
      "new_patches": [],
+     "new_project": null,
+     "new_source_url": null,
      "new_tagged_in": null,
      "old_branch": null,
+     "old_completed": "2026-05-14",
      "old_evr": "9.0-1.el9",
      "old_inherited": null,
+     "old_koji_url": "https://hub/koji/search?match=exact&type=build&terms=vim-9.0-1.el9",
+     "old_owner": "editor",
      "old_patches": [
       {
        "class": "COVERAGE",
@@ -216,6 +257,8 @@
        "url": "https://gl/blob/PATCH/coverage-vim.patch"
       }
      ],
+     "old_project": null,
+     "old_source_url": null,
      "old_tagged_in": null,
      "patches_added": [],
      "patches_removed": [],
@@ -228,18 +271,21 @@
      "rpms_added": [],
      "rpms_removed": [],
      "source_url": null,
-     "status": "removed",
-     "marks": [
-      "removed"
-     ]
+     "status": "removed"
     },
     {
      "changed": true,
      "koji_url": "https://hub/koji/search?match=exact&type=build&terms=zlib-1.3-1.el9",
+     "marks": [
+      "downgraded"
+     ],
      "name": "zlib",
      "new_branch": "os-9.1",
+     "new_completed": "никогда",
      "new_evr": "1.3-1.el9",
      "new_inherited": false,
+     "new_koji_url": "https://hub/koji/search?match=exact&type=build&terms=zlib-1.3-1.el9",
+     "new_owner": "builder",
      "new_patches": [
       {
        "class": "SAST",
@@ -256,10 +302,15 @@
        "url": "https://gl/blob/PATCH/weird.diff"
       }
      ],
+     "new_project": "core/zlib",
+     "new_source_url": "https://gl/core/zlib/-/tree/os-9.1",
      "new_tagged_in": "os-9.2",
      "old_branch": "os-9.1",
+     "old_completed": "никогда",
      "old_evr": "1.3-2.el9",
      "old_inherited": false,
+     "old_koji_url": "https://hub/koji/search?match=exact&type=build&terms=zlib-1.3-2.el9",
+     "old_owner": "builder",
      "old_patches": [
       {
        "class": "SAST",
@@ -276,6 +327,8 @@
        "url": "https://gl/blob/PATCH/weird.diff"
       }
      ],
+     "old_project": "core/zlib",
+     "old_source_url": "https://gl/core/zlib/-/tree/os-9.1",
      "old_tagged_in": "os-9.1",
      "patches_added": [],
      "patches_removed": [],
@@ -292,10 +345,7 @@
      "rpms_added": [],
      "rpms_removed": [],
      "source_url": "https://gl/core/zlib/-/tree/os-9.1",
-     "status": "downgraded",
-     "marks": [
-      "downgraded"
-     ]
+     "status": "downgraded"
     }
    ],
    "summary": false
@@ -326,6 +376,12 @@
       "os-9.1"
      ],
      "koji_url": "https://hub/koji/search?match=exact&type=build&terms=httpd-2.4.62-1.el9",
+     "marks": [
+      "inherited",
+      "from-commit",
+      "no-patch",
+      "gitlab-error"
+     ],
      "name": "httpd",
      "nvr": "httpd-2.4.62-1.el9",
      "owner": "apache",
@@ -343,12 +399,6 @@
      ],
      "source_url": "https://gl/web/httpd/-/tree/abc123",
      "tagged_in": "os-9.0",
-     "marks": [
-      "inherited",
-      "from-commit",
-      "no-patch",
-      "gitlab-error"
-     ],
      "task_id": 202,
      "version": "2.4.62"
     },
@@ -362,6 +412,11 @@
       "os-9.1"
      ],
      "koji_url": "https://hub/koji/search?match=exact&type=build&terms=nginx-1.24.0-3.el9",
+     "marks": [
+      "autogen",
+      "cve",
+      "spec"
+     ],
      "name": "nginx",
      "nvr": "nginx-1.24.0-3.el9",
      "owner": "builder",
@@ -408,11 +463,6 @@
      ],
      "source_url": "https://gl/web/nginx/-/tree/os-9.1",
      "tagged_in": "os-9.1",
-     "marks": [
-      "autogen",
-      "cve",
-      "spec"
-     ],
      "task_id": 201,
      "version": "1.24.0"
     },
@@ -424,6 +474,11 @@
      "inherited": null,
      "koji_tags": [],
      "koji_url": "https://hub/koji/search?match=exact&type=build&terms=vim-9.0-1.el9",
+     "marks": [
+      "coverage",
+      "no-source",
+      "internal-error"
+     ],
      "name": "vim",
      "nvr": "vim-9.0-1.el9",
      "owner": "editor",
@@ -451,11 +506,6 @@
      ],
      "source_url": null,
      "tagged_in": null,
-     "marks": [
-      "coverage",
-      "no-source",
-      "internal-error"
-     ],
      "task_id": null,
      "version": "9.0"
     },
@@ -469,6 +519,10 @@
       "os-9.1"
      ],
      "koji_url": "https://hub/koji/search?match=exact&type=build&terms=zlib-1.3-2.el9",
+     "marks": [
+      "sast",
+      "other"
+     ],
      "name": "zlib",
      "nvr": "zlib-1.3-2.el9",
      "owner": "builder",
@@ -503,10 +557,6 @@
      ],
      "source_url": "https://gl/core/zlib/-/tree/os-9.1",
      "tagged_in": "os-9.1",
-     "marks": [
-      "sast",
-      "other"
-     ],
      "task_id": null,
      "version": "1.3"
     }
@@ -574,6 +624,9 @@
       "os-9.2"
      ],
      "koji_url": "https://hub/koji/search?match=exact&type=build&terms=curl-8.0-1.el9",
+     "marks": [
+      "files"
+     ],
      "name": "curl",
      "nvr": "curl-8.0-1.el9",
      "owner": "net",
@@ -599,9 +652,6 @@
      ],
      "source_url": "https://gl/core/curl/-/tree/os-9.2",
      "tagged_in": "os-9.2",
-     "marks": [
-      "files"
-     ],
      "task_id": null,
      "version": "8.0"
     },
@@ -615,6 +665,11 @@
       "os-9.2"
      ],
      "koji_url": "https://hub/koji/search?match=exact&type=build&terms=httpd-2.4.62-1.el9",
+     "marks": [
+      "from-commit",
+      "no-patch",
+      "gitlab-error"
+     ],
      "name": "httpd",
      "nvr": "httpd-2.4.62-1.el9",
      "owner": "apache",
@@ -632,11 +687,6 @@
      ],
      "source_url": "https://gl/web/httpd/-/tree/abc123",
      "tagged_in": "os-9.2",
-     "marks": [
-      "from-commit",
-      "no-patch",
-      "gitlab-error"
-     ],
      "task_id": 202,
      "version": "2.4.62"
     },
@@ -650,6 +700,11 @@
       "os-9.2"
      ],
      "koji_url": "https://hub/koji/search?match=exact&type=build&terms=nginx-1.26.0-1.el9",
+     "marks": [
+      "cve",
+      "dast",
+      "changelog"
+     ],
      "name": "nginx",
      "nvr": "nginx-1.26.0-1.el9",
      "owner": "builder",
@@ -696,11 +751,6 @@
      ],
      "source_url": "https://gl/web/nginx/-/tree/os-9.2",
      "tagged_in": "os-9.2",
-     "marks": [
-      "cve",
-      "dast",
-      "changelog"
-     ],
      "task_id": 211,
      "version": "1.26.0"
     },
@@ -714,6 +764,10 @@
       "os-9.2"
      ],
      "koji_url": "https://hub/koji/search?match=exact&type=build&terms=zlib-1.3-1.el9",
+     "marks": [
+      "sast",
+      "other"
+     ],
      "name": "zlib",
      "nvr": "zlib-1.3-1.el9",
      "owner": "builder",
@@ -748,10 +802,6 @@
      ],
      "source_url": "https://gl/core/zlib/-/tree/os-9.1",
      "tagged_in": "os-9.2",
-     "marks": [
-      "sast",
-      "other"
-     ],
      "task_id": null,
      "version": "1.3"
     }

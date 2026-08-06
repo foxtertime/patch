@@ -50,8 +50,16 @@
       q: '',
       /* «Изменения» открываются на изменившихся компонентах: неизменившиеся
          строки в этой таблице — шум, из-за которого не видно изменившихся.
-         Фильтр обычный, он виден чипом и снимается как любой другой. */
+         Фильтр обычный: он виден на кнопке фильтров и снимается как любой
+         другой.
+
+         Значение — 1 («есть») или -1 («нет»); отсутствие ключа значит
+         «неважно». */
       filters: { state: {}, diff: { 'changed': 1 } },
+      /* Режим группы признаков: 'any' значит «любой из», отсутствие ключа —
+         «все», то есть И. Умолчание у всех групп одно, поэтому хранить его
+         незачем. */
+      modes: { state: {}, diff: {} },
       sort: { state: { key: 'name', asc: true },
               diff: { key: 'name', asc: true } }
     };
@@ -227,38 +235,109 @@
 
     function activeFilters() { return st.filters[st.tab]; }
 
+    function filterState(key) {
+      const at = st.filters[st.tab][key];
+      return at === 1 || at === -1 ? at : 0;
+    }
+
+    function setFilter(key, state) {
+      const set = st.filters[st.tab];
+      if (state === 1 || state === -1) set[key] = state;
+      else delete set[key];
+    }
+
+    /* Клик по плашке: «есть» ↔ «неважно». Из «нет» клик тоже уводит в
+       «неважно» — получить с плашки обратный срез нельзя, а уйти из него
+       можно. Все три положения показывает меню. */
     function toggleFilter(key) {
-      const set = activeFilters();
-      if (key === 'all') { st.filters[st.tab] = {}; }
-      else if (own(set, key)) { delete set[key]; }
-      else {
-        /* «версия та же» — не уточнение к «что-то изменилось», а другой срез
-           той же таблицы. Складывать их по И значит показать «версия не
-           менялась, но что-то другое поехало» — не то, что просит карточка. */
-        if (key === 'unchanged') delete set['changed'];
-        set[key] = 1;
-      }
+      if (key === 'all') { st.filters[st.tab] = {}; return; }
+      setFilter(key, filterState(key) === 0 ? 1 : 0);
     }
 
-    function stateMatches(row) {
-      let set = st.filters.state, key;
+    /* Режим любой вкладки, а не только текущей: судить приходится и о той,
+       на которой человека сейчас нет. */
+    function modeOf(tab, id) {
+      return st.modes[tab][id] === 'any' ? 'any' : 'all';
+    }
+
+    function groupMode(id) { return modeOf(st.tab, id); }
+
+    function setGroupMode(id, mode) {
+      if (mode === 'any') st.modes[st.tab][id] = 'any';
+      else delete st.modes[st.tab][id];
+    }
+
+    /* Есть ли у строки этот признак. Два ключа считаются, остальные просто
+       стоят в её метках — и это единственное место, где такое знание нужно:
+       и совпадение, и счётчики меню спрашивают отсюда. */
+    function rowHas(row, key, tab) {
+      if (tab === 'diff') {
+        if (key === 'changed') return Boolean(row.changed);
+        return row.marks.indexOf(key) !== -1;
+      }
+      if (key === 'has-patch') return row.patches.length > 0;
+      if (key === 'problem') return row.problems.length > 0;
+      return row.marks.indexOf(key) !== -1;
+    }
+
+    /* Совпадение строки с набором фильтров.
+
+       Внутри группы: «нет» — запрет, он действует всегда; «есть»
+       складываются по И или по ИЛИ, смотря какой у группы режим. Группы
+       между собой всегда по И.
+
+       Ключ, не попавший ни в одну группу, проверяется по И. Сейчас таких
+       нет — группы покрывают все метки, которые ставит viewmodel, — но
+       набор меток задаётся данными, и молча не применять неизвестный фильтр
+       нельзя: он приехал бы из ссылки и не действовал, ничем себя не выдав. */
+    function matches(row, tab) {
+      const set = st.filters[tab];
+      const groups = labels.groups(tab);
+      const seen = {};
+      let key;
+      for (const group of groups) {
+        let positives = 0, hit = false;
+        for (const name of group.keys) {
+          seen[name] = 1;
+          if (own(set, name) === undefined) continue;
+          if (set[name] === -1) {
+            if (rowHas(row, name, tab)) return false;
+            continue;
+          }
+          positives += 1;
+          if (rowHas(row, name, tab)) hit = true;
+          else if (modeOf(tab, group.id) === 'all') return false;
+        }
+        if (positives && !hit) return false;
+      }
       for (key in set) {
-        if (!set.hasOwnProperty(key)) continue;
-        if (key === 'has-patch') { if (!row.patches.length) return false; }
-        else if (key === 'problem') { if (!row.problems.length) return false; }
-        else if (row.marks.indexOf(key) === -1) return false;
+        if (own(set, key) === undefined || seen[key]) continue;
+        if (set[key] === -1) { if (rowHas(row, key, tab)) return false; }
+        else if (!rowHas(row, key, tab)) return false;
       }
       return true;
     }
 
-    function diffMatches(row) {
-      let set = st.filters.diff, key;
-      for (key in set) {
-        if (!set.hasOwnProperty(key)) continue;
-        if (key === 'changed') { if (!row.changed) return false; }
-        else if (row.marks.indexOf(key) === -1) return false;
+    function stateMatches(row) { return matches(row, 'state'); }
+    function diffMatches(row) { return matches(row, 'diff'); }
+
+    /* Сколько строк вкладки подходит под каждый признак само по себе, без
+       оглядки на другие фильтры: так же считают плашки. Зовут это при
+       открытии меню, а не на каждую перерисовку — иначе лишний проход по
+       всем строкам на каждый клик. */
+    function filterCounts() {
+      const tab = st.tab;
+      const host = tab === 'diff' ? curPair() : curSnap();
+      const list = host ? (tab === 'diff' ? host.rows : host.builds) : [];
+      const out = {};
+      for (const group of labels.groups(tab)) {
+        for (const key of group.keys) {
+          let n = 0;
+          for (const row of list) { if (rowHas(row, key, tab)) n += 1; }
+          out[key] = n;
+        }
       }
-      return true;
+      return out;
     }
 
     /* Токен фильтра мог устареть — приехать из чужого хеша или пережить свой
@@ -288,15 +367,14 @@
        фильтр на невидимой сейчас вкладке встретил бы человека той же пустой
        таблицей через один клик по ней. */
     function dropDeadFilters() {
-      let tabs = ['state', 'diff'], t, i, tab, from, live;
-      for (t = 0; t < tabs.length; t++) {
-        tab = tabs[t];
-        from = keys(st.filters[tab]);
-        live = [];
-        for (i = 0; i < from.length; i++) {
-          if (knownFilter(from[i], tab)) live.push(from[i]);
+      for (const tab of ['state', 'diff']) {
+        const from = st.filters[tab], live = {};
+        /* Переносим значение, а не единицу: у пережившего отсев фильтра
+           «нет» обязано остаться «нет». */
+        for (const key of keys(from)) {
+          if (knownFilter(key, tab)) live[key] = from[key];
         }
-        st.filters[tab] = setFrom(live);
+        st.filters[tab] = live;
       }
     }
 
@@ -307,9 +385,13 @@
        иначе непонятно, почему она в выдаче. */
     function scanState(row, q) {
       if (!q) return { show: true, deep: false };
+      /* Видимое в самой строке — мелкое совпадение: разворачивать её незачем,
+         человек и так видит, за что она попала в выдачу. Владелец и время
+         сборки стоят в своих колонках, поэтому они здесь, а не ниже. */
       const shallow = has(row.name, q) || has(row.nvr, q) || has(row.branch, q)
-                 || has(row.evr, q) || has(row.tagged_in, q);
-      let deep = has(row.project, q) || has(row.completed, q) || has(row.owner, q);
+                 || has(row.evr, q) || has(row.tagged_in, q)
+                 || has(row.owner, q) || has(row.completed, q);
+      let deep = has(row.project, q);
       let i, j, p;
       for (i = 0; !deep && i < (row.koji_tags || []).length; i++) {
         if (has(row.koji_tags[i], q)) deep = true;
@@ -528,7 +610,25 @@
       if (dropped) filters = null;
       /* Что из этого живое, решает dropDeadFilters() — его зовут оба, кто
          читает хеш, и оба по той же причине, что и после смены данных. */
-      if (filters) st.filters[st.tab] = setFrom(filters);
+      /* Минус перед ключом значит «нет». Разбирает его page, а не hash:
+         hash.js о смысле ключей не знает ничего и знать не должен. */
+      if (filters) {
+        const set = {};
+        for (const raw of filters) {
+          if (raw.charAt(0) === '-') {
+            if (raw.length > 1) set[raw.slice(1)] = -1;
+          } else if (raw) set[raw] = 1;
+        }
+        st.filters[st.tab] = set;
+      }
+      /* Ссылка без any= значит «все группы по И», и это не то же самое, что
+         «ссылка о режимах молчит»: режим, оставшийся от прошлого просмотра,
+         показал бы под присланной ссылкой другой срез. */
+      if (parsed.any !== null && parsed.any !== undefined) {
+        const modes = {};
+        for (const id of parsed.any) { if (id) modes[id] = 'any'; }
+        st.modes[st.tab] = modes;
+      }
       if (parsed.sort) st.sort[st.tab] = parsed.sort;
       if (parsed.q !== null) st.q = parsed.q;
     }
@@ -540,7 +640,9 @@
         tab: st.tab,
         tag: SNAPS.length ? snapKey(SNAPS[st.tag]) : null,
         pair: SNAPS.length > 1 ? pairKey(currentEnds()) : null,
-        filters: keys(activeFilters()).sort(),
+        filters: keys(activeFilters()).map(
+          (key) => (activeFilters()[key] === -1 ? '-' : '') + key).sort(),
+        any: keys(st.modes[st.tab]).sort(),
         q: st.q,
         sort: st.sort[st.tab]
       };
@@ -558,7 +660,8 @@
       lastEndsNamed, endsFromName,
       setPairEnds, selectSnapshot,
       anchor: anchorAt, setAnchor,
-      activeFilters, toggleFilter,
+      activeFilters, filterState, setFilter, toggleFilter,
+      groupMode, setGroupMode, filterCounts,
       knownFilter, dropDeadFilters,
       visibleRows, totalRows,
       sortRows, sortBy,

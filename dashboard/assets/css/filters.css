@@ -1,0 +1,61 @@
+/* Кнопка фильтров и плашка меню под ней. */
+
+/* Обёртка нужна плашке: она позиционируется от кнопки, а не от панели
+   управления, которая переезжает между вкладками. */
+.filterbox { position: relative; flex: 0 0 auto; }
+/* Поставленный фильтр виден и с закрытым меню: кнопка горит акцентом и
+   несёт число условий. Раньше на вопрос «почему строк так мало» отвечала
+   строка чипов — теперь отвечает она. */
+#filters.on { border-color: var(--accent); color: var(--accent); }
+
+/* Плашка лежит поверх таблицы: в потоке она раздвигала бы панель
+   управления и уводила таблицу вниз на каждое открытие. z-index больше,
+   чем у липкой шапки таблицы и самой панели, но меньше, чем у сообщений и
+   подсказки — те всплывают поверх всего. */
+.filtermenu { position: absolute; top: calc(100% + .4rem); left: 0;
+  z-index: 60; width: min(23rem, calc(100vw - 2.5rem));
+  max-height: 70vh; overflow-y: auto;
+  padding: .6rem .7rem; border-radius: var(--r-2);
+  border: 1px solid var(--line); background: var(--card);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .3); }
+.filtermenu[hidden] { display: none; }
+
+.fhead { display: flex; align-items: center; gap: .5rem;
+  padding-bottom: .45rem; margin-bottom: .45rem;
+  border-bottom: 1px solid var(--line); }
+.fhead .fl { color: var(--muted); font-size: .64rem; text-transform: uppercase;
+  letter-spacing: .09em; margin-right: auto; }
+.fclear { padding: .1rem .45rem; font-size: .72rem; color: var(--muted); }
+
+.fgroup + .fgroup { margin-top: .6rem; }
+.fghead { display: flex; align-items: center; gap: .5rem; margin-bottom: .25rem; }
+.fgname { color: var(--muted); font-size: .64rem; text-transform: uppercase;
+  letter-spacing: .09em; margin-right: auto; }
+
+/* Строка признака: подпись тянется, число и переключатель стоят по правому
+   краю столбиками — так их читают сверху вниз, не перескакивая взглядом. */
+.frow { display: flex; align-items: center; gap: .5rem; padding: .12rem 0; }
+.frow .fl { flex: 1 1 auto; font-family: var(--sans); font-size: .78rem;
+  overflow-wrap: anywhere; }
+.frow .fn { flex: 0 0 2.2rem; text-align: right; color: var(--muted);
+  font-size: .74rem; font-variant-numeric: tabular-nums; }
+
+/* Тройной переключатель: кнопки встык, одна всегда нажата. Общий вид кнопки
+   страницы им не годится — там пилюля с полем вокруг, а здесь ряд, который
+   читается как одна деталь. */
+.fset, .fmode { display: inline-flex; flex: 0 0 auto;
+  border: 1px solid var(--line); border-radius: 999px; overflow: hidden; }
+.fset button, .fmode button { padding: .1rem .5rem; border: 0; border-radius: 0;
+  background: none; color: var(--muted); font-size: .7rem; line-height: 1.5;
+  white-space: nowrap; }
+.fset button + button, .fmode button + button {
+  border-left: 1px solid var(--line); }
+.fset button:hover, .fmode button:hover { color: var(--fg);
+  border-color: var(--line); }
+.fset button[aria-pressed=true], .fmode button[aria-pressed=true] {
+  background: var(--line); color: var(--fg); }
+/* «Нет» — единственное положение, которое сужает выдачу отрицанием, и
+   единственное, которое стоит покрасить: иначе боковым зрением его не
+   отличить от «есть». */
+.fset button[data-fset$=":-1"][aria-pressed=true] { color: var(--removed); }
+.fnone { color: var(--muted); font-size: .78rem; }

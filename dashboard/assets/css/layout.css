@@ -94,24 +94,6 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .count { color: var(--muted); font-size: .85rem; margin-left: auto;
   font-variant-numeric: tabular-nums; white-space: nowrap; }
 
-/* Чипы активных фильтров: карточки уезжают при прокрутке, а фильтры
-   складываются по И — без этой строки непонятно, почему таблица пуста.
-
-   Стоят они между панелью поиска и таблицей и принадлежат таблице: это
-   ответ на вопрос «почему строк так мало». Отбивка снизу больше, чем
-   сверху, — иначе чип прилипает к линии шапки и читается как её часть. */
-.chips { display: flex; flex-wrap: wrap; gap: .35rem; padding: .5rem 0 .9rem; }
-.chips:empty { padding: 0; }
-.chip { display: inline-flex; align-items: center; gap: .35rem; padding: .16rem .55rem;
-  border-radius: 999px; border: 1px solid var(--line); background: var(--card);
-  color: var(--fg); font-size: .74rem; cursor: pointer;
-  transition: background var(--dur) var(--ease),
-              color var(--dur) var(--ease),
-              border-color var(--dur) var(--ease); }
-.chip:hover { background: var(--fg); border-color: var(--fg); color: var(--bg); }
-.chip.clear { color: var(--muted); }
-.chip.clear:hover { background: var(--line); border-color: var(--line);
-  color: var(--fg); }
 
 /* Кнопка «наверх». Тег в тысячу сборок — это метры прокрутки, а фильтры и
    вкладки остались вверху. Появляется ниже первого экрана: на нетронутой

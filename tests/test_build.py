@@ -107,8 +107,12 @@ class TemplateContractTest(unittest.TestCase):
         self.assertIn('id="q"', self.html)
         self.assertIn('id="expand"', self.html)
 
-    def test_has_active_filter_chip_bar(self):
-        self.assertIn('id="chips"', self.html)
+    def test_has_a_filter_menu(self):
+        # Поставленные фильтры больше не стоят строкой чипов под панелью:
+        # их показывает и правит меню под кнопкой.
+        self.assertIn('id="filters"', self.html)
+        self.assertIn('id="filtermenu"', self.html)
+        self.assertNotIn('id="chips"', self.html)
 
     def test_has_copy_nvr_button(self):
         self.assertIn('id="copy-nvr"', self.html)
@@ -158,6 +162,16 @@ class TemplateContractTest(unittest.TestCase):
         end = self.html.index("</section>", start)
         at = self.html.index('id="toasts"')
         self.assertFalse(start < at < end)
+
+    def test_marks_wrap_inside_their_cell(self):
+        # Меток у строки бывает полтора десятка, и в одну строку они
+        # растягивали таблицу за край окна вместе со всей страницей:
+        # обёртка таблицы не прокручивается, поэтому уезжала вся страница.
+        self.assertIn("td.marks { white-space: normal; }", self.html)
+        self.assertNotIn("td.marks { white-space: nowrap", self.html)
+        # А сама метка не переносится: разорванная посередине, она
+        # перестаёт читаться как метка.
+        self.assertRegex(self.html, r"\.mark \{[^}]*white-space: nowrap")
 
     def test_reuses_ref_html_css_variables(self):
         for name in ("--bg", "--fg", "--muted", "--line", "--card",

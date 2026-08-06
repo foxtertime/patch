@@ -130,7 +130,7 @@ test('каждый запрос скрипта находит свой узел'
   var heads = dom.document.querySelectorAll('th[data-sort]'), i;
   assert.ok(dom.document.querySelector('.tabs'));
   assert.strictEqual(dom.document.querySelectorAll('.tab').length, 2);
-  assert.strictEqual(heads.length, 12);
+  assert.strictEqual(heads.length, 13);
   for (i = 0; i < heads.length; i++) {
     assert.ok(heads[i].querySelector('.arrow'),
               'у колонки ' + heads[i].getAttribute('data-sort') + ' нет стрелки');
@@ -639,12 +639,10 @@ test('по умолчанию открыт диапазон во всю цепо
    заново, пройдя весь рельс сначала.
 
    Что из этого проверяет тест: после клика фокус стоит на узле с тем же
-   номером — значит, focusNode() зовут, и свой узел он находит. Отличить
-   «фокус вернули на перерисованный узел» от «фокус никуда и не уходил»
-   тест не может: innerHTML в заглушке — обычная строка, рельс от неё не
-   перерисовывается, и подставная кнопка из clickNode остаётся живым
-   узлом, который focusNode и находит. Само исчезновение узла живёт в
-   браузере, и заглушкой его не изобразить. */
+   номером. Узел при этом настоящий, перерисованный: запись в innerHTML
+   заглушка разбирает тем же разбором, что и шаблон, поэтому подставная
+   кнопка из clickNode до проверки не доживает — её уносит перерисовка
+   рельса, ровно как в браузере. */
 test('после клика фокус остаётся на том же узле', function () {
   var dom = load();
   threeChain(dom);
@@ -896,7 +894,7 @@ test('подписи классов не переживают выгрузку �
   await dom.tick();
   dom.location.hash = '#tab=state&f=sast';
   dom.fireWindow('hashchange');
-  assert.strictEqual(dom.id('chips').innerHTML, '',
+  assert.strictEqual(filterBtn(dom).textContent, 'Фильтры',
                      'фильтр класса из выгруженного снапшота остался живым');
 });
 
@@ -924,19 +922,155 @@ test('фильтр по классу не переживает смену сос
             'a.json');
   await dom.tick();
   pressCard(dom, 'tab-state', 'sast');            /* человек включил фильтр */
-  assert.ok(dom.id('chips').innerHTML.indexOf('sast') !== -1,
-            dom.id('chips').innerHTML);
+  assert.strictEqual(filterBtn(dom).textContent, 'Фильтры · 1');
   store.remove(0);
   store.add([snap('os-9.2', AUG,
                   { classes: ['CVE'],
                     builds: [build('nginx', { patches: [patch('c.patch', 'CVE')] })] })],
             'b.json');
   await dom.tick();
-  assert.strictEqual(dom.id('chips').innerHTML, '',
+  assert.strictEqual(filterBtn(dom).textContent, 'Фильтры',
                      'фильтр класса из выгруженного снапшота остался живым');
   assert.ok(dom.id('state-rows').innerHTML.indexOf('nginx') !== -1,
             'таблица пуста под фильтр, которого нет ни на одной карточке: '
             + dom.id('state-rows').innerHTML);
+});
+
+/* Кнопка фильтров: и орган управления, и единственное место, где с
+   закрытым меню видно, что фильтр вообще стоит. Раньше это говорила строка
+   чипов. */
+function filterBtn(dom) { return dom.id('filters'); }
+
+/* Кнопку меню нажимаем настоящую — ту, которую нарисовал сам модуль.
+   Заодно проверяется, что он её нарисовал: подставной узел сказал бы
+   только про обработчик. Меню при этом обязано быть открыто. */
+function menuBtn(dom, attr, value) {
+  var list = dom.id('filtermenu').querySelectorAll('[' + attr + ']'), i;
+  for (i = 0; i < list.length; i++) {
+    if (list[i].getAttribute(attr) === value) return list[i];
+  }
+  throw new Error('в меню нет ' + attr + '="' + value + '"');
+}
+
+function pressMenu(dom, attr, value) {
+  if (dom.id('filtermenu').hidden) dom.fire(filterBtn(dom), 'click', {});
+  dom.fire(menuBtn(dom, attr, value), 'click', {});
+}
+
+test('меню не закрывается после клика по признаку', function () {
+  /* Условий человек ставит несколько подряд, и переоткрывать меню на
+     каждое — работа, которой он не просил. Своя разметка при этом
+     перерисовывается, и узел, по которому щёлкнули, уходит из дерева: от
+     него до плашки уже не дойти, и клик выглядит внешним. */
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { classes: ['CVE', 'SAST'],
+    builds: [build('nginx', { patches: [patch('c.patch', 'CVE')] })] })],
+    'a.json');
+  dom.fire(filterBtn(dom), 'click', {});
+  dom.fire(menuBtn(dom, 'data-fset', 'cve:1'), 'click', {});
+  assert.strictEqual(dom.id('filtermenu').hidden, false,
+                     'меню закрылось после первого же клика');
+  dom.fire(menuBtn(dom, 'data-fset', 'sast:-1'), 'click', {});
+  assert.strictEqual(dom.id('filtermenu').hidden, false);
+  assert.strictEqual(filterBtn(dom).textContent, 'Фильтры · 2');
+});
+
+test('переключатель группы меню тоже не закрывает', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { classes: ['CVE'],
+    builds: [build('nginx', { patches: [patch('c.patch', 'CVE')] })] })],
+    'a.json');
+  dom.fire(filterBtn(dom), 'click', {});
+  dom.fire(menuBtn(dom, 'data-fmode', 'classes:any'), 'click', {});
+  assert.strictEqual(dom.id('filtermenu').hidden, false);
+  dom.fire(menuBtn(dom, 'data-fclear', '1'), 'click', {});
+  assert.strictEqual(dom.id('filtermenu').hidden, false);
+});
+
+test('после нажатия фокус остаётся на той же кнопке меню', function () {
+  /* Разметка меню перерисовывается целиком, и нажатая кнопка исчезает
+     вместе с фокусом: с клавиатуры второе условие пришлось бы искать табом
+     с начала плашки. */
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { classes: ['CVE'],
+    builds: [build('nginx', { patches: [patch('c.patch', 'CVE')] })] })],
+    'a.json');
+  dom.fire(filterBtn(dom), 'click', {});
+  dom.fire(menuBtn(dom, 'data-fset', 'cve:1'), 'click', {});
+  assert.strictEqual(dom.focused().getAttribute('data-fset'), 'cve:1');
+});
+
+test('клик мимо меню его закрывает', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { builds: [build('nginx')] })], 'a.json');
+  dom.fire(filterBtn(dom), 'click', {});
+  dom.fire(dom.id('state-rows'), 'click', {});
+  assert.strictEqual(dom.id('filtermenu').hidden, true);
+});
+
+test('кнопка фильтров считает поставленные условия', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { classes: ['CVE'],
+    builds: [build('nginx', { patches: [patch('c.patch', 'CVE')] })] })],
+    'a.json');
+  assert.strictEqual(filterBtn(dom).textContent, 'Фильтры');
+  pressCard(dom, 'tab-state', 'cve');
+  assert.strictEqual(filterBtn(dom).textContent, 'Фильтры · 1');
+});
+
+test('меню открывается кнопкой и закрывается ею же', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { builds: [build('nginx')] })], 'a.json');
+  assert.strictEqual(dom.id('filtermenu').hidden, true);
+  dom.fire(filterBtn(dom), 'click', {});
+  assert.strictEqual(dom.id('filtermenu').hidden, false);
+  assert.strictEqual(filterBtn(dom).getAttribute('aria-expanded'), 'true');
+  dom.fire(filterBtn(dom), 'click', {});
+  assert.strictEqual(dom.id('filtermenu').hidden, true);
+});
+
+test('Escape закрывает меню', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { builds: [build('nginx')] })], 'a.json');
+  dom.fire(filterBtn(dom), 'click', {});
+  dom.fire(dom.document.body, 'keydown', { key: 'Escape' });
+  assert.strictEqual(dom.id('filtermenu').hidden, true);
+});
+
+test('меню и плашка правят одно и то же состояние', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { classes: ['CVE'],
+    builds: [build('nginx', { patches: [patch('c.patch', 'CVE')] }),
+             build('curl')] })], 'a.json');
+  pressMenu(dom, 'data-fset', 'cve:-1');
+  assert.strictEqual(filterBtn(dom).textContent, 'Фильтры · 1');
+  assert.ok(dom.id('state-rows').innerHTML.indexOf('curl') !== -1,
+            dom.id('state-rows').innerHTML);
+  assert.strictEqual(dom.id('state-rows').innerHTML.indexOf('nginx'), -1,
+                     'строка с CVE-патчем осталась под фильтром «нет»');
+  /* Плашка того же признака снимает его в «неважно». */
+  pressCard(dom, 'tab-state', 'cve');
+  assert.strictEqual(filterBtn(dom).textContent, 'Фильтры');
+});
+
+test('переключатель группы уезжает в адрес', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { classes: ['CVE'],
+    builds: [build('nginx', { patches: [patch('c.patch', 'CVE')] })] })],
+    'a.json');
+  pressMenu(dom, 'data-fmode', 'classes:any');
+  assert.ok(dom.location.hash.indexOf('any=classes') !== -1,
+            dom.location.hash);
+});
+
+test('«сбросить всё» снимает фильтры вкладки', function () {
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { classes: ['CVE'],
+    builds: [build('nginx', { patches: [patch('c.patch', 'CVE')] })] })],
+    'a.json');
+  pressCard(dom, 'tab-state', 'cve');
+  pressMenu(dom, 'data-fclear', '1');
+  assert.strictEqual(filterBtn(dom).textContent, 'Фильтры');
 });
 
 /* Вкладки скрипт переключает делегированием, как карточки: кнопки в шаблоне
@@ -955,7 +1089,7 @@ function pressTab(dom, name) {
 /* Фильтры у вкладок свои, и мёртвым фильтр остаётся молча: пока человек на
    «Изменениях», отсев по одной текущей вкладке ничего не делает с
    «Состоянием», а один клик по вкладке возвращает и пустую таблицу, и
-   «sast · sast» в чипе. */
+   поставленный фильтр на кнопке. */
 test('мёртвый фильтр отсеивается и на той вкладке, где человека сейчас нет',
      async function () {
   var dom = load();
@@ -983,7 +1117,7 @@ test('мёртвый фильтр отсеивается и на той вкла
   assert.strictEqual(dom.id('tab-diff').hidden, false,
                      'человек уехал с «Изменений», сценарий проверяет не то');
   pressTab(dom, 'state');
-  assert.strictEqual(dom.id('chips').innerHTML, '',
+  assert.strictEqual(filterBtn(dom).textContent, 'Фильтры',
                      'на невидимой вкладке фильтр пережил свой снапшот');
   assert.ok(dom.id('state-rows').innerHTML.indexOf('nginx') !== -1,
             'таблица пуста под фильтр, которого нет ни на одной карточке: '
@@ -1650,3 +1784,31 @@ test('повторный выбор того же диапазона не счи
    проверка живёт в page.test.js, где сам кэш и стоит. Со страницы её было
    видно по метке «итог» на рельсе; метки больше нет, а другого следа кэш
    на странице не оставляет. */
+
+test('плашка показывает все три положения признака', function () {
+  /* Плашки страница рисует через innerHTML, а состояние расставляет по
+     готовым узлам: разметка карточек пересобирается только со сменой
+     данных. Поэтому и здесь узел настоящий. */
+  var dom = load();
+  store.add([snap('os-9.1', JUL, { classes: ['CVE'],
+    builds: [build('nginx', { patches: [patch('c.patch', 'CVE')] })] })],
+    'a.json');
+  var node = dom.document.createElement('div');
+  node.setAttribute('class', 'card');
+  node.setAttribute('data-filter', 'cve');
+  dom.id('tab-state').appendChild(node);
+
+  pressMenu(dom, 'data-fset', 'cve:-1');
+  assert.ok(String(node.className).indexOf('is-no') !== -1, node.className);
+  assert.strictEqual(node.getAttribute('aria-pressed'), 'false');
+
+  pressMenu(dom, 'data-fset', 'cve:1');
+  assert.strictEqual(String(node.className).indexOf('is-no'), -1,
+                     node.className);
+  assert.strictEqual(node.getAttribute('aria-pressed'), 'true');
+
+  pressMenu(dom, 'data-fset', 'cve:0');
+  assert.strictEqual(String(node.className).indexOf('is-no'), -1,
+                     node.className);
+  assert.strictEqual(node.getAttribute('aria-pressed'), 'false');
+});

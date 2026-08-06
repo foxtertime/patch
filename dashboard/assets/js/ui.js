@@ -13,18 +13,20 @@
                              require('./tables.js'), require('./cards.js'),
                              require('./page.js'), require('./hash.js'),
                              require('./rail.js'), require('./files.js'),
-                             require('./tips.js'), require('./toasts.js'));
+                             require('./tips.js'), require('./toasts.js'),
+                             require('./filters.js'));
   } else {
     root.KP = root.KP || {};
     root.KP.ui = factory(root.KP.viewmodel, root.KP.store, root.KP.diff,
                          root.KP.text, root.KP.labels, root.KP.markup,
                          root.KP.tables, root.KP.cards, root.KP.page,
                          root.KP.hash, root.KP.rail, root.KP.files,
-                         root.KP.tips, root.KP.toasts);
+                         root.KP.tips, root.KP.toasts, root.KP.filters);
   }
 }(typeof globalThis !== 'undefined' ? globalThis : this,
   function (viewmodel, store, diffmod, text, labels, markup, tables, cards,
-            pagemod, hash, railmod, filesmod, tipsmod, toastsmod) {
+            pagemod, hash, railmod, filesmod, tipsmod, toastsmod,
+            filtersmod) {
   'use strict';
 
   /* Состояние страницы живёт в page.js: там же и всё, что из него
@@ -43,7 +45,6 @@
   const stateSection = document.getElementById('tab-state');
   const diffSection = document.getElementById('tab-diff');
   let controls = document.getElementById('controls');
-  const chipsBox = document.getElementById('chips');
   const search = document.getElementById('q');
   const clearBtn = document.getElementById('q-clear');
   const counter = document.getElementById('count');
@@ -116,18 +117,27 @@
     document.getElementById('diff-cards').innerHTML = cards.diffCards(curPair());
   }
 
+  /* Плашка показывает все три положения признака: нажата — «есть», класс
+     is-no — «нет», ничего — «неважно». «Нет» нажатием быть не может: это не
+     выбор этой плашки, а запрет, и показывать его тем же, чем показан
+     выбор, значило бы называть разные вещи одним.
+
+     Плашка «все» нажата, когда на вкладке не стоит ни одного фильтра. */
   function syncCards() {
-    const set = activeFilters();
     const host = st.tab === 'diff' ? diffSection : stateSection;
-    const empty = !keys(set).length;
+    const empty = !keys(activeFilters()).length;
     for (const node of host.querySelectorAll('.card[data-filter]')) {
       const key = node.getAttribute('data-filter');
-      node.setAttribute('aria-pressed',
-        String(key === 'all' ? empty : Boolean(own(set, key))));
+      const state = key === 'all' ? (empty ? 1 : 0) : page.filterState(key);
+      node.setAttribute('aria-pressed', String(state === 1));
+      const base = String(node.className).replace(/\s*is-no\b/g, '');
+      node.className = state === -1 ? `${base} is-no` : base;
     }
   }
 
-  function renderChips() { chipsBox.innerHTML = cards.chips(activeFilters()); }
+  /* Меню одной вкладки на другой показывало бы чужие признаки: закрываем
+     его вместе со сменой таблицы. */
+  function closeFilters() { filters.close(); }
 
 
   /* ---------- рендер ---------- */
@@ -166,7 +176,7 @@
     copyBtn.disabled = !items.length;
 
     syncCards();
-    renderChips();
+    filters.sync();
     syncArrows();
     /* Рельс показывает текущий выбор, а он меняется и без смены состава:
        переключили тег, пару или вкладку — рельс обязан это отразить.
@@ -227,7 +237,7 @@
        с тем же именем забирала бы себе его сброс строкой выше. */
     const wrap = host.querySelector('.tablewrap');
     host.insertBefore(controls, wrap);
-    host.insertBefore(chipsBox, wrap);
+    closeFilters();
     search.placeholder = name === 'diff'
       ? 'Компонент, версия, тег, ветка, патч, CVE, RPM…'
       : 'Компонент, тег, ветка, патч, CVE, RPM…';
@@ -349,13 +359,12 @@
   bindBody(stateBody);
   bindBody(diffBody);
 
-  /* Карточки, чипы и селекторы — делегированием: их разметка перерисовывается. */
+  /* Плашки и узлы рельса — делегированием: их разметку страница
+     перерисовывает целиком. */
   document.addEventListener('click', (e) => {
     let node = e.target;
     while (node && node !== document) {
       if (node.getAttribute) {
-        const chip = node.getAttribute('data-chip');
-        if (chip !== null && chip !== undefined) { toggleFilter(chip); return; }
         if (node.className && String(node.className).indexOf('card') !== -1) {
           const f = node.getAttribute('data-filter');
           if (f) { toggleFilter(f); return; }
@@ -464,6 +473,10 @@
                               text: text, app: app, hideTip: hideTip });
   let files = filesmod.create({ store: store, toasts: toasts,
     dom: { input: fileInput, drop: dropZone, pick: pickBtn } });
+  const filters = filtersmod.create({
+    box: document.getElementById('filtermenu'),
+    button: document.getElementById('filters'),
+    page: page, labels: labels, text: text, app: app });
   app.render = render;
   app.renderStateCards = renderStateCards;
   app.renderDiffCards = renderDiffCards;

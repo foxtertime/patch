@@ -51,3 +51,47 @@ test('класс из данных, которого нет в списке, и�
     assert.deepStrictEqual(labels.classOrder({ zzz: 1, CVE: 1, aaa: 1 }),
                            ['CVE', 'aaa', 'zzz']);
   });
+
+test('группы «Состояния» перечислены в порядке показа', function () {
+  labels.setClasses([]);
+  var ids = labels.groups('state').map(function (g) { return g.id; });
+  assert.deepStrictEqual(ids, ['build', 'trouble'],
+                         'группа классов пуста и в список не попадает');
+});
+
+test('живые классы становятся группой', function () {
+  labels.setClasses(['CVE', 'SAST']);
+  var g = labels.groups('state')[0];
+  assert.strictEqual(g.id, 'classes');
+  assert.strictEqual(g.label, 'классы патчей');
+  assert.deepStrictEqual(g.keys, ['cve', 'sast']);
+});
+
+test('класс уходит из группы вместе со своим снапшотом', function () {
+  labels.setClasses(['CVE']);
+  labels.setClasses([]);
+  var ids = labels.groups('state').map(function (g) { return g.id; });
+  assert.strictEqual(ids.indexOf('classes'), -1);
+});
+
+test('группы «Изменений» — статус и что изменилось', function () {
+  labels.setClasses(['CVE']);
+  var ids = labels.groups('diff').map(function (g) { return g.id; });
+  assert.deepStrictEqual(ids, ['status', 'change']);
+  /* Классов патчей у строки диффа нет: viewmodel их туда не кладёт, и
+     группа классов на этой вкладке показывала бы фильтр, под который не
+     попадает ни одна строка. */
+  assert.strictEqual(ids.indexOf('classes'), -1);
+});
+
+test('каждый ключ группы называется по-русски', function () {
+  labels.setClasses([]);
+  ['state', 'diff'].forEach(function (tab) {
+    labels.groups(tab).forEach(function (group) {
+      group.keys.forEach(function (key) {
+        assert.notStrictEqual(labels.label(key), key,
+                              'ключ ' + key + ' без подписи');
+      });
+    });
+  });
+});

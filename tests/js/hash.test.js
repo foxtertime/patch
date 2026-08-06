@@ -8,7 +8,8 @@ var hash = require('../../dashboard/assets/js/hash.js');
 
 test('пустой адрес не говорит ни о чём', function () {
   assert.deepStrictEqual(hash.parse(''),
-    { tab: null, tag: null, pair: null, filters: null, q: null, sort: null });
+    { tab: null, tag: null, pair: null, filters: null, any: null,
+      q: null, sort: null });
   assert.deepStrictEqual(hash.parse('#'), hash.parse(''));
 });
 
@@ -95,4 +96,32 @@ test('амперсанд в запросе не рвёт ссылку надво
   var out = hash.format({ tab: 'state', tag: null, pair: null, filters: [],
                           q: 'a&f=x', sort: { key: 'name', asc: true } });
   assert.strictEqual(hash.parse(out).q, 'a&f=x');
+});
+
+test('any= разбирается списком групп', function () {
+  assert.deepStrictEqual(hash.parse('#tab=state&any=classes,status').any,
+                         ['classes', 'status']);
+});
+
+test('без any= режимы групп из ссылки не читаются', function () {
+  assert.strictEqual(hash.parse('#tab=state&f=cve').any, null);
+});
+
+test('пустой any= значит «все группы по И»', function () {
+  assert.deepStrictEqual(hash.parse('#tab=state&any=').any, []);
+});
+
+test('any= пишется, только когда есть что писать', function () {
+  var parts = { tab: 'state', tag: null, pair: null, filters: ['cve'],
+                any: [], q: '', sort: { key: 'name', asc: true } };
+  assert.strictEqual(hash.format(parts).indexOf('any='), -1);
+  parts.any = ['classes'];
+  assert.ok(hash.format(parts).indexOf('any=classes') !== -1,
+            hash.format(parts));
+});
+
+test('минус в f= проходит насквозь строкой', function () {
+  /* О смысле ключей hash.js не знает: минус разбирает page.restore. */
+  assert.deepStrictEqual(hash.parse('#f=cve,-autogen').filters,
+                         ['cve', '-autogen']);
 });

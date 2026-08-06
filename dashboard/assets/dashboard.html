@@ -39,11 +39,18 @@
         <button type="button" id="q-clear" hidden aria-label="Очистить поиск"
                 data-tip="Очистить строку поиска">✕</button>
       </div>
+      <!-- Кнопка и плашка стоят в одной обёртке: плашка позиционируется от
+           кнопки, а вся панель управления переезжает между вкладками. -->
+      <div class="filterbox" id="filterbox">
+        <button type="button" id="filters" class="toggle" aria-expanded="false"
+                aria-haspopup="true"
+                data-tip="Что показывать в таблице: признаки строки и классы патчей. У каждого признака три положения — неважно, есть, нет.">Фильтры</button>
+        <div class="filtermenu" id="filtermenu" hidden></div>
+      </div>
       <button id="expand" class="toggle" data-tip="Развернуть или свернуть все строки, которые сейчас видны. Фильтры и поиск учитываются.">Expand all</button>
       <button id="copy-nvr" class="toggle" data-tip="Скопировать NVR отфильтрованных строк">Copy NVR</button>
       <span class="count" id="count"></span>
     </div>
-    <div class="chips" id="chips"></div>
     <div class="tablewrap"><table id="state-table">
       <thead><tr>
         <th data-sort="name">компонент <span class="arrow">▲</span></th>
@@ -53,6 +60,7 @@
         <th data-sort="patches" data-tip="Сколько файлов лежит в каталоге PATCH ветки. Полоска показывает, из каких классов они состоят: цвет занимает долю, равную доле класса. Длина полоски одна у всех строк — сколько патчей, говорит число слева. Наведите на полоску, чтобы увидеть точные числа.">патчи <span class="arrow"></span></th>
         <th data-sort="rpms">RPM <span class="arrow"></span></th>
         <th data-sort="completed" data-tip="Когда koji завершил сборку, в московском времени. Хаб отдаёт UTC, в снапшоте хранится он же — перевод делается при построении дашборда. Сортировка показывает самые залежавшиеся.">собран <span class="arrow"></span></th>
+        <th data-sort="owner" data-tip="Кто запустил сборку в koji. Сортировка собирает сборки одного человека подряд.">владелец <span class="arrow"></span></th>
         <th>метки</th>
         <th>ссылки</th>
       </tr></thead>

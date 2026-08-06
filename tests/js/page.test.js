@@ -17,6 +17,14 @@ function patch(name, cls) {
            web_url: null };
 }
 
+/* Сборка с названным владельцем: у build() он всегда один и тот же, а
+   сортировке нужны разные. */
+function buildBy(name, owner) {
+  var out = build(name);
+  out.owner = owner;
+  return out;
+}
+
 function build(name, over) {
   over = over || {};
   return { nvr: name + '-1.0-1.el9', name: name, version: '1.0',
@@ -133,14 +141,178 @@ test('имя без разделителя — не диапазон', function 
   assert.strictEqual(make([snap('os-9.1', JUL)]).endsFromName('os-9.1'), null);
 });
 
-test('«версия та же» снимает «что-то изменилось», а не складывается с ним',
+/* Имена видимых строк: почти каждая проверка фильтров смотрит именно на
+   них, и разворачивать это в четыре строки на каждый тест незачем. */
+function rows(p) {
+  return p.visibleRows().map(function (item) { return item.row.name; }).sort();
+}
+
+test('«версия та же» и «что-то изменилось» теперь пересекаются', function () {
+  /* Раньше вторая плашка молча гасила первую — костыль под клик. В меню оба
+     признака видны и ставятся осознанно, а пересечение — законный запрос:
+     версия не менялась, а состав поехал. */
+  var p = make([snap('os-9.1', JUL),
+                snap('os-9.2', AUG,
+                     { builds: [build('nginx', { problems: ['ой'] })] })]);
+  p.st.tab = 'diff';
+  p.setFilter('unchanged', 1);
+  p.setFilter('changed', 1);
+  assert.strictEqual(p.filterState('unchanged'), 1);
+  assert.strictEqual(p.filterState('changed'), 1);
+});
+
+test('«нет» оставляет строки без признака', function () {
+  var p = make([snap('os-9.1', JUL, {
+    classes: ['CVE'],
+    builds: [build('nginx', { patches: [patch('c.patch', 'CVE')] }),
+             build('curl')]
+  })]);
+  p.setFilter('cve', -1);
+  assert.deepStrictEqual(rows(p), ['curl']);
+});
+
+test('«есть» и «нет» на одном ключе не уживаются', function () {
+  var p = make([snap('os-9.1', JUL, {
+    classes: ['CVE'],
+    builds: [build('nginx', { patches: [patch('c.patch', 'CVE')] })]
+  })]);
+  p.setFilter('cve', 1);
+  p.setFilter('cve', -1);
+  assert.strictEqual(p.filterState('cve'), -1);
+  assert.deepStrictEqual(rows(p), []);
+});
+
+test('два «есть» в одной группе по умолчанию требуют оба признака',
   function () {
-    var p = make([snap('os-9.1', JUL), snap('os-9.2', AUG)]);
-    p.st.tab = 'diff';
-    assert.deepStrictEqual(p.activeFilters(), { changed: 1 });
-    p.toggleFilter('unchanged');
-    assert.deepStrictEqual(p.activeFilters(), { unchanged: 1 });
+    var p = make([snap('os-9.1', JUL, {
+      classes: ['CVE', 'SAST'],
+      builds: [
+        build('both', { patches: [patch('c.patch', 'CVE'),
+                                  patch('s.patch', 'SAST')] }),
+        build('one', { patches: [patch('c.patch', 'CVE')] })
+      ]
+    })]);
+    p.setFilter('cve', 1);
+    p.setFilter('sast', 1);
+    assert.deepStrictEqual(rows(p), ['both']);
   });
+
+test('в режиме «любой из» хватает одного признака', function () {
+  var p = make([snap('os-9.1', JUL, {
+    classes: ['CVE', 'SAST'],
+    builds: [
+      build('both', { patches: [patch('c.patch', 'CVE'),
+                                patch('s.patch', 'SAST')] }),
+      build('one', { patches: [patch('c.patch', 'CVE')] }),
+      build('none')
+    ]
+  })]);
+  p.setFilter('cve', 1);
+  p.setFilter('sast', 1);
+  p.setGroupMode('classes', 'any');
+  assert.deepStrictEqual(rows(p), ['both', 'one']);
+});
+
+test('«нет» действует и в режиме «любой из»', function () {
+  /* Отрицание — не одно из условий на выбор, а запрет: строка с этим
+     признаком уходит независимо от того, чем группа сложена. */
+  var p = make([snap('os-9.1', JUL, {
+    classes: ['CVE', 'SAST', 'AUTOGEN'],
+    builds: [
+      build('clean', { patches: [patch('c.patch', 'CVE')] }),
+      build('dirty', { patches: [patch('c.patch', 'CVE'),
+                                 patch('a.patch', 'AUTOGEN')] })
+    ]
+  })]);
+  p.setFilter('cve', 1);
+  p.setFilter('sast', 1);
+  p.setFilter('autogen', -1);
+  p.setGroupMode('classes', 'any');
+  assert.deepStrictEqual(rows(p), ['clean']);
+});
+
+test('группы между собой складываются по И даже в режиме «любой из»',
+  function () {
+    var p = make([snap('os-9.1', JUL, {
+      classes: ['CVE'],
+      builds: [
+        build('inh', { patches: [patch('c.patch', 'CVE')],
+                       tag_name: 'os-9.0' }),
+        build('own', { patches: [patch('c.patch', 'CVE')] })
+      ]
+    })]);
+    p.setFilter('cve', 1);
+    p.setGroupMode('classes', 'any');
+    p.setFilter('inherited', -1);
+    assert.deepStrictEqual(rows(p), ['own']);
+  });
+
+test('ключ вне групп складывается по И', function () {
+  /* Групп на все метки хватает, но набор меток задаётся данными. Молча не
+     применять неизвестный фильтр нельзя: он приехал бы из ссылки и не
+     действовал, ничем себя не выдав. */
+  var p = make([snap('os-9.1', JUL, { builds: [build('nginx')] })]);
+  p.st.filters.state = { 'выдуманная-метка': 1 };
+  assert.deepStrictEqual(rows(p), []);
+});
+
+test('клик по плашке снимает и «нет» тоже', function () {
+  var p = make([snap('os-9.1', JUL)]);
+  p.setFilter('has-patch', -1);
+  p.toggleFilter('has-patch');
+  assert.strictEqual(p.filterState('has-patch'), 0);
+  p.toggleFilter('has-patch');
+  assert.strictEqual(p.filterState('has-patch'), 1);
+});
+
+test('счётчики считают по всем строкам вкладки, а не по видимым',
+  function () {
+    var p = make([snap('os-9.1', JUL, {
+      classes: ['CVE'],
+      builds: [build('nginx', { patches: [patch('c.patch', 'CVE')] }),
+               build('curl')]
+    })]);
+    p.setFilter('cve', 1);
+    assert.deepStrictEqual(rows(p), ['nginx']);
+    var counts = p.filterCounts();
+    assert.strictEqual(counts.cve, 1);
+    assert.strictEqual(counts['has-patch'], 1);
+    assert.strictEqual(counts.problem, 0);
+  });
+
+test('ссылка несёт минус у «нет» и режимы групп', function () {
+  var p = make([snap('os-9.1', JUL, { classes: ['CVE', 'SAST'] })]);
+  p.setFilter('cve', 1);
+  p.setFilter('sast', -1);
+  p.setGroupMode('classes', 'any');
+  var parts = p.hashParts();
+  assert.deepStrictEqual(parts.filters.slice().sort(), ['-sast', 'cve']);
+  assert.deepStrictEqual(parts.any, ['classes']);
+});
+
+test('ссылка с минусом восстанавливается как «нет»', function () {
+  var p = make([snap('os-9.1', JUL, { classes: ['CVE'] })]);
+  p.restore(parsed({ tab: 'state', filters: ['-cve'] }));
+  assert.strictEqual(p.filterState('cve'), -1);
+});
+
+test('ссылка без any= оставляет все группы в режиме «все»', function () {
+  /* Режим, оставшийся от прошлого просмотра, показал бы под присланной
+     ссылкой другой срез. */
+  var p = make([snap('os-9.1', JUL, { classes: ['CVE'] })]);
+  p.setGroupMode('classes', 'any');
+  p.restore(parsed({ tab: 'state', filters: ['cve'], any: [] }));
+  assert.strictEqual(p.groupMode('classes'), 'all');
+});
+
+test('мёртвый фильтр выбрасывается вместе со знаком', function () {
+  var p = make([snap('os-9.1', JUL, { classes: ['CVE'] })]);
+  p.setFilter('cve', -1);
+  p.setFilter('нет-такого', -1);
+  p.dropDeadFilters();
+  assert.strictEqual(p.filterState('cve'), -1);
+  assert.strictEqual(p.filterState('нет-такого'), 0);
+});
 
 test('повторный клик по фильтру снимает его', function () {
   var p = make([snap('os-9.1', JUL)]);
@@ -184,6 +356,36 @@ test('поиск по видимому полю не разворачивает 
   assert.strictEqual(items.length, 1);
   assert.strictEqual(items[0].open, false);
 });
+
+test('поиск по владельцу строку не разворачивает', function () {
+  /* Владелец стоит в самой строке, и разворачивать её незачем: правило
+     «развернуть» — про совпадения, которых в строке не видно. */
+  var p = make([snap('os-9.1', JUL)]);
+  p.st.q = 'builder';
+  var items = p.visibleRows();
+  assert.strictEqual(items.length, 1);
+  assert.strictEqual(items[0].open, false);
+});
+
+test('поиск по времени сборки строку тоже не разворачивает', function () {
+  var p = make([snap('os-9.1', JUL)]);
+  p.st.q = '2026-05-14';
+  var items = p.visibleRows();
+  assert.strictEqual(items.length, 1);
+  assert.strictEqual(items[0].open, false);
+});
+
+test('сортировка по владельцу собирает сборки одного человека подряд',
+  function () {
+    var p = make([snap('os-9.1', JUL, { builds: [
+      buildBy('nginx', 'zoe'), buildBy('curl', 'alice'),
+      buildBy('vim', 'zoe'), buildBy('zlib', 'alice')
+    ] })]);
+    p.sortBy('owner');
+    assert.deepStrictEqual(
+      p.sortRows(p.visibleRows()).map(function (i) { return i.row.owner; }),
+      ['alice', 'alice', 'zoe', 'zoe']);
+  });
 
 test('совпадение только в деталях разворачивает строку', function () {
   var p = make([snap('os-9.1', JUL,
@@ -243,7 +445,7 @@ test('отметка узла живёт в состоянии и снимает
 /* Разобранный адрес встречается с цепочкой ровно здесь: hash.js имён не
    разрешает, а page — не разбирает строк. */
 function parsed(over) {
-  var out = { tab: null, tag: null, pair: null, filters: null,
+  var out = { tab: null, tag: null, pair: null, filters: null, any: null,
               q: null, sort: null };
   for (var k in over) { if (over.hasOwnProperty(k)) out[k] = over[k]; }
   return out;

@@ -41,6 +41,16 @@ function diffRow(over) {
            old_patches: [], new_patches: [], rpm_rows: [],
            patches_added: [], patches_removed: [],
            rpms_added: [], rpms_removed: [],
+           old_owner: over.old_owner || 'builder',
+           new_owner: over.new_owner || 'builder',
+           old_completed: '2026-05-14 10:00:00',
+           new_completed: '2026-07-31 03:10:00',
+           old_project: over.old_project || 'core/nginx',
+           new_project: over.new_project || 'core/nginx',
+           old_koji_url: 'https://koji/koji/buildinfo?buildID=1',
+           new_koji_url: 'https://koji/koji/buildinfo?buildID=2',
+           old_source_url: 'https://git/core/nginx/-/tree/os-9.2',
+           new_source_url: 'https://git/core/nginx/-/tree/os-9.3',
            koji_url: null, source_url: null, marks: over.marks || [] };
 }
 
@@ -178,12 +188,97 @@ test('деталь состояния показывает оба источни
   assert.match(out, /<div class="bl">gitlab<\/div>/);
 });
 
-test('сборка с коммита помечена прямо в детали', function () {
-  var out = tables.stateDetail(stateRow({ }), '');
-  assert.doesNotMatch(out, /from-commit/);
+test('метку from-commit деталь не повторяет', function () {
+  /* Она уже стоит в колонке меток той же строки, и вторая такая же внутри
+     раскрытия сообщает то же самое второй раз. */
   var row = stateRow();
   row.ref_kind = 'commit';
-  assert.match(tables.stateDetail(row, ''), /data-filter="from-commit"/);
+  assert.doesNotMatch(tables.stateDetail(row, ''), /from-commit/);
+});
+
+test('владелец сборки стоит в строке', function () {
+  var out = tables.stateRows([{ row: stateRow(), open: false }], opts());
+  assert.match(out, /<td class="owner">builder<\/td>/);
+});
+
+test('владельца нет — в ячейке прочерк, а не пустота', function () {
+  var row = stateRow();
+  row.owner = null;
+  var out = tables.stateRows([{ row: row, open: false }], opts());
+  assert.match(out, /<td class="owner"><span class="none">—<\/span><\/td>/);
+});
+
+test('владелец подсвечивается поиском', function () {
+  var out = tables.stateRows([{ row: stateRow(), open: false }],
+                             opts({ q: 'build' }));
+  assert.match(out, /<td class="owner"><span class="hit">build<\/span>er<\/td>/);
+});
+
+test('в блоке koji стоят все поля билда', function () {
+  /* Раскрытие — полная карточка сборки, а не выжимка из того, чего нет в
+     строке: сюда приходят, когда строки уже мало. */
+  var row = stateRow();
+  row.koji_url = 'https://koji.example.com/koji/buildinfo?buildID=1';
+  var out = tables.stateDetail(row, '');
+  assert.match(out, /NVR/);
+  assert.match(out, /основной тег/);
+  assert.match(out, /другие теги/);
+  assert.match(out, /собран/);
+  assert.match(out, /владелец[\s\S]*builder/);
+  assert.match(out, /build id/);
+  assert.match(out, /task id/);
+  assert.match(out, /buildinfo\?buildID=1/, 'нет ссылки на билд в koji');
+});
+
+test('сборка с коммита названа коммитом, а не веткой', function () {
+  /* Значение в этой строке — не имя ветки, а хеш; подписать его «веткой»
+     значит соврать. Метка from-commit сюда не ставится: она стоит в
+     колонке меток той же строки. */
+  var row = stateRow();
+  row.ref_kind = 'commit';
+  row.branch = 'abc1234';
+  var out = tables.stateDetail(row, '');
+  assert.match(out, /<span class="k">коммит<\/span>/);
+  assert.doesNotMatch(out, /from-commit/);
+  assert.doesNotMatch(tables.stateDetail(stateRow(), ''),
+                      /<span class="k">коммит<\/span>/);
+});
+
+test('сводка стороны диффа несёт всю карточку сборки', function () {
+  /* «Было» и «стало» — это две карточки одной сборки, и обрезать их до
+     трёх строк значит заставлять уходить из раскрытия за остальным. */
+  var out = tables.diffDetail(diffRow(), '', 'os-9.1', 'os-9.4');
+  assert.match(out, /версия/);
+  assert.match(out, /тег/);
+  assert.match(out, /ветка/);
+  assert.match(out, /проект/);
+  assert.match(out, /собран/);
+  assert.match(out, /владелец/);
+  assert.match(out, /buildID=1/, 'нет ссылки на старый билд');
+  assert.match(out, /buildID=2/, 'нет ссылки на новый билд');
+  assert.match(out, /tree\/os-9\.2/, 'нет ссылки на старую ветку');
+  assert.match(out, /tree\/os-9\.3/, 'нет ссылки на новую ветку');
+});
+
+test('сменившийся владелец помечен на стороне «стало»', function () {
+  var out = tables.diffDetail(diffRow({ old_owner: 'alice',
+                                        new_owner: 'bob' }),
+                              '', 'os-9.1', 'os-9.4');
+  assert.match(out, /<span class="is-added">bob<\/span>/);
+  assert.doesNotMatch(out, /<span class="is-added">alice<\/span>/);
+});
+
+test('переехавший проект помечен на стороне «стало»', function () {
+  var out = tables.diffDetail(diffRow({ old_project: 'core/nginx',
+                                        new_project: 'web/nginx' }),
+                              '', 'os-9.1', 'os-9.4');
+  assert.match(out, /is-added">web\/nginx</);
+});
+
+test('одинаковые владелец и проект ничем не помечены', function () {
+  var out = tables.diffDetail(diffRow(), '', 'os-9.1', 'os-9.4');
+  assert.doesNotMatch(out, /is-added">builder</);
+  assert.doesNotMatch(out, /is-added">core\/nginx</);
 });
 
 test('блок проблем появляется только когда они есть', function () {

@@ -5,9 +5,11 @@
    перестаёт рисоваться. Дерево строится из самого шаблона, поэтому
    пропавший id или селектор роняет тест, а не молча меняет вид страницы.
 
-   Это заглушка, а не реализация DOM: innerHTML здесь обычная строка, и
-   разметка, которую скрипт рисует сам, селекторами не ищется. Всё, что
-   ui.js ищет запросами, стоит в шаблоне статически. */
+   Это заглушка, а не реализация DOM, но записанную в innerHTML разметку
+   она разбирает тем же разбором, что и шаблон: нарисованное скриптом
+   ищется селекторами, а прежние дети из дерева уходят — от этого зависит,
+   дойдёт ли делегированный обработчик от цели события до своего участка.
+   Ни стилей, ни размеров, ни настоящих событий браузера здесь нет. */
 var fs = require('node:fs');
 var path = require('node:path');
 
@@ -21,7 +23,7 @@ function Node(tag, attrs) {
   this.children = [];
   this.parentNode = null;
   this.text = '';
-  this.innerHTML = '';
+  this.html = '';
   this.hidden = Object.prototype.hasOwnProperty.call(this.attrs, 'hidden');
   this.className = this.attrs['class'] || '';
   this.disabled = false;
@@ -69,6 +71,25 @@ Node.prototype.insertBefore = function (node, anchor) {
 Object.defineProperty(Node.prototype, 'textContent', {
   get: function () { return this.text; },
   set: function (value) { this.text = String(value); }
+});
+
+/* Запись в innerHTML разбирается тем же разбором, что и шаблон: прежние
+   дети уходят из дерева, новые встают на их место. Без этого узел, по
+   которому щёлкнули, оставался бы прикреплённым и после перерисовки — а от
+   этого зависит, дойдёт ли обработчик на документе от цели события до
+   своего участка. */
+Object.defineProperty(Node.prototype, 'innerHTML', {
+  get: function () { return this.html; },
+  set: function (value) {
+    var i, kids;
+    for (i = 0; i < this.children.length; i++) {
+      this.children[i].parentNode = null;
+    }
+    this.html = String(value);
+    kids = parse(this.html).children;
+    this.children = kids;
+    for (i = 0; i < kids.length; i++) kids[i].parentNode = this;
+  }
 });
 
 Node.prototype.getBoundingClientRect = function () {
