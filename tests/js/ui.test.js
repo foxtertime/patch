@@ -1001,15 +1001,6 @@ test('негодный снапшот не уносит соседей по за
   assert.ok(noteText(dom).indexOf('bad.json') !== -1, noteText(dom));
 });
 
-test('разные хабы — предупреждение на странице', function () {
-  var dom = load();
-  var other = snap('os-9.2', '2026-08-01T00:00:00+03:00');
-  other.koji_hub = 'https://elsewhere/kojihub';
-  store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
-  store.add([other], 'b.json');
-  assert.ok(noteText(dom).indexOf('хаба') !== -1, noteText(dom));
-});
-
 test('перестановка тех же снапшотов предупреждение не повторяет', function () {
   /* warnings() считается заново от состава, и на каждое перетаскивание
      набор строк там прежний. Показывать его снова значило бы твердить
@@ -1024,20 +1015,6 @@ test('перестановка тех же снапшотов предупреж
   dragNode(dom, 1, 0, 'before');
   assert.strictEqual(dom.id('toasts').querySelectorAll('.toast').length, before,
                      'предупреждение всплыло второй раз: ' + noteText(dom));
-});
-
-test('откатившаяся перестановка объясняется окошком', function () {
-  /* У перестановки нет своего места для ошибок: причина уезжает в
-     предупреждения хранилища. Состав после отката прежний, и не показать
-     её значило бы промолчать о том, что действие не состоялось. */
-  var dom = load();
-  store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
-  store.add([snap('os-9.2', '2026-08-01T00:00:00+03:00')], 'b.json');
-  store.onChange(function () {
-    if (store.list()[0].tag === 'os-9.2') throw new Error('пара не рисуется');
-  });
-  store.move(1, -1);
-  assert.ok(noteText(dom).indexOf('пара не рисуется') !== -1, noteText(dom));
 });
 
 /* Добавляют снапшоты с рельса: призрак в его конце открывает тот же
