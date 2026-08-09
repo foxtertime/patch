@@ -32,6 +32,7 @@ function build(name, over) {
            tag_name: over.tag_name || null, tags: [], owner: 'builder',
            completed: '2026-05-14 10:00:00', source: null,
            patch_dir_present: true, patches: over.patches || [],
+           ghost_patches: over.ghost_patches || [],
            rpms: ['a.x86_64'], problems: over.problems || [] };
 }
 
@@ -395,6 +396,21 @@ test('совпадение только в деталях разворачива
   assert.strictEqual(items.length, 1);
   assert.strictEqual(items[0].open, true);
 });
+
+test('совпадение только в ghost-патче находит строку и разворачивает её',
+  function () {
+    /* Ghost-патч — это «влито в ветку, не собрано»: патча нет в самом
+       билде, он лежит только в ghosts, а секция с ним — в раскрытии.
+       Не найти строку по нему значило бы, что вопрос «какие пакеты ещё
+       ждут CVE-2026-1234» дашборд не отвечает вовсе. */
+    var p = make([snap('os-9.1', JUL,
+      { builds: [build('nginx',
+                       { ghost_patches: [patch('CVE-2026-1234.patch', 'CVE')] })] })]);
+    p.st.q = 'cve-2026-1234';
+    var items = p.visibleRows();
+    assert.strictEqual(items.length, 1);
+    assert.strictEqual(items[0].open, true);
+  });
 
 test('под запрос не подошло ничего — строк нет, но всего их столько же',
   function () {

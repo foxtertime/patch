@@ -5,6 +5,7 @@
     "build_id": 151,
     "completed": "2026-10-12 11:40:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "nginx",
     "nvr": "nginx-1.27.0-1.el9",
     "owner": "builder",
@@ -15,6 +16,7 @@
       "cves": [
        "CVE-2025-1112"
       ],
+      "ghost": null,
       "name": "CVE-2025-1112.patch",
       "path": "PATCH/CVE-2025-1112.patch",
       "web_url": "https://gl/blob/PATCH/CVE-2025-1112.patch"
@@ -22,6 +24,7 @@
      {
       "class": "CHANGELOG",
       "cves": [],
+      "ghost": null,
       "name": "changelog.yaml",
       "path": "PATCH/changelog.yaml",
       "web_url": "https://gl/blob/PATCH/changelog.yaml"
@@ -29,6 +32,7 @@
      {
       "class": "SPEC",
       "cves": [],
+      "ghost": null,
       "name": "nginx.spec.patch",
       "path": "PATCH/nginx.spec.patch",
       "web_url": "https://gl/blob/PATCH/nginx.spec.patch"
@@ -36,11 +40,13 @@
      {
       "class": "DISTSUFFIX",
       "cves": [],
+      "ghost": null,
       "name": "nginx-distsuffix.patch",
       "path": "PATCH/nginx-distsuffix.patch",
       "web_url": "https://gl/blob/PATCH/nginx-distsuffix.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "1.el9",
     "rpms": [
@@ -50,6 +56,11 @@
      "nginx-mod-http-1.27.0-1.el9.aarch64"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "web/nginx",
      "raw": "git+https://gl/web/nginx?#os-9.5",
@@ -68,17 +79,24 @@
     "build_id": 143,
     "completed": "2026-09-30 12:00:00",
     "epoch": 1,
+    "ghost_patches": [],
     "name": "httpd",
     "nvr": "httpd-2.4.62-2.el9",
     "owner": "httpd-team",
     "patch_dir_present": false,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "2.el9",
     "rpms": [
      "httpd-2.4.62-2.el9.x86_64"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "apps/httpd",
      "raw": "git+https://gl/apps/httpd?#abc123",
@@ -98,11 +116,13 @@
     "build_id": 144,
     "completed": "2026-09-29 07:30:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "zlib",
     "nvr": "zlib-1.3-3.el9",
     "owner": "builder",
     "patch_dir_present": null,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "3.el9",
     "rpms": [
@@ -110,6 +130,11 @@
      "zlib-1.3-3.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": null,
      "project": null,
      "raw": "cli-build/1730000000.5/zlib-1.3-3.el9.src.rpm",
@@ -128,6 +153,7 @@
     "build_id": 103,
     "completed": "2026-05-14",
     "epoch": null,
+    "ghost_patches": [],
     "name": "vim",
     "nvr": "vim-9.0-1.el9",
     "owner": "editor",
@@ -136,11 +162,13 @@
      {
       "class": "COVERAGE",
       "cves": [],
+      "ghost": null,
       "name": "coverage-vim.patch",
       "path": "PATCH/coverage-vim.patch",
       "web_url": "https://gl/blob/PATCH/coverage-vim.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "1.el9",
     "rpms": [
@@ -156,6 +184,7 @@
     "build_id": 140,
     "completed": "2026-09-01 05:05:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "kernel",
     "nvr": "kernel-5.14.0-620.el9",
     "owner": "kernel",
@@ -164,6 +193,7 @@
      {
       "class": "AUTOGEN",
       "cves": [],
+      "ghost": null,
       "name": "autogen-cve-patches.inc.new",
       "path": "PATCH/autogen-cve-patches.inc.new",
       "web_url": "https://gl/blob/PATCH/autogen-cve-patches.inc.new"
@@ -173,6 +203,7 @@
       "cves": [
        "CVE-2025-2003"
       ],
+      "ghost": null,
       "name": "CVE-2025-2003.patch",
       "path": "PATCH/CVE-2025-2003.patch",
       "web_url": "https://gl/blob/PATCH/CVE-2025-2003.patch"
@@ -180,6 +211,7 @@
      {
       "class": "SAST",
       "cves": [],
+      "ghost": null,
       "name": "sast-kernel-net.patch",
       "path": "PATCH/sast-kernel-net.patch",
       "web_url": "https://gl/blob/PATCH/sast-kernel-net.patch"
@@ -187,6 +219,7 @@
      {
       "class": "SAST",
       "cves": [],
+      "ghost": null,
       "name": "sast-kernel-fs.patch",
       "path": "PATCH/sast-kernel-fs.patch",
       "web_url": "https://gl/blob/PATCH/sast-kernel-fs.patch"
@@ -194,6 +227,7 @@
      {
       "class": "DAST",
       "cves": [],
+      "ghost": null,
       "name": "dast-kernel-fuzz.patch",
       "path": "PATCH/dast-kernel-fuzz.patch",
       "web_url": "https://gl/blob/PATCH/dast-kernel-fuzz.patch"
@@ -201,6 +235,7 @@
      {
       "class": "COVERAGE",
       "cves": [],
+      "ghost": null,
       "name": "coverage-kernel.patch",
       "path": "PATCH/coverage-kernel.patch",
       "web_url": "https://gl/blob/PATCH/coverage-kernel.patch"
@@ -208,6 +243,7 @@
      {
       "class": "DISTSUFFIX",
       "cves": [],
+      "ghost": null,
       "name": "kernel.spec.distsuffix.patch",
       "path": "PATCH/kernel.spec.distsuffix.patch",
       "web_url": "https://gl/blob/PATCH/kernel.spec.distsuffix.patch"
@@ -215,6 +251,7 @@
      {
       "class": "SPEC",
       "cves": [],
+      "ghost": null,
       "name": "kernel.spec.patch",
       "path": "PATCH/kernel.spec.patch",
       "web_url": "https://gl/blob/PATCH/kernel.spec.patch"
@@ -222,11 +259,13 @@
      {
       "class": "FILES",
       "cves": [],
+      "ghost": null,
       "name": "linux-5.14.0.tar.gz",
       "path": "PATCH/linux-5.14.0.tar.gz",
       "web_url": "https://gl/blob/PATCH/linux-5.14.0.tar.gz"
      }
     ],
+    "patches_ref": null,
     "problems": [
      "internal error: koji не ответил за 60 с"
     ],
@@ -241,6 +280,11 @@
      "kernel-5.14.0-620.el9.aarch64"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/kernel",
      "raw": "git+https://gl/core/kernel?#os-9.4",
@@ -259,6 +303,7 @@
     "build_id": 115,
     "completed": "2026-07-31 00:10:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "curl",
     "nvr": "curl-8.0-1.el9",
     "owner": "net",
@@ -267,17 +312,24 @@
      {
       "class": "FILES",
       "cves": [],
+      "ghost": null,
       "name": "source.tar.gz",
       "path": "PATCH/source.tar.gz",
       "web_url": "https://gl/blob/PATCH/source.tar.gz"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "1.el9",
     "rpms": [
      "curl-8.0-1.el9.x86_64"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/curl",
      "raw": "git+https://gl/core/curl?#os-9.2",
@@ -296,6 +348,7 @@
     "build_id": 142,
     "completed": null,
     "epoch": null,
+    "ghost_patches": [],
     "name": "openssl",
     "nvr": "openssl-3.2.1-1.el9",
     "owner": null,
@@ -306,6 +359,7 @@
       "cves": [
        "CVE-2025-3001"
       ],
+      "ghost": null,
       "name": "CVE-2025-3001.patch",
       "path": "PATCH/CVE-2025-3001.patch",
       "web_url": "https://gl/blob/PATCH/CVE-2025-3001.patch"
@@ -313,11 +367,13 @@
      {
       "class": "DISTSUFFIX",
       "cves": [],
+      "ghost": null,
       "name": "openssl-distsuffix.patch",
       "path": "PATCH/openssl-distsuffix.patch",
       "web_url": "https://gl/blob/PATCH/openssl-distsuffix.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "1.el9",
     "rpms": [
@@ -326,6 +382,11 @@
      "openssl-3.2.1-1.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/openssl",
      "raw": "git+https://gl/core/openssl?#os-9.4",

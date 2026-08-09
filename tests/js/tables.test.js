@@ -28,7 +28,9 @@ function stateRow(over) {
            ref_kind: 'branch', patch_dir_present: true, source_url: null,
            koji_url: null, patches: over.patches || [], patch_counts: {},
            rpms: over.rpms || ['nginx-1.24.0-3.el9.x86_64'],
-           problems: over.problems || [], marks: over.marks || [] };
+           problems: over.problems || [], marks: over.marks || [],
+           commit: null, commit_url: null, commits_ahead: null,
+           patches_ref: null, ghosts: over.ghosts || [] };
 }
 
 function diffRow(over) {
@@ -249,15 +251,73 @@ test('билд из SRPM подписан srpm, а блок назван srpm', 
 test('билд с коммита назван коммитом, а не веткой', function () {
   /* Значение в этой строке — не имя ветки, а хеш; подписать его «веткой»
      значит соврать. Метка from-commit сюда не ставится: она стоит в
-     колонке меток той же строки. */
+     колонке меток той же строки. Отдельная строка «коммит» ниже по блоку —
+     про build.source.commit, поле другого рода, и у неё своя проверка (см.
+     «раскрытие показывает коммит…» и «без коммита…» ниже); здесь речь
+     только о подписи поля-источника. */
   var row = stateRow();
   row.ref_kind = 'commit';
   row.branch = 'abc1234';
   var out = tables.stateDetail(row, '');
-  assert.match(out, /<span class="k">коммит<\/span>/);
+  assert.match(out,
+    /<span class="k">коммит<\/span><span class="v"><span class="mono">abc1234/);
   assert.doesNotMatch(out, /from-commit/);
-  assert.doesNotMatch(tables.stateDetail(stateRow(), ''),
-                      /<span class="k">коммит<\/span>/);
+});
+
+test('раскрытие показывает коммит и ссылку на него', function () {
+  var row = Object.assign(stateRow(), {
+    commit: 'abc123def456', commit_url: 'https://gl/g/r/-/tree/abc123def456'
+  });
+  var out = tables.stateRows([{ row: row, open: true }], opts());
+  assert.match(out, /abc123def456/);
+  assert.match(out, /https:\/\/gl\/g\/r\/-\/tree\/abc123def456/);
+});
+
+test('коммит без ссылки на дерево выводится обычным текстом', function () {
+  /* commit_url бывает null и при известном commit — например, tree_url
+     возвращает null на хосте, которого нет в конфиге (gitlabclient.py).
+     Тогда ссылки нет, но сам хеш всё равно должен быть виден, а не
+     потерян за прочерком «нет коммита». */
+  var row = Object.assign(stateRow(), {
+    commit: 'abc123def456', commit_url: null
+  });
+  var out = tables.stateRows([{ row: row, open: true }], opts());
+  assert.match(out, /<span class="mono">abc123def456<\/span>/, out);
+  assert.doesNotMatch(out, /href="[^"]*abc123def456/, out);
+});
+
+test('без коммита строка коммита стоит с прочерком', function () {
+  var out = tables.stateRows([{ row: stateRow(), open: true }], opts());
+  /* Позитивная проверка, а не «нет слова „коммит“»: теперь оно законно
+     встречается в блоке само по себе (см. ниже) — важно, что ветка
+     по-прежнему подписана «веткой», а не «коммитом». Без неё регресс
+     тернарного refName в stateDetail (ветка → коммит) не ловил бы ни один
+     тест: у diffDetail та же подпись считается отдельной функцией
+     refName(kind) и охраняется отдельно. */
+  assert.match(out,
+    /<span class="k">ветка<\/span><span class="v"><span class="mono">os-9\.2/);
+  assert.match(out, /коммит/);
+  assert.match(out, /class="none">—</);
+});
+
+test('бейдж отставания попадает в шапку блока патчей', function () {
+  var row = Object.assign(stateRow(), { commits_ahead: 4 });
+  var out = tables.stateRows([{ row: row, open: true }], opts());
+  assert.match(out, /<div class="bl">патчи[\s\S]*ветка \+4/);
+});
+
+test('ghost-секция стоит в блоке патчей', function () {
+  var row = stateRow({ ghosts: [{ path: 'PATCH/x.patch', name: 'x.patch',
+                                  'class': 'CVE', cves: [],
+                                  url: 'https://gl/x', ghost: 'branch' }] });
+  var out = tables.stateRows([{ row: row, open: true }], opts());
+  assert.match(out, /class="ghosts"/);
+  assert.match(out, /нет в пакете/);
+});
+
+test('без ghost блок патчей прежний', function () {
+  var out = tables.stateRows([{ row: stateRow(), open: true }], opts());
+  assert.strictEqual(out.indexOf('class="ghosts"'), -1);
 });
 
 test('сводка стороны диффа несёт всю карточку билда', function () {

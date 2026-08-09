@@ -18,6 +18,7 @@
     "has-patch": "с патчами", "problem": "с проблемами",
     "no-patch": "нет каталога PATCH", "no-source": "нет источника",
     "from-commit": "собран с коммита", "from-srpm": "собран из SRPM",
+    "branch-ahead": "ветка ушла вперёд",
     "gitlab-error": "ошибка GitLab",
     "internal-error": "внутренняя ошибка",
     "inherited": "унаследован из другого тега",
@@ -38,6 +39,7 @@
                         "coverage": 1, "distsuffix": 1, "license": 1, "spec": 1,
                         "changelog": 1, "files": 1, "other": 1 };
   const CALM_MARKS = { "from-commit": "warn", "from-srpm": "warn",
+                       "branch-ahead": "warn",
                        "no-patch": "calm",
                        "no-source": "bad", "gitlab-error": "bad",
                        "internal-error": "bad", "inherited": "calm" };
@@ -59,7 +61,8 @@
     state: [
       { id: "classes", label: "классы патчей", keys: null },
       { id: "build", label: "свойства билда",
-        keys: ["has-patch", "inherited", "from-commit", "from-srpm"] },
+        keys: ["has-patch", "inherited", "from-commit", "from-srpm",
+               "branch-ahead"] },
       { id: "trouble", label: "проблемы",
         keys: ["problem", "no-patch", "no-source", "gitlab-error",
                "internal-error"] }

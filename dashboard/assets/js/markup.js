@@ -112,6 +112,18 @@
          + `, всего ${total}">${bars.join('')}</span>`;
   }
 
+  /* «Ветка +N» в шапке блока патчей. При нуле и при неизвестном числе не
+     показывается ничего: отставания нет или его не считали, и бейдж на
+     большинстве строк был бы шумом. */
+  function aheadHtml(row) {
+    if (!row.commits_ahead) return '';
+    const tip = `В ветке ${row.branch || '—'} после точки, из которой собран `
+              + `билд, ${row.commits_ahead} коммит(ов). Патчи билда сняты с `
+              + `коммита, а не с вершины ветки.`;
+    return `<span class="ahead" data-tip="${esc(tip)}">`
+         + `ветка +${esc(row.commits_ahead)}</span>`;
+  }
+
   function kv(k, v) {
     return `<div class="kv"><span class="k">${esc(k)}</span>`
          + `<span class="v">${v}</span></div>`;
@@ -138,16 +150,28 @@
     return Boolean(q) && text.has(path, q) && !text.has(p.name, q);
   }
 
-  function patchItem(p, q, markCls) {
-    const href = safeUrl(p.url);
-    const title = href
+  /* Имя патча — ссылка на диф в GitLab, если он известен, иначе просто
+     моноширинный текст. Общий кусок для patchItem и ghostItem: список
+     ghost-патчей — те же объекты патчей, только со своей обёрткой строки. */
+  function itemTitle(item, q) {
+    const href = safeUrl(item.url);
+    return href
       ? `<a href="${esc(href)}" target="_blank" rel="noopener">`
-        + `${hl(p.name, q)}</a>`
-      : `<span class="mono">${hl(p.name, q)}</span>`;
-    const path = pathAdds(p, q)
-      ? `<div class="ppath">${hl(p.path, q)}</div>` : '';
+        + `${hl(item.name, q)}</a>`
+      : `<span class="mono">${hl(item.name, q)}</span>`;
+  }
+
+  /* Путь вторая строкой — только когда pathAdds считает, что он что-то
+     добавляет к имени (см. её комментарий). */
+  function itemPathLine(item, q) {
+    return pathAdds(item, q)
+      ? `<div class="ppath">${hl(item.path, q)}</div>` : '';
+  }
+
+  function patchItem(p, q, markCls) {
     return `<li${markCls ? ` class="${markCls}"` : ''}>`
-         + `${markCls ? signHtml(markCls) : ''}${title}${path}</li>`;
+         + `${markCls ? signHtml(markCls) : ''}${itemTitle(p, q)}`
+         + `${itemPathLine(p, q)}</li>`;
   }
 
   function classGroupHtml(name, count, body) {
@@ -205,6 +229,56 @@
       name, counts[name],
       items.filter((item) => item.p['class'] === name)
            .map((item) => patchItem(item.p, q, item.cls)).join(''))).join('');
+  }
+
+  /* Расхождение с веткой — не патчи билда, а разница между коммитом сборки
+     и вершиной ветки. Порядок сторон читается как рассказ: чего в пакете
+     не хватает, что в нём устарело, что в нём лишнее.
+
+     Вердикты нарочно зеркальны по краям, а средний стоит между ними: так
+     три подписи читаются шкалой «пакет — ветка», а не тремя разными
+     сообщениями. Длинными предложениями они были раньше и в подпись группы
+     не годились — блок деталей вдвое уже строки таблицы. */
+  const GHOST_ORDER = ['branch', 'changed', 'build'];
+  const GHOST_SIDE = {
+    branch: 'нет в пакете',
+    changed: 'в пакете старый',
+    build: 'нет в ветке'
+  };
+  /* Длинная формулировка ушла в подсказку: в столбце она не читается, а
+     ответ нужен там, где возникает вопрос, — на самом вердикте. */
+  const GHOST_TIP = {
+    branch: 'Файл появился в ветке после коммита, из которого собран '
+          + 'билд: в пакет он не вошёл.',
+    changed: 'Файл в ветке переписали после сборки: в пакете лежит его '
+           + 'прежняя редакция.',
+    build: 'Файл убрали из ветки после сборки: в пакете он остался.'
+  };
+
+  function ghostItem(g, q) {
+    /* Класс подписью внутри строки, а не заголовком группы: делить каждую
+       сторону ещё и по классам значило бы девять заголовков на три файла.
+       Цвет при этом остаётся цветом класса — второй легенды не заводим. */
+    const cls = g['class']
+      ? `<span class="pcls ${labels.classCls(g['class'])}">`
+        + `${esc(g['class'])}</span>` : '';
+    return `<li>${cls}${itemTitle(g, q)}${itemPathLine(g, q)}</li>`;
+  }
+
+  function ghostsHtml(ghosts, q) {
+    /* Порядок сторон задаёт разметка, а не порядок в снапшоте: полагаться
+       на файл, который выбрал человек, значило бы отдать ему раскладку
+       страницы. Сторона, которой мы не знаем, не рисуется вовсе — счётчик
+       обязан называть то, что видно. */
+    const groups = GHOST_ORDER.map((side) => {
+      const list = ghosts.filter((g) => g.ghost === side);
+      if (!list.length) return '';
+      return `<div class="gside" data-tip="${esc(GHOST_TIP[side])}">`
+           + `${esc(GHOST_SIDE[side])}<span class="n">${list.length}</span>`
+           + `</div><ul class="glist">`
+           + `${list.map((g) => ghostItem(g, q)).join('')}</ul>`;
+    }).join('');
+    return groups ? `<div class="ghosts">${groups}</div>` : '';
   }
 
   /* Архитектуру считает rpms.js — тот же модуль, что раскладывает пакеты по
@@ -289,9 +363,10 @@
          + (removed ? `<span class="minus">−${removed}</span>` : '');
   }
 
-  return { markHtml, marksHtml, linkHtml, kv, signHtml, meterHtml, pathAdds,
-           patchesHtml, patchesChangeHtml, rpmsHtml, rpmsChangeHtml,
-           rpmSideList,
+  return { markHtml, marksHtml, linkHtml, kv, signHtml, meterHtml, aheadHtml,
+           pathAdds,
+           patchesHtml, patchesChangeHtml, ghostsHtml, rpmsHtml,
+           rpmsChangeHtml, rpmSideList,
            taggedCell, builtHtml, inheritedNote, mainTagHtml, otherTagsHtml,
            taggedText, delta };
 }));

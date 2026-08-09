@@ -28,9 +28,10 @@
 
   /* Подпись блока в развёрнутой строке: имя и, если есть что считать,
      счётчик сразу за ним. */
-  function blockHead(title, count) {
+  function blockHead(title, count, extra) {
     return `<div class="bl">${esc(title)}`
       + (count === undefined ? '' : `<span class="n">· ${count}</span>`)
+      + (extra || '')
       + '</div>';
   }
 
@@ -92,6 +93,11 @@
             ? `<span class="mono">${hl(row.project, q)}</span>`
             : '<span class="none">—</span>')
       + kv(refName, branch)
+      + kv('коммит', row.commit
+            ? (row.commit_url
+                ? markup.linkHtml(row.commit_url, row.commit)
+                : `<span class="mono">${hl(row.commit, q)}</span>`)
+            : '<span class="none">—</span>')
       + kv('каталог PATCH', esc(dir))
       + kv('ссылка', row.source_url
             ? markup.linkHtml(row.source_url, 'gitlab')
@@ -105,8 +111,10 @@
       + `<div class="block">${blockHead('RPM', row.rpms.length)}`
       + `${markup.rpmsHtml(row.rpms, q)}</div>`
 
-      + `<div class="block">${blockHead('патчи', row.patches.length)}`
-      + `${markup.patchesHtml(row.patches, q)}</div>`;
+      + `<div class="block">${blockHead('патчи', row.patches.length,
+                                        markup.aheadHtml(row))}`
+      + `${markup.patchesHtml(row.patches, q)}`
+      + `${markup.ghostsHtml(row.ghosts || [], q)}</div>`;
 
     if (row.problems.length) {
       const items = row.problems.map((p) => `<li>${hl(p, q)}</li>`).join('');

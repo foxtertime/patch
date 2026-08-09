@@ -99,22 +99,30 @@ h1 .ver { color: var(--muted); font-size: .68em; font-weight: 400;
 }
 
 /* Класс патчей — цветной, поэтому карточка класса красит только подпись:
-   номер остаётся нейтральным и колонки чисел читаются как одна сетка. */
-.card .l.c-autogen, .mark.c-autogen, .pgroup.c-autogen,
+   номер остаётся нейтральным и колонки чисел читаются как одна сетка.
+   .pcls — тот же приём для ghost-патчей: класс там подписью внутри строки,
+   а не отдельной группой, и красить его нужно тем же правилом, а не своей
+   копией — иначе цвет класса в двух местах страницы имел бы шанс разойтись. */
+.card .l.c-autogen, .mark.c-autogen, .pgroup.c-autogen, .pcls.c-autogen,
 .meter i.c-autogen { color: var(--autogen); }
-.card .l.c-cve, .mark.c-cve, .pgroup.c-cve, .meter i.c-cve { color: var(--cve); }
-.card .l.c-sast, .mark.c-sast, .pgroup.c-sast, .meter i.c-sast { color: var(--sast); }
-.card .l.c-dast, .mark.c-dast, .pgroup.c-dast, .meter i.c-dast { color: var(--dast); }
-.card .l.c-coverage, .mark.c-coverage, .pgroup.c-coverage,
+.card .l.c-cve, .mark.c-cve, .pgroup.c-cve, .pcls.c-cve,
+.meter i.c-cve { color: var(--cve); }
+.card .l.c-sast, .mark.c-sast, .pgroup.c-sast, .pcls.c-sast,
+.meter i.c-sast { color: var(--sast); }
+.card .l.c-dast, .mark.c-dast, .pgroup.c-dast, .pcls.c-dast,
+.meter i.c-dast { color: var(--dast); }
+.card .l.c-coverage, .mark.c-coverage, .pgroup.c-coverage, .pcls.c-coverage,
 .meter i.c-coverage { color: var(--coverage); }
 .card .l.c-distsuffix, .mark.c-distsuffix, .pgroup.c-distsuffix,
-.meter i.c-distsuffix { color: var(--distsuffix); }
-.card .l.c-license, .mark.c-license, .pgroup.c-license,
+.pcls.c-distsuffix, .meter i.c-distsuffix { color: var(--distsuffix); }
+.card .l.c-license, .mark.c-license, .pgroup.c-license, .pcls.c-license,
 .meter i.c-license { color: var(--license); }
-.card .l.c-spec, .mark.c-spec, .pgroup.c-spec, .meter i.c-spec { color: var(--spec); }
+.card .l.c-spec, .mark.c-spec, .pgroup.c-spec, .pcls.c-spec,
+.meter i.c-spec { color: var(--spec); }
 .card .l.c-changelog, .mark.c-changelog, .pgroup.c-changelog,
-.meter i.c-changelog { color: var(--changelog); }
-.card .l.c-files, .mark.c-files, .pgroup.c-files,
+.pcls.c-changelog, .meter i.c-changelog { color: var(--changelog); }
+.card .l.c-files, .mark.c-files, .pgroup.c-files, .pcls.c-files,
 .meter i.c-files { color: var(--files); }
-.card .l.c-other, .mark.c-other, .pgroup.c-other, .meter i.c-other { color: var(--other); }
-.card .l.c-x, .mark.c-x, .pgroup.c-x, .meter i.c-x { color: var(--accent); }
+.card .l.c-other, .mark.c-other, .pgroup.c-other, .pcls.c-other,
+.meter i.c-other { color: var(--other); }
+.card .l.c-x, .mark.c-x, .pgroup.c-x, .pcls.c-x, .meter i.c-x { color: var(--accent); }

@@ -283,6 +283,8 @@ RPMS = {1: [{"name": "nginx", "version": "1.25.0", "release": "1.el9",
 ROUTES = {TREE % "g%2Fnginx": Response(200, [
     {"name": "CVE-2024-7347.patch", "type": "blob",
      "path": "PATCH/CVE-2024-7347.patch"}], {})}
+SHA = "0f1a2b3c4d5e6f70819293a4b5c6d7e8f9001122"
+COMPARE_URL = GITLAB_API + "/projects/g%2Fnginx/repository/compare"
 
 
 class CollectCommandTest(TempDirTest):
@@ -352,6 +354,33 @@ class CollectCommandTest(TempDirTest):
                                            "-o", self.out_path("a.json")))
         self.assertEqual(code, 2)
         self.assertIn("нет-такого", err)
+
+    def test_no_branch_check_reaches_collect(self):
+        # collect_tag тут ничем не подменяется — этот класс гоняет его
+        # целиком через фейковые koji и GitLab, подменяя только connect() и
+        # GitlabClient(). Флаг проверяем так же: по факту (не)ушедшего
+        # запроса /repository/compare, а не мокая саму функцию.
+        details = {bid: dict(info) for bid, info in DETAILS.items()}
+        details[1] = dict(details[1],
+                          source="git+ssh://git@gitlab.example.com/g/nginx#"
+                                 + SHA)
+        self.session.builds = details
+        self.transport = FakeTransport(dict(
+            ROUTES, **{COMPARE_URL: Response(
+                200, {"commit": {"id": SHA}, "commits": []}, {})}))
+
+        code, _ = self.run_cli(self.argv("collect", "--tag", "os-9.2",
+                                         "--no-branch-check",
+                                         "-o", self.out_path("a.json")))
+        self.assertEqual(code, 0)
+        self.assertFalse([r for r in self.transport.requests
+                          if r[0] == COMPARE_URL])
+
+        code, _ = self.run_cli(self.argv("collect", "--tag", "os-9.2",
+                                         "-o", self.out_path("b.json")))
+        self.assertEqual(code, 0)
+        self.assertTrue([r for r in self.transport.requests
+                         if r[0] == COMPARE_URL])
 
 
 class LoggerIsolationTest(unittest.TestCase):

@@ -88,5 +88,45 @@ class ParseSourceUrlTest(unittest.TestCase):
             parse_source_url(None)
 
 
+SHA = "0f1a2b3c4d5e6f70819293a4b5c6d7e8f9001122"
+
+
+class KojiSourceFormTest(unittest.TestCase):
+    """Верхнеуровневое поле source билда: git+ssh с хешем в конце.
+
+    Отдельным классом, потому что это другой источник строки: остальные
+    тесты разбирают extra.source.original_url, а сюда приезжает то, чем
+    koji пошёл собирать на самом деле.
+    """
+
+    def test_plain(self):
+        got = parse_source_url("git+ssh://gitlab.example.com/g/nginx#" + SHA)
+        self.assertEqual(got.host, "gitlab.example.com")
+        self.assertEqual(got.project, "g/nginx")
+        self.assertEqual(got.ref, SHA)
+        self.assertEqual(got.ref_kind, "commit")
+
+    def test_user_and_dot_git(self):
+        got = parse_source_url(
+            "git+ssh://git@gitlab.example.com/g/nginx.git#" + SHA)
+        self.assertEqual(got.host, "gitlab.example.com")
+        self.assertEqual(got.project, "g/nginx")
+        self.assertEqual(got.ref_kind, "commit")
+
+    def test_port_and_nested_group(self):
+        got = parse_source_url(
+            "git+ssh://git@gitlab.example.com:2222/g/sub/nginx.git#0f1a2b3c")
+        self.assertEqual(got.host, "gitlab.example.com")
+        self.assertEqual(got.project, "g/sub/nginx")
+        self.assertEqual(got.ref, "0f1a2b3c")
+        self.assertEqual(got.ref_kind, "commit")
+
+    def test_branch_in_the_same_form_is_still_a_branch(self):
+        # хеш опознаётся по виду, а не по тому, из какого поля пришла строка
+        got = parse_source_url("git+ssh://gitlab.example.com/g/nginx#os-9.1")
+        self.assertEqual(got.ref, "os-9.1")
+        self.assertEqual(got.ref_kind, "branch")
+
+
 if __name__ == "__main__":
     unittest.main()

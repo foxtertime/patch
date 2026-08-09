@@ -5,6 +5,7 @@
     "build_id": 121,
     "completed": "2026-08-28 09:15:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "nginx",
     "nvr": "nginx-1.26.2-1.el9",
     "owner": "builder",
@@ -15,6 +16,7 @@
       "cves": [
        "CVE-2024-7347"
       ],
+      "ghost": null,
       "name": "CVE-2024-7347.patch",
       "path": "PATCH/CVE-2024-7347.patch",
       "web_url": "https://gl/blob/PATCH/CVE-2024-7347.patch"
@@ -24,6 +26,7 @@
       "cves": [
        "CVE-2025-1111"
       ],
+      "ghost": null,
       "name": "CVE-2025-1111.patch",
       "path": "PATCH/CVE-2025-1111.patch",
       "web_url": "https://gl/blob/PATCH/CVE-2025-1111.patch"
@@ -31,6 +34,7 @@
      {
       "class": "CHANGELOG",
       "cves": [],
+      "ghost": null,
       "name": "changelog.yaml",
       "path": "PATCH/changelog.yaml",
       "web_url": "https://gl/blob/PATCH/changelog.yaml"
@@ -38,11 +42,13 @@
      {
       "class": "SPEC",
       "cves": [],
+      "ghost": null,
       "name": "nginx.spec.patch",
       "path": "PATCH/nginx.spec.patch",
       "web_url": "https://gl/blob/PATCH/nginx.spec.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "1.el9",
     "rpms": [
@@ -52,6 +58,11 @@
      "nginx-mod-http-1.26.2-1.el9.aarch64"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "web/nginx",
      "raw": "git+https://gl/web/nginx?#os-9.3",
@@ -70,11 +81,13 @@
     "build_id": 102,
     "completed": "2026-04-01 10:00:00",
     "epoch": 1,
+    "ghost_patches": [],
     "name": "httpd",
     "nvr": "httpd-2.4.62-1.el9",
     "owner": "apache",
     "patch_dir_present": false,
     "patches": [],
+    "patches_ref": null,
     "problems": [
      "gitlab: 404 на дереве ветки"
     ],
@@ -83,6 +96,11 @@
      "httpd-2.4.62-1.el9.x86_64"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "web/httpd",
      "raw": "git+https://gl/web/httpd?#abc123",
@@ -102,6 +120,7 @@
     "build_id": 104,
     "completed": "никогда",
     "epoch": null,
+    "ghost_patches": [],
     "name": "zlib",
     "nvr": "zlib-1.3-2.el9",
     "owner": "builder",
@@ -110,6 +129,7 @@
      {
       "class": "SAST",
       "cves": [],
+      "ghost": null,
       "name": "sast-zlib.patch",
       "path": "PATCH/sast-zlib.patch",
       "web_url": "https://gl/blob/PATCH/sast-zlib.patch"
@@ -117,11 +137,13 @@
      {
       "class": "other",
       "cves": [],
+      "ghost": null,
       "name": "weird.diff",
       "path": "PATCH/weird.diff",
       "web_url": "https://gl/blob/PATCH/weird.diff"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "2.el9",
     "rpms": [
@@ -129,6 +151,11 @@
      "zlib-1.3-2.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/zlib",
      "raw": "git+https://gl/core/zlib?#os-9.1",
@@ -147,6 +174,7 @@
     "build_id": 103,
     "completed": "2026-05-14",
     "epoch": null,
+    "ghost_patches": [],
     "name": "vim",
     "nvr": "vim-9.0-1.el9",
     "owner": "editor",
@@ -155,11 +183,13 @@
      {
       "class": "COVERAGE",
       "cves": [],
+      "ghost": null,
       "name": "coverage-vim.patch",
       "path": "PATCH/coverage-vim.patch",
       "web_url": "https://gl/blob/PATCH/coverage-vim.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "1.el9",
     "rpms": [
@@ -175,6 +205,7 @@
     "build_id": 130,
     "completed": "2026-08-30 03:40:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "kernel",
     "nvr": "kernel-5.14.0-611.el9",
     "owner": "kernel",
@@ -183,6 +214,7 @@
      {
       "class": "AUTOGEN",
       "cves": [],
+      "ghost": null,
       "name": "autogen-cve-patches.inc.new",
       "path": "PATCH/autogen-cve-patches.inc.new",
       "web_url": "https://gl/blob/PATCH/autogen-cve-patches.inc.new"
@@ -192,6 +224,7 @@
       "cves": [
        "CVE-2025-2001"
       ],
+      "ghost": null,
       "name": "CVE-2025-2001.patch",
       "path": "PATCH/CVE-2025-2001.patch",
       "web_url": "https://gl/blob/PATCH/CVE-2025-2001.patch"
@@ -201,6 +234,7 @@
       "cves": [
        "CVE-2025-2002"
       ],
+      "ghost": null,
       "name": "CVE-2025-2002.patch",
       "path": "PATCH/CVE-2025-2002.patch",
       "web_url": "https://gl/blob/PATCH/CVE-2025-2002.patch"
@@ -210,6 +244,7 @@
       "cves": [
        "CVE-2025-2003"
       ],
+      "ghost": null,
       "name": "CVE-2025-2003.patch",
       "path": "PATCH/CVE-2025-2003.patch",
       "web_url": "https://gl/blob/PATCH/CVE-2025-2003.patch"
@@ -217,6 +252,7 @@
      {
       "class": "SAST",
       "cves": [],
+      "ghost": null,
       "name": "sast-kernel-net.patch",
       "path": "PATCH/sast-kernel-net.patch",
       "web_url": "https://gl/blob/PATCH/sast-kernel-net.patch"
@@ -224,6 +260,7 @@
      {
       "class": "SAST",
       "cves": [],
+      "ghost": null,
       "name": "sast-kernel-fs.patch",
       "path": "PATCH/sast-kernel-fs.patch",
       "web_url": "https://gl/blob/PATCH/sast-kernel-fs.patch"
@@ -231,6 +268,7 @@
      {
       "class": "DAST",
       "cves": [],
+      "ghost": null,
       "name": "dast-kernel-fuzz.patch",
       "path": "PATCH/dast-kernel-fuzz.patch",
       "web_url": "https://gl/blob/PATCH/dast-kernel-fuzz.patch"
@@ -238,6 +276,7 @@
      {
       "class": "COVERAGE",
       "cves": [],
+      "ghost": null,
       "name": "coverage-kernel.patch",
       "path": "PATCH/coverage-kernel.patch",
       "web_url": "https://gl/blob/PATCH/coverage-kernel.patch"
@@ -245,6 +284,7 @@
      {
       "class": "SPEC",
       "cves": [],
+      "ghost": null,
       "name": "kernel.spec.patch",
       "path": "PATCH/kernel.spec.patch",
       "web_url": "https://gl/blob/PATCH/kernel.spec.patch"
@@ -252,11 +292,13 @@
      {
       "class": "FILES",
       "cves": [],
+      "ghost": null,
       "name": "linux-5.14.0.tar.gz",
       "path": "PATCH/linux-5.14.0.tar.gz",
       "web_url": "https://gl/blob/PATCH/linux-5.14.0.tar.gz"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "611.el9",
     "rpms": [
@@ -268,6 +310,11 @@
      "kernel-5.14.0-611.el9.aarch64"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/kernel",
      "raw": "git+https://gl/core/kernel?#os-9.3",
@@ -283,7 +330,7 @@
     "version": "5.14.0"
    }
   ],
-  "dashboard": "2.0.0",
+  "dashboard": "2.1.0",
   "generated": "2026-09-01T00:00:00+03:00",
   "koji_hub": "https://hub/kojihub",
   "koji_web": "https://hub/koji",
