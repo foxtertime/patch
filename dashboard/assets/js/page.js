@@ -403,6 +403,19 @@
           if (has(p.cves[j], q)) deep = true;
         }
       }
+      /* Ghost-патчи — то самое место, где живёт «влито в ветку, не
+         собрано»: без них запрос по имени CVE не находил бы строку вовсе,
+         хотя вопрос дашборда патчей CVE как раз «какие пакеты его ещё
+         ждут». Секция ghost-ов лежит в раскрытии, поэтому совпадение здесь
+         тоже глубокое — строка обязана открыться, а не просто остаться в
+         выдаче. */
+      for (i = 0; !deep && i < (row.ghosts || []).length; i++) {
+        p = row.ghosts[i];
+        if (has(p.name, q) || has(p.path, q) || has(p['class'], q)) deep = true;
+        for (j = 0; !deep && j < (p.cves || []).length; j++) {
+          if (has(p.cves[j], q)) deep = true;
+        }
+      }
       for (i = 0; !deep && i < row.rpms.length; i++) {
         if (has(row.rpms[i], q)) deep = true;
       }
