@@ -59,6 +59,8 @@ def marks_of(build, tag):
         marks.add("from-srpm")
     if build.patch_dir_present is False:
         marks.add("no-patch")
+    if build.source is not None and build.source.commits_ahead:
+        marks.add("branch-ahead")
     for problem in build.problems:
         if problem.startswith("gitlab:") or problem.startswith("bad source"):
             marks.add("gitlab-error")
@@ -69,7 +71,11 @@ def marks_of(build, tag):
 
 NAMES = ["rich-old.json", "rich-new.json", "rich-newer.json",
          "rich-newest.json", "rich-again.json", "rich-mirror.json",
-         "rich-wide.json", "rich-many.json"]
+         "rich-wide.json", "rich-many.json",
+         "rich-legacy.json", "rich-drift.json", "rich-caught-up.json"]
+
+# Цепочка одного тега про коммит сборки, в порядке съёмки.
+DRIFT_CHAIN = ["rich-legacy.json", "rich-drift.json", "rich-caught-up.json"]
 
 
 class ReadableTest(unittest.TestCase):
@@ -165,6 +171,118 @@ class InterestingCasesTest(unittest.TestCase):
         for key in ("inherited", "no-source", "from-commit", "no-patch",
                     "gitlab-error", "internal-error"):
             self.assertIn(key, marks, key)
+
+
+class DriftChainTest(unittest.TestCase):
+    """Три снапшота одного тега про коммит сборки.
+
+    Каждый по отдельности показывает своё состояние, а вместе они —
+    единственное место в наборе, где видно движение: ghost-патч перестаёт
+    быть ghost, потому что билд пересобрали.
+    """
+
+    def test_the_chain_is_one_tag_at_three_moments(self):
+        tags = set(snapshot(name).tag for name in DRIFT_CHAIN)
+        self.assertEqual(len(tags), 1)
+        stamps = [snapshot(name).generated for name in DRIFT_CHAIN]
+        self.assertEqual(stamps, sorted(stamps))
+        self.assertEqual(len(set(stamps)), 3)
+
+    def test_legacy_carries_none_of_the_new_fields(self):
+        # Так выглядит файл, записанный до 2.2.0: страница обязана открыть
+        # его без единой ошибки, а рядом с соседями по цепочке — поднять
+        # предупреждение о двух видах.
+        legacy = snapshot("rich-legacy.json")
+        for build in legacy.builds:
+            self.assertIsNone(build.patches_ref, build.name)
+            self.assertEqual(build.ghost_patches, [], build.name)
+            self.assertIsNone(build.source.commit, build.name)
+            self.assertIsNone(build.source.commits_ahead, build.name)
+
+    def test_the_lie_the_work_was_about_is_visible_in_the_pair(self):
+        # В legacy патчи сняты с вершины ветки, и CVE-2026-3011 стоит у
+        # билда как свой. В drift тот же файл — ghost стороны branch: он
+        # в ветке есть, а в пакет не вошёл. Ровно то расхождение, ради
+        # которого всё затевалось, и увидеть его можно только в паре.
+        was = snapshot("rich-legacy.json").by_name()["nginx"]
+        now = snapshot("rich-drift.json").by_name()["nginx"]
+        self.assertIn("CVE-2026-3011.patch", [p.name for p in was.patches])
+        self.assertNotIn("CVE-2026-3011.patch", [p.name for p in now.patches])
+        self.assertEqual([(p.name, p.ghost) for p in now.ghost_patches
+                          if p.ghost == "branch"],
+                         [("CVE-2026-3011.patch", "branch")])
+
+    def test_drift_shows_every_ghost_side_and_the_quiet_case(self):
+        drift = snapshot("rich-drift.json")
+        sides = set(p.ghost for b in drift.builds for p in b.ghost_patches)
+        self.assertEqual(sides, {"branch", "changed", "build"})
+        # Бейдж без секции: ветка ушла, а каталога PATCH не касалась.
+        openssl = drift.by_name()["openssl"]
+        self.assertEqual(openssl.source.commits_ahead, 7)
+        self.assertEqual(openssl.ghost_patches, [])
+        # Обратного в наборе нет и быть не должно: ghost без отставания
+        # не бывает — второе дерево читают только когда ветка ушла.
+        for build in drift.builds:
+            if build.ghost_patches:
+                self.assertTrue(build.source.commits_ahead, build.name)
+        # Спокойная строка, на фоне которой остальные и читаются.
+        python3 = drift.by_name()["python3"]
+        self.assertEqual(python3.source.commits_ahead, 0)
+        self.assertNotIn("branch-ahead", marks_of(python3, drift.tag))
+
+    def test_drift_holds_both_kinds_of_build_at_once(self):
+        # Предупреждение о двух видах поднимается и на одном файле: у curl
+        # хеша нет вовсе и патчи сняты с ветки, у соседей — с коммита.
+        drift = snapshot("rich-drift.json")
+        curl = drift.by_name()["curl"]
+        self.assertIsNone(curl.source.commit)
+        self.assertEqual(curl.patches_ref, curl.source.ref)
+        self.assertEqual(curl.problems, [])
+        nginx = drift.by_name()["nginx"]
+        self.assertNotEqual(nginx.patches_ref, nginx.source.ref)
+
+    def test_drift_has_a_pinned_build_and_a_vanished_commit(self):
+        drift = snapshot("rich-drift.json")
+        # Собран прямо с коммита: ветки нет, сравнивать не с чем — и
+        # «снятым с ветки» такой билд считать нельзя.
+        zlib = drift.by_name()["zlib"]
+        self.assertEqual(zlib.source.ref_kind, "commit")
+        self.assertEqual(zlib.patches_ref, zlib.source.commit)
+        self.assertIsNone(zlib.source.commits_ahead)
+        self.assertIn("from-commit", marks_of(zlib, drift.tag))
+        # Коммит пропал: патчи сняты с ветки, и об этом сказано вслух.
+        glibc = drift.by_name()["glibc"]
+        self.assertEqual(glibc.patches_ref, glibc.source.ref)
+        self.assertIsNotNone(glibc.source.commit)
+        self.assertTrue(any("недоступен" in p for p in glibc.problems))
+
+    def test_catching_up_turns_a_ghost_into_a_patch(self):
+        before = snapshot("rich-drift.json").by_name()
+        after = snapshot("rich-caught-up.json").by_name()
+        # nginx пересобрали: ghost стал патчем билда, ghost не осталось.
+        self.assertIn("CVE-2026-3011.patch",
+                      [p.name for p in before["nginx"].ghost_patches])
+        self.assertIn("CVE-2026-3011.patch",
+                      [p.name for p in after["nginx"].patches])
+        self.assertEqual(after["nginx"].ghost_patches, [])
+        self.assertNotEqual(before["nginx"].nvr, after["nginx"].nvr)
+        # httpd тоже: сторона build исчерпана вместе с пересборкой.
+        self.assertEqual(after["httpd"].ghost_patches, [])
+        # glibc пересобрали с живого коммита — проблема ушла.
+        self.assertEqual(after["glibc"].problems, [])
+
+    def test_catching_up_also_lets_drift_accumulate(self):
+        before = snapshot("rich-drift.json").by_name()
+        after = snapshot("rich-caught-up.json").by_name()
+        # openssl не трогали, и ветка ушла ещё дальше.
+        self.assertEqual(before["openssl"].nvr, after["openssl"].nvr)
+        self.assertGreater(after["openssl"].source.commits_ahead,
+                           before["openssl"].source.commits_ahead)
+        # А спокойная прежде строка обзавелась несобранным CVE.
+        self.assertEqual(before["python3"].ghost_patches, [])
+        self.assertEqual([(p.name, p.ghost)
+                          for p in after["python3"].ghost_patches],
+                         [("CVE-2026-3030.patch", "branch")])
 
 
 if __name__ == "__main__":
