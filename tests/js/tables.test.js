@@ -273,6 +273,19 @@ test('раскрытие показывает коммит и ссылку на 
   assert.match(out, /https:\/\/gl\/g\/r\/-\/tree\/abc123def456/);
 });
 
+test('коммит без ссылки на дерево выводится обычным текстом', function () {
+  /* commit_url бывает null и при известном commit — например, tree_url
+     возвращает null на хосте, которого нет в конфиге (gitlabclient.py).
+     Тогда ссылки нет, но сам хеш всё равно должен быть виден, а не
+     потерян за прочерком «нет коммита». */
+  var row = Object.assign(stateRow(), {
+    commit: 'abc123def456', commit_url: null
+  });
+  var out = tables.stateRows([{ row: row, open: true }], opts());
+  assert.match(out, /<span class="mono">abc123def456<\/span>/, out);
+  assert.doesNotMatch(out, /href="[^"]*abc123def456/, out);
+});
+
 test('без коммита строка коммита стоит с прочерком', function () {
   var out = tables.stateRows([{ row: stateRow(), open: true }], opts());
   /* Позитивная проверка, а не «нет слова „коммит“»: теперь оно законно
