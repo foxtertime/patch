@@ -277,6 +277,22 @@ def _attach_patches(build: Build, info: dict, cfg, gitlab_client,
 
     if not build.source.commits_ahead:
         return
+    # Дерево коммита не прочиталось вовсе (сетевой отказ, 500, исчерпанные
+    # ретраи 429) — result.present is None, а built.blobs в _ghosts пуст.
+    # Посчитай мы ghost-и по такому дереву, каждый файл на вершине ветки
+    # ушёл бы в сторону "branch" — «влит, но не собран», — хотя на деле мы
+    # просто не знаем, что лежало в коммите: фабрикация, а не находка.
+    # commits_ahead уже записан и не трогается: число коммитов не зависит
+    # от чтения дерева патчей и остаётся верным само по себе — то, что
+    # ветка ушла вперёд, известно, даже если неизвестно, что именно она
+    # принесла.
+    #
+    # result.present is False — легитимно пустое дерево (ветка есть,
+    # каталога PATCH в коммите нет), и сравнение с веткой по нему верно:
+    # тогда каждый файл ветки — и правда несобранный ghost. Поэтому
+    # ограничиваемся ровно случаем «неизвестно», а не любым пустым built.
+    if result.present is None:
+        return
     tip = gitlab_client.patch_files(parsed.host, parsed.project, parsed.ref)
     if tip.problem:
         build.problems.append(tip.problem)

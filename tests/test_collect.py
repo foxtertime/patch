@@ -804,6 +804,22 @@ class GhostPatchesTest(unittest.TestCase):
         self.assertEqual(build.ghost_patches, [])
         self.assertTrue(any("gitlab:" in p for p in build.problems))
 
+    def test_failed_first_read_does_not_fabricate_branch_ghosts(self):
+        # Дерево коммита не прочиталось вовсе (500) — result.present is
+        # None, result.blobs пуст. Если бы ghost считался по пустому
+        # built.blobs, каждый файл на вершине ветки выглядел бы как "влит,
+        # но не собран" — хотя на деле мы просто не знаем, что лежало в
+        # коммите. commits_ahead при этом верен сам по себе (не зависит от
+        # дерева патчей) и остаётся в снапшоте.
+        built = Response(500, {"message": "boom"}, {})
+        tip = Response(200, [{"id": "d1", "type": "blob",
+                              "path": "PATCH/CVE-2026-9.patch"}], {})
+        build, _ = self._nginx(built, tip, ahead=2)
+        self.assertIsNone(build.patch_dir_present)
+        self.assertEqual(build.ghost_patches, [])
+        self.assertEqual(build.source.commits_ahead, 2)
+        self.assertTrue(any("gitlab:" in p for p in build.problems))
+
 
 if __name__ == "__main__":
     unittest.main()
