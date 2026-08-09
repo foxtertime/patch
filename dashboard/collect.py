@@ -258,6 +258,13 @@ def _attach_patches(build: Build, info: dict, cfg, gitlab_client,
 # уже нет: его выдаёт доразбор 404 в GitlabClient. Отказ сети выглядит
 # иначе, и путать их нельзя — на отказе сети чтение ветки ничего не
 # исправит, а патчи с ветки, выданные за патчи коммита, соврут.
+#
+# Сравниваем суффиксом, а не полным равенством: при подмене хоста
+# GitlabClient._fetch приписывает свою заметку впереди («host не описан в
+# конфиге, запрошен ...; gitlab: ref not found»), и точное равенство эту
+# комбинацию бы не узнало. Строка рождается в одном месте
+# (_resolve_missing_tree), а _fetch только дописывает к ней спереди — маркер
+# всегда остаётся в конце, и ложных срабатываний суффикс не даёт.
 _REF_GONE = "gitlab: ref not found"
 
 
@@ -273,7 +280,7 @@ def _read_patch_dir(build, gitlab_client, parsed, commit):
         return parsed.ref, gitlab_client.patch_files(parsed.host,
                                                      parsed.project, parsed.ref)
     result = gitlab_client.patch_files(parsed.host, parsed.project, commit)
-    if result.problem != _REF_GONE:
+    if not result.problem or not result.problem.endswith(_REF_GONE):
         return commit, result
     build.problems.append(
         "gitlab: коммит %s недоступен, патчи сняты с ветки" % commit[:12])

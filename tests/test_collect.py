@@ -609,6 +609,39 @@ class PatchesComeFromCommitTest(unittest.TestCase):
         self.assertEqual(len(build.patches), 1)
         self.assertTrue(any("недоступен" in p for p in build.problems))
 
+    def test_ref_gone_is_recognised_behind_a_substituted_host_note(self):
+        # хост из original_url не описан в конфиге: GitlabClient._fetch
+        # приписывает свою заметку впереди строки problem, и «ref not
+        # found» оказывается не всей строкой, а её концом. Откат на ветку
+        # обязан сработать и в этой комбинации, а не только при чистом
+        # "gitlab: ref not found".
+        tagged = {"os-9.2": [{"build_id": 1, "name": "nginx"}]}
+        builds = {1: dict(BUILDS[1], extra={"source": {"original_url":
+                  "git+ssh://git@old.example.com/g/nginx?#origin/br"}},
+                  source="git+ssh://git@old.example.com/g/nginx#" + SHA)}
+        session = FakeKojiSession(tagged=tagged, builds=builds,
+                                  rpms={1: RPMS[1]})
+        transport = FakeTransport({
+            (NGINX_TREE, (("path", "PATCH"), ("per_page", "100"),
+                          ("recursive", "true"), ("ref", SHA))):
+                Response(404, {"message": "404 Tree Not Found"}, {}),
+            COMMITS % ("g%2Fnginx", SHA): Response(404, {"message": "404"}, {}),
+            (NGINX_TREE, (("path", "PATCH"), ("per_page", "100"),
+                          ("recursive", "true"), ("ref", "br"))):
+                tree(["PATCH/CVE-2026-1.patch"]),
+        })
+        gitlab = GitlabClient(HOSTS, token=None, transport=transport,
+                              sleeper=lambda _s: None, default_host=HOST)
+        build = collect_tag("os-9.2", config(), KojiClient(session), gitlab,
+                            jobs=1, now="n").by_name()["nginx"]
+        self.assertEqual(build.patches_ref, "br")
+        self.assertEqual([p.name for p in build.patches],
+                         ["CVE-2026-1.patch"])
+        self.assertTrue(any("недоступен" in p for p in build.problems),
+                        build.problems)
+        self.assertTrue(any("old.example.com" in p for p in build.problems),
+                        build.problems)
+
     def test_network_failure_does_not_silently_read_the_branch(self):
         # отказ сети — не «коммита нет»: второе чтение ничего не исправит,
         # а патчи с ветки, выданные за патчи коммита, соврут
