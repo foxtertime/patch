@@ -174,6 +174,43 @@ test('вторая неудачная перестановка не копит �
   assert.strictEqual(store.warnings().length, 1, store.warnings().join(' | '));
 });
 
+function withBuild(tag, generated, over) {
+  var s = snap(tag, generated);
+  s.builds = [Object.assign({ nvr: 'n-1-1', name: 'n', version: '1',
+                              release: '1',
+                              source: { raw: 'git+https://gl/g/n#origin/br',
+                                        ref: 'br', ref_kind: 'branch' } },
+                            over || {})];
+  return s;
+}
+
+test('снапшоты разных видов — предупреждение', function () {
+  store.reset();
+  store.add([withBuild('os-9.1', '2026-07-01T00:00:00+03:00',
+                       { patches_ref: 'br' })], 'a.json');
+  store.add([withBuild('os-9.2', '2026-08-01T00:00:00+03:00',
+                       { patches_ref: 'abc123' })], 'b.json');
+  assert.strictEqual(store.warnings().length, 1);
+  assert.match(store.warnings()[0], /коммит/);
+});
+
+test('снапшоты одного вида — тишина', function () {
+  store.reset();
+  store.add([withBuild('os-9.1', '2026-07-01T00:00:00+03:00',
+                       { patches_ref: 'abc123' })], 'a.json');
+  store.add([withBuild('os-9.2', '2026-08-01T00:00:00+03:00',
+                       { patches_ref: 'def456' })], 'b.json');
+  assert.deepStrictEqual(store.warnings(), []);
+});
+
+test('снапшоты без patches_ref в счёт не идут', function () {
+  store.reset();
+  store.add([withBuild('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
+  store.add([withBuild('os-9.2', '2026-08-01T00:00:00+03:00',
+                       { patches_ref: 'abc123' })], 'b.json');
+  assert.deepStrictEqual(store.warnings(), []);
+});
+
 test('удаление, на котором падает отрисовка, откатывается', function () {
   store.reset();
   store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
