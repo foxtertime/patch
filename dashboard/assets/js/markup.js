@@ -150,16 +150,28 @@
     return Boolean(q) && text.has(path, q) && !text.has(p.name, q);
   }
 
-  function patchItem(p, q, markCls) {
-    const href = safeUrl(p.url);
-    const title = href
+  /* Имя патча — ссылка на диф в GitLab, если он известен, иначе просто
+     моноширинный текст. Общий кусок для patchItem и ghostItem: список
+     ghost-патчей — те же объекты патчей, только со своей обёрткой строки. */
+  function itemTitle(item, q) {
+    const href = safeUrl(item.url);
+    return href
       ? `<a href="${esc(href)}" target="_blank" rel="noopener">`
-        + `${hl(p.name, q)}</a>`
-      : `<span class="mono">${hl(p.name, q)}</span>`;
-    const path = pathAdds(p, q)
-      ? `<div class="ppath">${hl(p.path, q)}</div>` : '';
+        + `${hl(item.name, q)}</a>`
+      : `<span class="mono">${hl(item.name, q)}</span>`;
+  }
+
+  /* Путь вторая строкой — только когда pathAdds считает, что он что-то
+     добавляет к имени (см. её комментарий). */
+  function itemPathLine(item, q) {
+    return pathAdds(item, q)
+      ? `<div class="ppath">${hl(item.path, q)}</div>` : '';
+  }
+
+  function patchItem(p, q, markCls) {
     return `<li${markCls ? ` class="${markCls}"` : ''}>`
-         + `${markCls ? signHtml(markCls) : ''}${title}${path}</li>`;
+         + `${markCls ? signHtml(markCls) : ''}${itemTitle(p, q)}`
+         + `${itemPathLine(p, q)}</li>`;
   }
 
   function classGroupHtml(name, count, body) {
@@ -238,19 +250,13 @@
   };
 
   function ghostItem(g, q) {
-    const href = safeUrl(g.url);
-    const title = href
-      ? `<a href="${esc(href)}" target="_blank" rel="noopener">`
-        + `${hl(g.name, q)}</a>`
-      : `<span class="mono">${hl(g.name, q)}</span>`;
     /* Класс подписью, а не отдельной группой: сторон уже три, и деление
        каждой ещё и по классам дало бы девять заголовков на четыре файла. */
     const cls = g['class']
       ? `<span class="pcls ${labels.classCls(g['class'])}">`
         + `${esc(g['class'])}</span>` : '';
-    const path = pathAdds(g, q) ? `<div class="ppath">${hl(g.path, q)}</div>`
-                                : '';
-    return `<li class="is-ghost">${cls}${title}${path}</li>`;
+    return `<li class="is-ghost">${cls}${itemTitle(g, q)}`
+         + `${itemPathLine(g, q)}</li>`;
   }
 
   function ghostsHtml(ghosts, q) {
