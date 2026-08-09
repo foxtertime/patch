@@ -255,7 +255,8 @@
       + sideBlock('патчи', row.old_patches.length,
                   markup.patchesHtml(row.old_patches, q))
       + sideBlock('патчи', row.new_patches.length,
-                  markup.patchesChangeHtml(row.old_patches, row.new_patches, q))
+                  markup.patchesChangeHtml(row.old_patches, row.new_patches,
+                                           row.patches_rewritten || [], q))
       + sideBlock('RPM', oldRpms.length, markup.rpmsHtml(oldRpms, q))
       + sideBlock('RPM', newRpms.length, markup.rpmsChangeHtml(row.rpm_rows, q))
       + '</div>';

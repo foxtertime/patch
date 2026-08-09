@@ -119,7 +119,7 @@ test('в «стало» пришедший патч помечен знаком 
     labels.setClasses(['CVE']);
     var was = [patch('a.patch', 'CVE')];
     var now = [patch('a.patch', 'CVE'), patch('b.patch', 'CVE')];
-    var out = markup.patchesChangeHtml(was, now, '');
+    var out = markup.patchesChangeHtml(was, now, [], '');
     assert.match(out, /<li class="is-added"><span class="sign">\+<\/span>/);
     assert.ok(out.indexOf('a.patch') < out.indexOf('b.patch'),
               'пришедший должен стоять ниже уцелевшего: ' + out);
@@ -129,7 +129,7 @@ test('в «стало» ушедший патч зачёркнут на своё
   labels.setClasses(['CVE']);
   var was = [patch('a.patch', 'CVE'), patch('b.patch', 'CVE')];
   var now = [patch('b.patch', 'CVE')];
-  var out = markup.patchesChangeHtml(was, now, '');
+  var out = markup.patchesChangeHtml(was, now, [], '');
   assert.match(out, /<li class="is-removed"><span class="sign">−<\/span>/);
   assert.ok(out.indexOf('a.patch') < out.indexOf('b.patch'),
             'ушедший должен остаться на своём прежнем месте: ' + out);
@@ -139,7 +139,7 @@ test('счётчик группы считает новое состояние, 
   function () {
     labels.setClasses(['CVE']);
     var was = [patch('a.patch', 'CVE'), patch('b.patch', 'CVE')];
-    var out = markup.patchesChangeHtml(was, [patch('b.patch', 'CVE')], '');
+    var out = markup.patchesChangeHtml(was, [patch('b.patch', 'CVE')], [], '');
     assert.match(out, /CVE <span class="n">1<\/span>/, out);
   });
 
@@ -147,7 +147,7 @@ test('класс, ушедший целиком, остаётся с нулём 
   function () {
     labels.setClasses(['CVE', 'SAST']);
     var was = [patch('a.patch', 'CVE'), patch('s.patch', 'SAST')];
-    var out = markup.patchesChangeHtml(was, [patch('a.patch', 'CVE')], '');
+    var out = markup.patchesChangeHtml(was, [patch('a.patch', 'CVE')], [], '');
     assert.match(out, /SAST <span class="n">0<\/span>/, out);
     assert.match(out, /is-removed/, out);
   });
@@ -165,21 +165,42 @@ function withSha(name, sha) {
 
 test('переписанный патч помечен знаком и классом', function () {
   var html = markup.patchesChangeHtml([withSha('a.patch', 'aaa')],
-                                      [withSha('a.patch', 'bbb')], '');
+                                      [withSha('a.patch', 'bbb')],
+                                      ['PATCH/a.patch'], '');
   assert.match(html, /class="is-rewritten"/);
   assert.match(html, /<span class="sign">~<\/span>/);
 });
 
 test('тот же sha не метится ничем', function () {
   var html = markup.patchesChangeHtml([withSha('a.patch', 'aaa')],
-                                      [withSha('a.patch', 'aaa')], '');
+                                      [withSha('a.patch', 'aaa')], [], '');
   assert.strictEqual(html.indexOf('is-rewritten'), -1);
 });
 
 test('sha только с одной стороны — не метится', function () {
   var html = markup.patchesChangeHtml([withSha('a.patch', undefined)],
-                                      [withSha('a.patch', 'bbb')], '');
+                                      [withSha('a.patch', 'bbb')], [], '');
   assert.strictEqual(html.indexOf('is-rewritten'), -1);
+});
+
+/* Правило «переписан» живёт в diff.js и только там. Разметка красит то,
+   что ей сказали: патч с разными sha, которого нет в списке, остаётся
+   непомеченным, а патч из списка помечается, какими бы ни были его sha.
+   Иначе правило снова окажется записанным дважды. */
+test('переписанные приходят списком, а не выводятся заново', function () {
+  var was = [{ path: 'PATCH/a.patch', name: 'a.patch', 'class': 'CVE',
+               cves: [], url: null, sha: 'aaa' }];
+  var now = [{ path: 'PATCH/a.patch', name: 'a.patch', 'class': 'CVE',
+               cves: [], url: null, sha: 'bbb' }];
+  labels.setClasses(['CVE']);
+
+  var silent = markup.patchesChangeHtml(was, now, [], '');
+  assert.doesNotMatch(silent, /is-rewritten/,
+    'sha разные, но списка нет — разметка не имеет права решать сама');
+
+  var told = markup.patchesChangeHtml(was, now, ['PATCH/a.patch'], '');
+  assert.match(told, /is-rewritten/);
+  assert.match(told, /class="sign">~/);
 });
 
 test('сторона «было» по-прежнему не метится', function () {
