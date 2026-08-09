@@ -84,6 +84,14 @@ test('группы «Изменений» — статус и что измен�
   assert.strictEqual(ids.indexOf('classes'), -1);
 });
 
+test('branch-ahead подписан и лежит в группе свойств билда', function () {
+  assert.strictEqual(labels.label('branch-ahead'), 'ветка ушла вперёд');
+  var build = labels.groups('state').filter(function (g) {
+    return g.id === 'build';
+  })[0];
+  assert.ok(build.keys.indexOf('branch-ahead') !== -1);
+});
+
 test('каждый ключ группы называется по-русски', function () {
   labels.setClasses([]);
   ['state', 'diff'].forEach(function (tab) {

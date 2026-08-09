@@ -28,6 +28,7 @@ function build(name, over) {
     source = { raw: 'git+ssh://git@h/g/' + name + '?#origin/' + ref,
                host: 'h', project: 'g/' + name, ref: ref, ref_kind: refKind,
                web_url: 'https://gl/tree' };
+    if (has(over, 'ahead')) source.commits_ahead = over.ahead;
   }
   return { nvr: name + '-' + version + '-1.el9', name: name, version: version,
            release: '1.el9', epoch: null, build_id: 1, task_id: 2,
@@ -341,6 +342,25 @@ test('метка билда из SRPM', function () {
   var rows = data([snap('t', [srpm])]).snapshots[0].builds;
   assert.ok(rows[0].marks.indexOf('from-srpm') !== -1, rows[0].marks.join(','));
   assert.strictEqual(rows[0].marks.indexOf('no-source'), -1);
+});
+
+test('ветка ушла вперёд — метка branch-ahead', function () {
+  var rows = data([snap('os-9.2', [build('nginx', { commit: 'abc123',
+                                                    ahead: 3 })])])
+             .snapshots[0].builds;
+  assert.ok(rows[0].marks.indexOf('branch-ahead') !== -1);
+});
+
+test('ветка на месте — метки нет', function () {
+  var rows = data([snap('os-9.2', [build('nginx', { commit: 'abc123',
+                                                    ahead: 0 })])])
+             .snapshots[0].builds;
+  assert.strictEqual(rows[0].marks.indexOf('branch-ahead'), -1);
+});
+
+test('снапшот без нового поля метки не получает', function () {
+  var rows = data([snap('os-9.2', [build('nginx')])]).snapshots[0].builds;
+  assert.strictEqual(rows[0].marks.indexOf('branch-ahead'), -1);
 });
 
 test('метка внутренней ошибки', function () {
