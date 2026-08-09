@@ -732,5 +732,78 @@ class BranchAheadTest(unittest.TestCase):
         self.assertTrue(any("gitlab:" in p for p in build.problems))
 
 
+class GhostPatchesTest(unittest.TestCase):
+    def _nginx(self, built, tip, ahead=2):
+        routes = {
+            (NGINX_TREE, (("path", "PATCH"), ("per_page", "100"),
+                          ("recursive", "true"), ("ref", SHA))): built,
+            (NGINX_TREE, (("path", "PATCH"), ("per_page", "100"),
+                          ("recursive", "true"), ("ref", "br"))): tip,
+            NGINX_COMPARE: compare_answer(ahead),
+        }
+        koji, gitlab, transport = clients_with_source(
+            routes, "git+ssh://git@gitlab.example.com/g/nginx#" + SHA)
+        snapshot = collect_tag("os-9.2", config(), koji, gitlab, jobs=1)
+        return snapshot.by_name()["nginx"], transport
+
+    def test_three_sides(self):
+        built = Response(200, [
+            {"id": "a1", "type": "blob", "path": "PATCH/kept.patch"},
+            {"id": "b1", "type": "blob", "path": "PATCH/rewritten.patch"},
+            {"id": "c1", "type": "blob", "path": "PATCH/dropped.patch"},
+        ], {})
+        tip = Response(200, [
+            {"id": "a1", "type": "blob", "path": "PATCH/kept.patch"},
+            {"id": "b2", "type": "blob", "path": "PATCH/rewritten.patch"},
+            {"id": "d1", "type": "blob", "path": "PATCH/CVE-2026-9.patch"},
+        ], {})
+        build, _ = self._nginx(built, tip)
+        self.assertEqual([(p.name, p.ghost) for p in build.ghost_patches],
+                         [("CVE-2026-9.patch", "branch"),
+                          ("rewritten.patch", "changed"),
+                          ("dropped.patch", "build")])
+        # патчи билда — по-прежнему то, что лежит на коммите
+        self.assertEqual(sorted(p.name for p in build.patches),
+                         ["dropped.patch", "kept.patch", "rewritten.patch"])
+
+    def test_ghosts_are_classified_like_the_rest(self):
+        # id CVE — не меньше четырёх цифр (CVE_RE в classify.py); короткий
+        # "CVE-2026-9" не CVE и уехал бы в "other", а тест как раз о том,
+        # что ghost-патчи классифицируются тем же классификатором, что и
+        # обычные.
+        built = Response(200, [], {})
+        tip = Response(200, [{"id": "d1", "type": "blob",
+                              "path": "PATCH/CVE-2026-9999.patch"}], {})
+        build, _ = self._nginx(built, tip)
+        self.assertEqual(build.ghost_patches[0].cls, "CVE")
+        self.assertEqual(build.ghost_patches[0].cves, ["CVE-2026-9999"])
+
+    def test_ghost_links_point_where_the_file_exists(self):
+        built = Response(200, [{"id": "c1", "type": "blob",
+                                "path": "PATCH/dropped.patch"}], {})
+        tip = Response(200, [{"id": "d1", "type": "blob",
+                              "path": "PATCH/added.patch"}], {})
+        build, _ = self._nginx(built, tip)
+        by_side = {p.ghost: p.web_url for p in build.ghost_patches}
+        self.assertIn("/br/", by_side["branch"])
+        self.assertIn("/%s/" % SHA, by_side["build"])
+
+    def test_branch_at_the_same_place_reads_the_tree_once(self):
+        built = Response(200, [{"id": "a1", "type": "blob",
+                                "path": "PATCH/kept.patch"}], {})
+        build, transport = self._nginx(built, Response(500, {}, {}), ahead=0)
+        self.assertEqual(build.ghost_patches, [])
+        refs = [params.get("ref") for url, params, _ in transport.requests
+                if url == NGINX_TREE]
+        self.assertEqual(refs, [SHA])
+
+    def test_failed_second_read_leaves_the_count_and_says_so(self):
+        built = Response(200, [], {})
+        build, _ = self._nginx(built, Response(500, {"message": "boom"}, {}))
+        self.assertEqual(build.source.commits_ahead, 2)
+        self.assertEqual(build.ghost_patches, [])
+        self.assertTrue(any("gitlab:" in p for p in build.problems))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -275,6 +275,15 @@ def _attach_patches(build: Build, info: dict, cfg, gitlab_client,
     build.source.branch_head = ahead.head
     build.source.commits_ahead = ahead.ahead
 
+    if not build.source.commits_ahead:
+        return
+    tip = gitlab_client.patch_files(parsed.host, parsed.project, parsed.ref)
+    if tip.problem:
+        build.problems.append(tip.problem)
+        return
+    build.ghost_patches = _ghosts(result, tip, parsed, commit, classifier,
+                                  gitlab_client)
+
 
 # Единственный ответ дерева, по которому видно, что коммита в репозитории
 # уже нет: его выдаёт доразбор 404 в GitlabClient. Отказ сети выглядит
@@ -308,6 +317,36 @@ def _read_patch_dir(build, gitlab_client, parsed, commit):
         "gitlab: коммит %s недоступен, патчи сняты с ветки" % commit[:12])
     return parsed.ref, gitlab_client.patch_files(parsed.host, parsed.project,
                                                  parsed.ref)
+
+
+# Порядок сторон — тот же, в каком их читают на странице: сперва то, чего
+# в билде не хватает, потом устаревшее, потом лишнее.
+_GHOST_SIDES = ("branch", "changed", "build")
+
+
+def _ghosts(built, tip, parsed, commit, classifier, gitlab_client):
+    """Различие между деревом коммита и деревом вершины ветки.
+
+    Считается по blob sha, а не по одним именам: файл с тем же именем и
+    другим содержимым — это патч, переписанный после сборки, и в пакете
+    лежит его прежняя редакция. Форма истории ветки на это не влияет
+    никак: сравниваются деревья, а не журнал.
+    """
+    paths = {
+        "branch": sorted(set(tip.blobs) - set(built.blobs)),
+        "changed": sorted(path for path in set(tip.blobs) & set(built.blobs)
+                          if tip.blobs[path] != built.blobs[path]),
+        "build": sorted(set(built.blobs) - set(tip.blobs)),
+    }
+    out = []
+    for side in _GHOST_SIDES:
+        # ссылка ведёт туда, где файл есть: у стороны build его в ветке уже
+        # нет, и ссылка на ветку вела бы в никуда
+        ref = commit if side == "build" else parsed.ref
+        for path in paths[side]:
+            out.append(_patch(path, parsed, ref, classifier, gitlab_client,
+                              ghost=side))
+    return out
 
 
 def _patch(path, parsed, ref, classifier, gitlab_client, ghost=None):
