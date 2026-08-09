@@ -124,8 +124,16 @@
         if (!builds[j]) continue;
         ref = builds[j].patches_ref;
         if (ref === undefined || ref === null) continue;
-        kinds[ref === (builds[j].source && builds[j].source.ref)
-              ? 'branch' : 'commit'] = true;
+        /* source отсутствует целиком — сравнивать patches_ref не с чем,
+           режим билда так же неизвестен, как при отсутствующем
+           patches_ref: угадывать «коммит» по умолчанию значило бы то же
+           самое молчаливое искажение, от которого защищает эта функция.
+           source.ref, напротив, бывает null осмысленно — source URL без
+           фрагмента — и тогда сравнение состоятельно само по себе: ref
+           (реальное значение patches_ref) не совпадёт с null, и билд верно
+           уйдёт в «коммит». */
+        if (!builds[j].source) continue;
+        kinds[ref === builds[j].source.ref ? 'branch' : 'commit'] = true;
       }
     }
     if (kinds.branch && kinds.commit) {

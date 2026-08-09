@@ -194,12 +194,21 @@ test('снапшоты разных видов — предупреждение'
   assert.match(store.warnings()[0], /коммит/);
 });
 
-test('снапшоты одного вида — тишина', function () {
+test('снапшоты одного вида (коммит) — тишина', function () {
   store.reset();
   store.add([withBuild('os-9.1', '2026-07-01T00:00:00+03:00',
                        { patches_ref: 'abc123' })], 'a.json');
   store.add([withBuild('os-9.2', '2026-08-01T00:00:00+03:00',
                        { patches_ref: 'def456' })], 'b.json');
+  assert.deepStrictEqual(store.warnings(), []);
+});
+
+test('снапшоты одного вида (ветка) — тишина', function () {
+  store.reset();
+  store.add([withBuild('os-9.1', '2026-07-01T00:00:00+03:00',
+                       { patches_ref: 'br' })], 'a.json');
+  store.add([withBuild('os-9.2', '2026-08-01T00:00:00+03:00',
+                       { patches_ref: 'br' })], 'b.json');
   assert.deepStrictEqual(store.warnings(), []);
 });
 
@@ -209,6 +218,35 @@ test('снапшоты без patches_ref в счёт не идут', function (
   store.add([withBuild('os-9.2', '2026-08-01T00:00:00+03:00',
                        { patches_ref: 'abc123' })], 'b.json');
   assert.deepStrictEqual(store.warnings(), []);
+});
+
+test('patches_ref есть, а source отсутствует вовсе — режим неизвестен', function () {
+  /* Без source сравнивать patches_ref не с чем: билд не «коммитный» по
+     умолчанию, а неизвестного вида, ровно как билд без patches_ref. Если
+     бы это было не так, пара со вторым снапшотом, у которого патчи
+     честно сняты с ветки, ложно поднимала бы предупреждение. */
+  store.reset();
+  store.add([withBuild('os-9.1', '2026-07-01T00:00:00+03:00',
+                       { patches_ref: 'abc123', source: undefined })], 'a.json');
+  store.add([withBuild('os-9.2', '2026-08-01T00:00:00+03:00',
+                       { patches_ref: 'br' })], 'b.json');
+  assert.deepStrictEqual(store.warnings(), []);
+});
+
+test('source есть, но ref в нём null — patches_ref-хеш всё равно коммит', function () {
+  /* source.ref == null законно значит «URL источника без фрагмента» — это
+     не то же самое, что отсутствие самого source. Сравнение здесь
+     состоятельно: непустой patches_ref не совпадает с null, и билд верно
+     считается «коммитным», а не неизвестным. */
+  store.reset();
+  store.add([withBuild('os-9.1', '2026-07-01T00:00:00+03:00',
+                       { patches_ref: 'abc123',
+                         source: { raw: 'git+https://gl/g/n',
+                                   ref: null, ref_kind: null } })], 'a.json');
+  store.add([withBuild('os-9.2', '2026-08-01T00:00:00+03:00',
+                       { patches_ref: 'br' })], 'b.json');
+  assert.strictEqual(store.warnings().length, 1);
+  assert.match(store.warnings()[0], /коммит/);
 });
 
 test('удаление, на котором падает отрисовка, откатывается', function () {
