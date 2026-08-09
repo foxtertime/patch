@@ -372,6 +372,34 @@ test('под запрос не подошло ничего — строк нет
     assert.strictEqual(p.totalRows(), 1);
   });
 
+/* deep — то, ради чего строку с совпадением только в деталях (здесь: в имени
+   патча) разворачивают сразу, а не оставляют свёрнутой: иначе непонятно, чем
+   она подошла под запрос. scanState в search.js посчитан юнит-тестами
+   отдельно, а вот доводит ли page.visibleRows() найденное deep до открытости
+   строки — нет; это и проверяем, вместе с обратным случаем, где совпадение
+   мелкое и раскрывать нечего. */
+test('совпадение только в имени патча разворачивает строку', function () {
+  var p = make([snap('os-9.1', JUL, { classes: ['CVE'],
+    builds: [build('nginx',
+      { patches: [patch('unique-patch-name.patch', 'CVE')] })] })]);
+  p.st.q = 'unique-patch-name';
+  var items = p.visibleRows();
+  assert.strictEqual(items.length, 1, 'строка с патчем не попала в выдачу');
+  assert.strictEqual(items[0].open, true,
+                     'совпадение только в патче обязано раскрыть строку');
+});
+
+test('совпадение в имени компонента строку не разворачивает', function () {
+  var p = make([snap('os-9.1', JUL, { classes: ['CVE'],
+    builds: [build('nginx',
+      { patches: [patch('unique-patch-name.patch', 'CVE')] })] })]);
+  p.st.q = 'nginx';
+  var items = p.visibleRows();
+  assert.strictEqual(items.length, 1, 'строка не попала в выдачу');
+  assert.strictEqual(items[0].open, false,
+                     'мелкое совпадение по имени не должно раскрывать строку');
+});
+
 test('ключ раскрытия несёт полное имя снапшота', function () {
   var p = make([snap('os-9.1', JUL)]);
   assert.strictEqual(p.rowKey({ name: 'nginx' }),

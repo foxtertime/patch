@@ -1936,3 +1936,15 @@ test('плашка показывает все три положения при�
                      node.className);
   assert.strictEqual(node.getAttribute('aria-pressed'), 'false');
 });
+
+/* Кнопка «наверх» и высота липкой шапки живут в своём модуле и покрыты там
+   же (viewport.test.js), но подключение этого модуля к настоящей странице —
+   вызов viewportmod.create() из ui.js — там не проверено: конструируется
+   модуль напрямую, без страницы. Здесь поднимаем страницу целиком и смотрим,
+   что прокрутка и правда показывает кнопку. */
+test('прокрутка настоящей страницы показывает кнопку «наверх»', function () {
+  var dom = load();
+  dom.window.pageYOffset = dom.window.innerHeight + 1;
+  dom.fireWindow('scroll');
+  assert.strictEqual(dom.id('totop').hidden, false);
+});

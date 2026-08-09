@@ -136,6 +136,23 @@ test('колонка Δ патчей показывает три исхода, �
   assert.doesNotMatch(cells[1], /tilde/);
 });
 
+/* Δ-колонка выше показывает, что патч переписан, числом за «~»; сам янтарный
+   знак стоит в раскрытой детали, и его туда доносит tables.js, передавая
+   row.patches_rewritten третьим доводом в markup.patchesChangeHtml. Знак
+   собирает markup.js (markup.test.js), а вот дошёл ли до него список
+   переписанных путей именно с этой строки — не проверено нигде: тест ниже
+   про это. */
+test('раскрытая строка диффа несёт янтарный знак переписанного патча',
+  function () {
+    var p = { path: 'PATCH/a.patch', name: 'a.patch', 'class': 'CVE',
+              cves: [], url: null };
+    var row = diffRow({ patches_rewritten: ['PATCH/a.patch'] });
+    row.old_patches = [p];
+    row.new_patches = [p];
+    var out = tables.diffRows([{ row: row, open: true }], opts({ open: true }));
+    assert.match(out, /is-rewritten/, out);
+  });
+
 /* Раскрытая строка и её детали — один предмет: полоса слева идёт через
    обе, и рисует её CSS по классам, которые ставит разметка. */
 test('раскрытая строка помечена, свёрнутая — нет', function () {

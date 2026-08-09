@@ -71,3 +71,19 @@ test('isOurs становится правдой только после сво�
   addr.write();
   assert.strictEqual(addr.isOurs(), true);
 });
+
+/* write() ставит ours = true раньше раннего выхода «адрес уже такой, как
+   надо». Если бы страница пришла к тому же адресу, который уже стоит в
+   строке (например, после перерисовки без смены состояния), ранний выход
+   сработал бы первым — и, поставь write() свою метку позже него, страница
+   не узнала бы, что это её собственная запись. Три теста выше write() с уже
+   совпадающим адресом не зовут ни разу; здесь — ровно этот случай. */
+test('write() метит адрес своим, даже когда он уже совпадает', function () {
+  var next = hash.format(fakePage().hashParts());
+  var dom = domstub.install({ hash: next });
+  var addr = make(dom);
+  assert.strictEqual(addr.isOurs(), false);
+  addr.write();
+  assert.strictEqual(addr.isOurs(), true,
+                     'ранний выход не должен обгонять пометку своей записи');
+});
