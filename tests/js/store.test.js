@@ -174,12 +174,13 @@ test('вторая неудачная перестановка не копит �
   assert.strictEqual(store.warnings().length, 1, store.warnings().join(' | '));
 });
 
-function withBuild(tag, generated, over) {
+function withBuild(tag, generated, over, refKind) {
   var s = snap(tag, generated);
   s.builds = [Object.assign({ nvr: 'n-1-1', name: 'n', version: '1',
                               release: '1',
                               source: { raw: 'git+https://gl/g/n#origin/br',
-                                        ref: 'br', ref_kind: 'branch' } },
+                                        ref: 'br',
+                                        ref_kind: refKind || 'branch' } },
                             over || {})];
   return s;
 }
@@ -247,6 +248,65 @@ test('source есть, но ref в нём null — patches_ref-хеш всё р�
                        { patches_ref: 'br' })], 'b.json');
   assert.strictEqual(store.warnings().length, 1);
   assert.match(store.warnings()[0], /коммит/);
+});
+
+test('одинокий from-commit билд не поднимает предупреждение о смешанных видах', function () {
+  /* ref_kind: 'commit' — билд собран прямо с коммита, у него нет ветки
+     вовсе, и source.ref равен тому же коммиту, что и patches_ref: это
+     самый точный источник патчей, а не старая семантика вершины ветки. */
+  store.reset();
+  store.add([withBuild('os-9.1', '2026-07-01T00:00:00+03:00',
+                       { patches_ref: 'abc123',
+                         source: { raw: 'git+ssh://gl/g/n#abc123',
+                                   ref: 'abc123', ref_kind: 'commit' } })],
+            'a.json');
+  assert.deepStrictEqual(store.warnings(), []);
+});
+
+test('обычный билд и from-commit билд в одном снапшоте — не смешанные виды', function () {
+  /* Воспроизведение находки ревью: снапшот с одним from-commit билдом и
+     одним обычным (ветка, но хеш известен — patches_ref указывает на
+     коммит, а не на имя ветки) не должен поднимать предупреждение сам по
+     себе. До фикса ref === source.ref у from-commit билда (оба — тот же
+     самый коммит) ошибочно читалось как «снят с вершины ветки». */
+  store.reset();
+  var s = withBuild('os-9.1', '2026-07-01T00:00:00+03:00',
+                    { patches_ref: 'commit1' });
+  s.builds.push(Object.assign({}, s.builds[0], { nvr: 'm-1-1', name: 'm',
+    patches_ref: 'commit2',
+    source: { raw: 'git+ssh://gl/g/m#commit2',
+              ref: 'commit2', ref_kind: 'commit' } }));
+  store.add([s], 'a.json');
+  assert.deepStrictEqual(store.warnings(), []);
+});
+
+test('настоящая вершина ветки рядом с from-commit билдом — предупреждение остаётся', function () {
+  /* Фикс не должен затыкать честное предупреждение: если рядом с
+     from-commit билдом лежит билд, у которого патчи и правда сняты с
+     вершины ветки (хеша не было), виды действительно разные. */
+  store.reset();
+  var s = withBuild('os-9.1', '2026-07-01T00:00:00+03:00',
+                    { patches_ref: 'br' }); /* ref_kind branch, ref === patches_ref */
+  s.builds.push(Object.assign({}, s.builds[0], { nvr: 'm-1-1', name: 'm',
+    patches_ref: 'commit2',
+    source: { raw: 'git+ssh://gl/g/m#commit2',
+              ref: 'commit2', ref_kind: 'commit' } }));
+  store.add([s], 'a.json');
+  assert.strictEqual(store.warnings().length, 1);
+  assert.match(store.warnings()[0], /коммит/);
+});
+
+test('предупреждение о смешанных видах говорит про билды, а не только про снапшоты', function () {
+  /* Формулировка не должна утверждать «в одних снапшотах … в других»: смесь
+     бывает и внутри одного и того же снапшота (см. тест выше), и текст
+     обязан оставаться верным для обоих случаев. */
+  store.reset();
+  store.add([withBuild('os-9.1', '2026-07-01T00:00:00+03:00',
+                       { patches_ref: 'br' })], 'a.json');
+  store.add([withBuild('os-9.2', '2026-08-01T00:00:00+03:00',
+                       { patches_ref: 'abc123' })], 'b.json');
+  assert.match(store.warnings()[0], /билд/);
+  assert.doesNotMatch(store.warnings()[0], /снапшоты двух видов/);
 });
 
 test('удаление, на котором падает отрисовка, откатывается', function () {
