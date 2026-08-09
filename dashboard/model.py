@@ -19,16 +19,22 @@ class Patch:
     cls: str
     cves: List[str] = field(default_factory=list)
     web_url: Optional[str] = None
+    # Не патч билда, а различие между коммитом сборки и вершиной ветки:
+    # "branch" — файл в ветке есть, в билд не вошёл; "build" — был в билде,
+    # из ветки убран; "changed" — путь тот же, содержимое в ветке другое.
+    # У патчей самого билда поле пустое.
+    ghost: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {"path": self.path, "name": self.name, "class": self.cls,
-                "cves": list(self.cves), "web_url": self.web_url}
+                "cves": list(self.cves), "web_url": self.web_url,
+                "ghost": self.ghost}
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Patch":
         return cls(path=data["path"], name=data["name"], cls=data["class"],
                    cves=list(data.get("cves") or []),
-                   web_url=data.get("web_url"))
+                   web_url=data.get("web_url"), ghost=data.get("ghost"))
 
 
 @dataclass
@@ -39,18 +45,39 @@ class Source:
     ref: Optional[str] = None
     ref_kind: str = "none"
     web_url: Optional[str] = None
+    # Коммит, из которого билд действительно собран. Ветка в ref — то, что
+    # человек ввёл; коммит — то, чем сборка пошла, и он неизменяем.
+    commit: Optional[str] = None
+    commit_url: Optional[str] = None
+    # Чему мы верим: "original_url" — коммит стоял прямо в ссылке билда,
+    # "koji_source" — добыт из верхнеуровневого source. Доверие к ним
+    # разное, и в день, когда коммит окажется неверным, разбираться будет
+    # нечем без этого поля.
+    commit_source: Optional[str] = None
+    # Вершина ветки на момент сбора и сколько коммитов легло в ветку после
+    # точки, из которой собран билд. None — не считали или не удалось.
+    branch_head: Optional[str] = None
+    commits_ahead: Optional[int] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {"raw": self.raw, "host": self.host, "project": self.project,
                 "ref": self.ref, "ref_kind": self.ref_kind,
-                "web_url": self.web_url}
+                "web_url": self.web_url, "commit": self.commit,
+                "commit_url": self.commit_url,
+                "commit_source": self.commit_source,
+                "branch_head": self.branch_head,
+                "commits_ahead": self.commits_ahead}
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Source":
         return cls(raw=data["raw"], host=data.get("host"),
                    project=data.get("project"), ref=data.get("ref"),
                    ref_kind=data.get("ref_kind", "none"),
-                   web_url=data.get("web_url"))
+                   web_url=data.get("web_url"), commit=data.get("commit"),
+                   commit_url=data.get("commit_url"),
+                   commit_source=data.get("commit_source"),
+                   branch_head=data.get("branch_head"),
+                   commits_ahead=data.get("commits_ahead"))
 
 
 @dataclass
@@ -76,7 +103,15 @@ class Build:
     tags: List[str] = field(default_factory=list)
     source: Optional[Source] = None
     patch_dir_present: Optional[bool] = None
+    # Ref, с которого снят список patches: хеш коммита сборки, а когда
+    # хеша нет — имя ветки. Без этого поля одна и та же строка «патчи»
+    # означала бы у разных билдов разное, и сравнить снапшот, собранный
+    # до этой работы, с нынешним было бы нельзя.
+    patches_ref: Optional[str] = None
     patches: List[Patch] = field(default_factory=list)
+    # Различие между коммитом сборки и вершиной ветки. В счётчики строки,
+    # карточки классов и сводку не идёт: это то, чего в билде нет.
+    ghost_patches: List[Patch] = field(default_factory=list)
     rpms: List[str] = field(default_factory=list)
     problems: List[str] = field(default_factory=list)
 
@@ -89,7 +124,9 @@ class Build:
             "tag_name": self.tag_name, "tags": list(self.tags),
             "source": self.source.to_dict() if self.source else None,
             "patch_dir_present": self.patch_dir_present,
+            "patches_ref": self.patches_ref,
             "patches": [p.to_dict() for p in self.patches],
+            "ghost_patches": [p.to_dict() for p in self.ghost_patches],
             "rpms": list(self.rpms), "problems": list(self.problems),
         }
 
@@ -105,7 +142,10 @@ class Build:
             tags=list(data.get("tags") or []),
             source=Source.from_dict(source) if source else None,
             patch_dir_present=data.get("patch_dir_present"),
+            patches_ref=data.get("patches_ref"),
             patches=[Patch.from_dict(p) for p in data.get("patches") or []],
+            ghost_patches=[Patch.from_dict(p)
+                           for p in data.get("ghost_patches") or []],
             rpms=list(data.get("rpms") or []),
             problems=list(data.get("problems") or []),
         )
