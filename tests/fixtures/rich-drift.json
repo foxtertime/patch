@@ -14,6 +14,7 @@
       "ghost": "branch",
       "name": "CVE-2026-3011.patch",
       "path": "PATCH/CVE-2026-3011.patch",
+      "sha": "2b3c4d5e6f70819293a4b5c6d7e8f90011223344",
       "web_url": "https://gl/web/nginx/-/blob/os-9.8/PATCH/CVE-2026-3011.patch"
      },
      {
@@ -22,6 +23,7 @@
       "ghost": "changed",
       "name": "nginx-distsuffix.patch",
       "path": "PATCH/nginx-distsuffix.patch",
+      "sha": "4d5e6f70819293a4b5c6d7e8f900112233445566",
       "web_url": "https://gl/web/nginx/-/blob/os-9.8/PATCH/nginx-distsuffix.patch"
      }
     ],
@@ -38,6 +40,7 @@
       "ghost": null,
       "name": "CVE-2026-3010.patch",
       "path": "PATCH/CVE-2026-3010.patch",
+      "sha": "1a2b3c4d5e6f70819293a4b5c6d7e8f900112233",
       "web_url": "https://gl/web/nginx/-/blob/3f5a1c9e2b7d48a06e1f5c3b9d2a7e4f60c81b53/PATCH/CVE-2026-3010.patch"
      },
      {
@@ -46,6 +49,7 @@
       "ghost": null,
       "name": "nginx-distsuffix.patch",
       "path": "PATCH/nginx-distsuffix.patch",
+      "sha": "3c4d5e6f70819293a4b5c6d7e8f9001122334455",
       "web_url": "https://gl/web/nginx/-/blob/3f5a1c9e2b7d48a06e1f5c3b9d2a7e4f60c81b53/PATCH/nginx-distsuffix.patch"
      }
     ],
@@ -87,6 +91,7 @@
       "ghost": "build",
       "name": "httpd-license.patch",
       "path": "PATCH/httpd-license.patch",
+      "sha": null,
       "web_url": "https://gl/web/httpd/-/blob/c81b5390a2f74e6d15b8c3097e2a4d6f81035b9c/PATCH/httpd-license.patch"
      }
     ],
@@ -103,6 +108,7 @@
       "ghost": null,
       "name": "CVE-2026-3020.patch",
       "path": "PATCH/CVE-2026-3020.patch",
+      "sha": null,
       "web_url": "https://gl/web/httpd/-/blob/c81b5390a2f74e6d15b8c3097e2a4d6f81035b9c/PATCH/CVE-2026-3020.patch"
      },
      {
@@ -111,6 +117,7 @@
       "ghost": null,
       "name": "httpd-license.patch",
       "path": "PATCH/httpd-license.patch",
+      "sha": null,
       "web_url": "https://gl/web/httpd/-/blob/c81b5390a2f74e6d15b8c3097e2a4d6f81035b9c/PATCH/httpd-license.patch"
      }
     ],
@@ -156,6 +163,7 @@
       "ghost": null,
       "name": "sast-openssl.patch",
       "path": "PATCH/sast-openssl.patch",
+      "sha": null,
       "web_url": "https://gl/core/openssl/-/blob/7e2d19b4c60a3f85d17e94b2a538c06f2d914e7b/PATCH/sast-openssl.patch"
      }
     ],
@@ -202,6 +210,7 @@
       "ghost": null,
       "name": "curl-distsuffix.patch",
       "path": "PATCH/curl-distsuffix.patch",
+      "sha": null,
       "web_url": "https://gl/core/curl/-/blob/os-9.8/PATCH/curl-distsuffix.patch"
      }
     ],
@@ -247,6 +256,7 @@
       "ghost": null,
       "name": "coverage-glibc.patch",
       "path": "PATCH/coverage-glibc.patch",
+      "sha": null,
       "web_url": "https://gl/core/glibc/-/blob/os-9.8/PATCH/coverage-glibc.patch"
      }
     ],
@@ -294,6 +304,7 @@
       "ghost": null,
       "name": "sast-zlib.patch",
       "path": "PATCH/sast-zlib.patch",
+      "sha": null,
       "web_url": "https://gl/core/zlib/-/blob/2b7d48a06e1f5c3b9d2a7e4f60c81b533f5a1c9e/PATCH/sast-zlib.patch"
      }
     ],
@@ -339,6 +350,7 @@
       "ghost": null,
       "name": "python3-distsuffix.patch",
       "path": "PATCH/python3-distsuffix.patch",
+      "sha": null,
       "web_url": "https://gl/core/python3/-/blob/e91d2c74f36a1e8d052b9c7f43e6081ab53f80e6/PATCH/python3-distsuffix.patch"
      }
     ],

@@ -23,6 +23,7 @@ function pair(over) {
            counts: Object.assign({
              changed: 1, added: 0, removed: 0, upgraded: 1, downgraded: 0,
              unchanged: 0, patches_added: 0, patches_removed: 0,
+             patches_rewritten: 0,
              repackaged: 0, branch_changed: 0, tag_changed: 0
            }, over.counts || {}) };
 }
@@ -70,28 +71,35 @@ test('класс с именем constructor не роняет карточки'
   assert.match(out, /class="l c-x"/);
 });
 
-test('карточки диффа перечисляют все одиннадцать срезов', function () {
+test('карточки диффа перечисляют все двенадцать срезов', function () {
   var out = cards.diffCards(pair());
   var found = out.match(/data-filter="/g) || [];
-  assert.strictEqual(found.length, 11);
+  assert.strictEqual(found.length, 12);
   assert.match(out, /data-filter="patches\+"/);
   assert.match(out, /data-filter="tag-changed"/);
+});
+
+test('ряд итогов считает переписанные патчи', function () {
+  var out = cards.diffCards(pair({ counts: { patches_rewritten: 3 } }));
+  assert.match(out, /data-filter="patches~"/);
+  assert.match(out, /патчи переписаны/);
 });
 
 test('карточка диффа подписана «из скольких»', function () {
   assert.match(cards.diffCards(pair()), /<span class="unit">из 2<\/span>/);
 });
 
-/* Раскладка среза по строкам. Одиннадцать карточек, из которых в строку
-   влезает десять, дают вторую строку из одной штуки и пустоту за ней;
+/* Раскладка карточек по строкам: числа здесь — произвольные аргументы
+   функции, а не число карточек на какой-то конкретной вкладке. Одиннадцать
+   при десяти влезающих дают вторую строку из одной штуки и пустоту за ней;
    считалка делит их на строки поровну. Ширину меряет тот, у кого есть
    раскладка, — здесь её задаёт тест. */
 test('карточки делятся на строки поровну', function () {
-  // влезает десять, карточек одиннадцать: две строки по шесть и пять
+  // у функции: влезает десять, аргумент одиннадцать — две строки по шесть и пять
   assert.strictEqual(cards.columnsFor(11, 1360, 122, 10), 6);
-  // влезает десять, карточек десять: одна строка
+  // у функции: влезает десять, аргумент десять — одна строка
   assert.strictEqual(cards.columnsFor(10, 1360, 122, 10), 10);
-  // влезает четыре, карточек одиннадцать: три строки по четыре
+  // у функции: влезает четыре, аргумент одиннадцать — три строки по четыре
   assert.strictEqual(cards.columnsFor(11, 550, 122, 10), 4);
 });
 

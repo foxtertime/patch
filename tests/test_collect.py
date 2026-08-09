@@ -854,5 +854,68 @@ class GhostPatchesTest(unittest.TestCase):
         self.assertTrue(any("gitlab:" in p for p in build.problems))
 
 
+class PatchShaTest(unittest.TestCase):
+    def _nginx(self, routes):
+        koji, gitlab, _ = clients_with_source(
+            routes, "git+ssh://git@gitlab.example.com/g/nginx#" + SHA)
+        return collect_tag("os-9.2", config(), koji, gitlab,
+                           jobs=1).by_name()["nginx"]
+
+    def test_build_patches_carry_the_sha_of_the_commit_tree(self):
+        build = self._nginx({
+            (NGINX_TREE, (("path", "PATCH"), ("per_page", "100"),
+                          ("recursive", "true"), ("ref", SHA))):
+                Response(200, [{"id": "blob-a", "type": "blob",
+                                "path": "PATCH/a.patch"}], {}),
+            NGINX_COMPARE: compare_answer(0, head=SHA),
+        })
+        self.assertEqual([p.sha for p in build.patches], ["blob-a"])
+
+    def test_each_ghost_side_takes_the_sha_of_the_tree_its_link_points_at(self):
+        built = Response(200, [
+            {"id": "kept", "type": "blob", "path": "PATCH/kept.patch"},
+            {"id": "old", "type": "blob", "path": "PATCH/rewritten.patch"},
+            {"id": "gone", "type": "blob", "path": "PATCH/dropped.patch"},
+        ], {})
+        tip = Response(200, [
+            {"id": "kept", "type": "blob", "path": "PATCH/kept.patch"},
+            {"id": "new", "type": "blob", "path": "PATCH/rewritten.patch"},
+            {"id": "fresh", "type": "blob", "path": "PATCH/added.patch"},
+        ], {})
+        build = self._nginx({
+            (NGINX_TREE, (("path", "PATCH"), ("per_page", "100"),
+                          ("recursive", "true"), ("ref", SHA))): built,
+            (NGINX_TREE, (("path", "PATCH"), ("per_page", "100"),
+                          ("recursive", "true"), ("ref", "br"))): tip,
+            NGINX_COMPARE: compare_answer(2),
+        })
+        got = {(p.ghost, p.name): p.sha for p in build.ghost_patches}
+        # branch и changed ведут на ветку — и sha берут оттуда же
+        self.assertEqual(got[("branch", "added.patch")], "fresh")
+        self.assertEqual(got[("changed", "rewritten.patch")], "new")
+        # build ведёт на коммит: в ветке этого файла уже нет
+        self.assertEqual(got[("build", "dropped.patch")], "gone")
+
+    def test_a_blob_without_an_id_leaves_that_patch_without_a_sha(self):
+        # tree отдаёт запись без "id" — GitLab на это способен, и это не
+        # отказ чтения: дерево прочиталось, путь есть, просто для этого
+        # файла id не пришёл. blobs.get(path) даёт None, и патч остаётся
+        # в списке с sha=None, а не пропадает и не считается проблемой.
+        build = self._nginx({
+            (NGINX_TREE, (("path", "PATCH"), ("per_page", "100"),
+                          ("recursive", "true"), ("ref", SHA))):
+                Response(200, [
+                    {"id": "blob-a", "type": "blob", "path": "PATCH/a.patch"},
+                    {"type": "blob", "path": "PATCH/b.patch"},
+                ], {}),
+            NGINX_COMPARE: compare_answer(0, head=SHA),
+        })
+        by_name = {p.name: p.sha for p in build.patches}
+        self.assertEqual(by_name["a.patch"], "blob-a")
+        self.assertIn("b.patch", by_name)
+        self.assertIsNone(by_name["b.patch"])
+        self.assertEqual(build.problems, [])
+
+
 if __name__ == "__main__":
     unittest.main()

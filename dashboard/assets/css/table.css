@@ -220,6 +220,11 @@ tr.detail-row > td { background: var(--card); padding: .85rem .7rem 1.1rem 2.2re
 .plist li.is-removed a { color: var(--removed); }
 .plist li.is-removed > a, .plist li.is-removed > .mono {
   text-decoration: line-through; }
+/* Переписанный патч: имя то же, содержимое другое. Янтарный — тот же цвет,
+   которым покрашены «сменил ветку» и «ветка +N»: он на этой странице уже
+   значит «разъехалось, но ничего не потеряно». Зелёный и красный заняты
+   приходом и уходом, лавандовый — составом RPM. */
+.plist li.is-rewritten, .plist li.is-rewritten a { color: var(--major); }
 .plist .ppath { color: var(--muted); font-size: .74rem; }
 /* Расхождение с веткой: не патчи билда, а разница между коммитом сборки и
    вершиной ветки. Отделено одной чертой — не тремя, по одной на сторону:

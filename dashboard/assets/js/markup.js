@@ -129,8 +129,12 @@
          + `<span class="v">${v}</span></div>`;
   }
 
+  /* Знак дублирует цвет — на случай, если цвет не различим. Их три:
+     пришёл, ушёл, переписан. */
+  const SIGNS = { 'is-added': '+', 'is-removed': '−', 'is-rewritten': '~' };
+
   function signHtml(markCls) {
-    return `<span class="sign">${markCls === 'is-added' ? '+' : '−'}</span>`;
+    return `<span class="sign">${SIGNS[markCls] || '−'}</span>`;
   }
 
   /* Путь патча второй строкой — только когда он что-то добавляет к имени.
@@ -212,7 +216,15 @@
       const kept = own(inNew, p.path);
       /* Уцелевший берём из нового состояния: класс или ссылка могли
          поменяться, и показывать надо то, что есть сейчас. */
-      items.push({ p: kept || p, cls: kept ? '' : 'is-removed' });
+      /* Переписанный — тот же путь и другое содержимое. Обе sha должны
+         быть известны: снапшоты до 2.3.0 их не несут, и метить патч по
+         одной стороне значило бы объявить переписанным то, чего мы не
+         сравнивали. */
+      const rewritten = Boolean(kept && p.sha && kept.sha
+                                && p.sha !== kept.sha);
+      items.push({ p: kept || p,
+                   cls: kept ? (rewritten ? 'is-rewritten' : '')
+                             : 'is-removed' });
     }
     for (const p of newPatches) {
       if (!own(inOld, p.path)) items.push({ p: p, cls: 'is-added' });

@@ -227,5 +227,20 @@ class NewFieldsTest(unittest.TestCase):
         self.assertIsNone(build.patches[0].ghost)
 
 
+class PatchShaTest(unittest.TestCase):
+    def test_round_trip(self):
+        patch = Patch(path="PATCH/a.patch", name="a.patch", cls="CVE",
+                      sha="0123456789abcdef0123456789abcdef01234567")
+        again = Patch.from_dict(patch.to_dict())
+        self.assertEqual(again.sha,
+                         "0123456789abcdef0123456789abcdef01234567")
+
+    def test_old_patch_reads_without_sha(self):
+        # снапшот до 2.3.0: ключа нет вовсе
+        again = Patch.from_dict({"path": "PATCH/a.patch", "name": "a.patch",
+                                 "class": "CVE"})
+        self.assertIsNone(again.sha)
+
+
 if __name__ == "__main__":
     unittest.main()

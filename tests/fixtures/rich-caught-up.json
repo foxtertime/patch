@@ -19,6 +19,7 @@
       "ghost": null,
       "name": "CVE-2026-3010.patch",
       "path": "PATCH/CVE-2026-3010.patch",
+      "sha": "1a2b3c4d5e6f70819293a4b5c6d7e8f900112233",
       "web_url": "https://gl/web/nginx/-/blob/9d4e7b12c05af3689e2d1a7c4b53f80e6a91d2c7/PATCH/CVE-2026-3010.patch"
      },
      {
@@ -29,6 +30,7 @@
       "ghost": null,
       "name": "CVE-2026-3011.patch",
       "path": "PATCH/CVE-2026-3011.patch",
+      "sha": "2b3c4d5e6f70819293a4b5c6d7e8f90011223344",
       "web_url": "https://gl/web/nginx/-/blob/9d4e7b12c05af3689e2d1a7c4b53f80e6a91d2c7/PATCH/CVE-2026-3011.patch"
      },
      {
@@ -37,6 +39,7 @@
       "ghost": null,
       "name": "nginx-distsuffix.patch",
       "path": "PATCH/nginx-distsuffix.patch",
+      "sha": "4d5e6f70819293a4b5c6d7e8f900112233445566",
       "web_url": "https://gl/web/nginx/-/blob/9d4e7b12c05af3689e2d1a7c4b53f80e6a91d2c7/PATCH/nginx-distsuffix.patch"
      }
     ],
@@ -85,6 +88,7 @@
       "ghost": null,
       "name": "CVE-2026-3020.patch",
       "path": "PATCH/CVE-2026-3020.patch",
+      "sha": null,
       "web_url": "https://gl/web/httpd/-/blob/1a7f34d6b92e05c8437f6a1d29b0c5e83f47a612/PATCH/CVE-2026-3020.patch"
      }
     ],
@@ -130,6 +134,7 @@
       "ghost": null,
       "name": "sast-openssl.patch",
       "path": "PATCH/sast-openssl.patch",
+      "sha": null,
       "web_url": "https://gl/core/openssl/-/blob/7e2d19b4c60a3f85d17e94b2a538c06f2d914e7b/PATCH/sast-openssl.patch"
      }
     ],
@@ -176,6 +181,7 @@
       "ghost": null,
       "name": "curl-distsuffix.patch",
       "path": "PATCH/curl-distsuffix.patch",
+      "sha": null,
       "web_url": "https://gl/core/curl/-/blob/os-9.8/PATCH/curl-distsuffix.patch"
      }
     ],
@@ -221,6 +227,7 @@
       "ghost": null,
       "name": "coverage-glibc.patch",
       "path": "PATCH/coverage-glibc.patch",
+      "sha": null,
       "web_url": "https://gl/core/glibc/-/blob/8d052b9c7f43e6081ab53f80e6a91d2c74f36a1e/PATCH/coverage-glibc.patch"
      }
     ],
@@ -266,6 +273,7 @@
       "ghost": null,
       "name": "sast-zlib.patch",
       "path": "PATCH/sast-zlib.patch",
+      "sha": null,
       "web_url": "https://gl/core/zlib/-/blob/2b7d48a06e1f5c3b9d2a7e4f60c81b533f5a1c9e/PATCH/sast-zlib.patch"
      }
     ],
@@ -308,6 +316,7 @@
       "ghost": "branch",
       "name": "CVE-2026-3030.patch",
       "path": "PATCH/CVE-2026-3030.patch",
+      "sha": null,
       "web_url": "https://gl/core/python3/-/blob/os-9.8/PATCH/CVE-2026-3030.patch"
      }
     ],
@@ -322,6 +331,7 @@
       "ghost": null,
       "name": "python3-distsuffix.patch",
       "path": "PATCH/python3-distsuffix.patch",
+      "sha": null,
       "web_url": "https://gl/core/python3/-/blob/e91d2c74f36a1e8d052b9c7f43e6081ab53f80e6/PATCH/python3-distsuffix.patch"
      }
     ],
