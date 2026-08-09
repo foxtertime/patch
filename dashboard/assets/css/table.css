@@ -209,9 +209,9 @@ tr.detail-row > td { background: var(--card); padding: .85rem .7rem 1.1rem 2.2re
   overflow-wrap: anywhere; }
 .plist li.is-added { color: var(--added); }
 .plist li.is-removed { color: var(--removed); }
-.plist a { color: var(--accent); text-decoration: none;
+.plist a, .glist a { color: var(--accent); text-decoration: none;
   border-bottom: 1px solid transparent; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
-.plist a:hover { border-bottom-color: var(--accent); }
+.plist a:hover, .glist a:hover { border-bottom-color: var(--accent); }
 /* Пришедший и ушедший патч должны читаться и по ссылке тоже: иначе синий
    цвет ссылки съедает единственный сигнал «что изменилось». Зачёркивание
    стоит на самом имени, а не на строке: под именем бывает путь, и вести
@@ -221,17 +221,43 @@ tr.detail-row > td { background: var(--card); padding: .85rem .7rem 1.1rem 2.2re
 .plist li.is-removed > a, .plist li.is-removed > .mono {
   text-decoration: line-through; }
 .plist .ppath { color: var(--muted); font-size: .74rem; }
-/* Ghost-патчи приглушены нарочно: их нет в пакете, и читаться они должны
-   тише настоящих — иначе блок патчей превращается в два равноправных
-   списка, и какой из них про билд, станет неочевидно. */
-.pgroup.ghost { margin-top: .75rem; padding-top: .5rem;
-                border-top: 1px dashed var(--line); }
-.pgroup.ghost .pclass { color: var(--muted); font-weight: 600;
-                        text-transform: none; letter-spacing: 0;
-                        cursor: help; }
-.pgroup.ghost .plist li.is-ghost { opacity: .72; }
-.pgroup.ghost .pcls { margin-right: .35rem; font-size: .66rem;
-                      font-weight: 700; letter-spacing: .04em; }
+/* Расхождение с веткой: не патчи билда, а разница между коммитом сборки и
+   вершиной ветки. Отделено одной чертой — не тремя, по одной на сторону:
+   границ у этой мысли ровно одна, выше неё пакет, ниже ветка.
+
+   Спины у списка нет нарочно, и это главное отличие от списка патчей выше.
+   Спина там красится цветом класса (.plist берёт currentColor у группы), а
+   у расхождения класс свой у каждой строки — цвету группы взяться неоткуда,
+   и полоса вышла бы белой: самой яркой в блоке у того, что тише всего.
+
+   Тише при этом делает не прозрачность, а --muted и мелкий кегль: opacity
+   гасит заодно и ссылку, а ссылка здесь — единственное, по чему кликают. */
+/* Имена начинаются с ghosts/g-, а не с ghost: класс .ghost на странице уже
+   занят — им помечен призрачный узел в конце рельса, и rail.css ставит ему
+   border-style: dashed. Блок патчей, взявший то же имя, получал пунктир на
+   все четыре стороны, причём ширину и цвет три из них брали начальными —
+   medium и currentColor, то есть почти белую рамку вокруг самого тихого
+   места в раскрытой строке. */
+.ghosts { margin-top: .8rem; padding-top: .6rem;
+  border-top: 1px solid var(--line); }
+/* Подпись стороны набрана тем же микро-регистром, что и подпись класса
+   выше, — прописными вразрядку: слот в раскладке один и тот же, и второй
+   типографический регистр в нём читался бы как другой вид содержимого.
+   Отличает её цвет: --muted против цвета класса. */
+.ghosts .gside { font-size: .7rem; font-weight: 700; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--muted); cursor: help; }
+.ghosts .gside .n { margin-left: .35rem; font-weight: 600; }
+.ghosts .gside ~ .gside { margin-top: .5rem; }
+/* Метрики списка те же, что у .plist, — оба списка стоят на одном ритме.
+   Отличается одно: полоса серая, а не цветная. Цвет полосы в этом
+   дашборде — класс патча, а у расхождения класс свой у каждой строки, и
+   взяться цвету группы неоткуда. */
+.glist { list-style: none; margin: .2rem 0 0; padding: .1rem 0 .1rem .6rem;
+  border-left: 2px solid var(--line); }
+.glist li { font-size: .82rem; padding: .1rem 0; overflow-wrap: anywhere; }
+.glist .pcls { margin-right: .35rem; font-size: .66rem; font-weight: 700;
+  letter-spacing: .04em; }
+.glist .ppath { color: var(--muted); font-size: .74rem; }
 /* Знак дублирует цвет — на случай, если цвет не различим. */
 .sign { font-weight: 700; margin-right: .15rem; }
 /* Пакеты — такой же список, как патчи, по одному в строке. */

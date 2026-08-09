@@ -311,12 +311,13 @@ test('ghost-секция стоит в блоке патчей', function () {
                                   'class': 'CVE', cves: [],
                                   url: 'https://gl/x', ghost: 'branch' }] });
   var out = tables.stateRows([{ row: row, open: true }], opts());
-  assert.match(out, /готово в ветке, не собрано/);
+  assert.match(out, /class="ghosts"/);
+  assert.match(out, /нет в пакете/);
 });
 
 test('без ghost блок патчей прежний', function () {
   var out = tables.stateRows([{ row: stateRow(), open: true }], opts());
-  assert.strictEqual(out.indexOf('готово в ветке'), -1);
+  assert.strictEqual(out.indexOf('class="ghosts"'), -1);
 });
 
 test('сводка стороны диффа несёт всю карточку билда', function () {
