@@ -112,6 +112,18 @@
          + `, всего ${total}">${bars.join('')}</span>`;
   }
 
+  /* «Ветка +N» в шапке блока патчей. При нуле и при неизвестном числе не
+     показывается ничего: отставания нет или его не считали, и бейдж на
+     большинстве строк был бы шумом. */
+  function aheadHtml(row) {
+    if (!row.commits_ahead) return '';
+    const tip = `В ветке ${row.branch || '—'} после точки, из которой собран `
+              + `билд, ${row.commits_ahead} коммит(ов). Патчи билда сняты с `
+              + `коммита, а не с вершины ветки.`;
+    return `<span class="ahead" data-tip="${esc(tip)}">`
+         + `ветка +${esc(row.commits_ahead)}</span>`;
+  }
+
   function kv(k, v) {
     return `<div class="kv"><span class="k">${esc(k)}</span>`
          + `<span class="v">${v}</span></div>`;
@@ -289,7 +301,8 @@
          + (removed ? `<span class="minus">−${removed}</span>` : '');
   }
 
-  return { markHtml, marksHtml, linkHtml, kv, signHtml, meterHtml, pathAdds,
+  return { markHtml, marksHtml, linkHtml, kv, signHtml, meterHtml, aheadHtml,
+           pathAdds,
            patchesHtml, patchesChangeHtml, rpmsHtml, rpmsChangeHtml,
            rpmSideList,
            taggedCell, builtHtml, inheritedNote, mainTagHtml, otherTagsHtml,

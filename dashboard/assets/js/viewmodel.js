@@ -179,7 +179,7 @@
   function patchDict(patch) {
     return { path: orNull(patch.path), name: orNull(patch.name),
              'class': orNull(patch['class']), cves: (patch.cves || []).slice(),
-             url: orNull(patch.web_url) };
+             url: orNull(patch.web_url), ghost: orNull(patch.ghost) };
   }
 
   function patchDicts(patches) {
@@ -200,6 +200,12 @@
       ref_kind: source ? orNull(source.ref_kind) : 'none',
       project: source ? orNull(source.project) : null,
       source_url: source ? orNull(source.web_url) : null,
+      // Коммит сборки — единственная вечная ссылка в дашборде: ветка
+      // уедет, а дерево на хеше останется тем же и через полгода.
+      commit: source ? orNull(source.commit) : null,
+      commit_url: source ? orNull(source.commit_url) : null,
+      commits_ahead: source ? orNull(source.commits_ahead) : null,
+      patches_ref: orNull(build.patches_ref),
       koji_url: kojiUrl(kojiWeb, build.nvr),
       completed: toMsk(build.completed), owner: orNull(build.owner),
       build_id: orNull(build.build_id), task_id: orNull(build.task_id),
@@ -209,6 +215,9 @@
       tagged_in: orNull(build.tag_name), inherited: inheritedIn(build, tag),
       koji_tags: (build.tags || []).slice(),
       patches: patchDicts(patches),
+      // Ghost-патчи стоят отдельно и в patch_counts не идут: это то, чего
+      // в билде нет, и счётчики строки о нём молчат нарочно.
+      ghosts: patchDicts(build.ghost_patches || []),
       // порядок задаём здесь: дашборд режет список на блоки по смене
       // архитектуры и сам ничего не пересортировывает
       patch_counts: counts, rpms: rpmsmod.sortRpms(build.rpms || []),

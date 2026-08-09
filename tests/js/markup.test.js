@@ -200,3 +200,11 @@ test('дельта без изменений — прочерк, а не «+0 �
   assert.strictEqual(markup.delta(0, 0), '<span class="zero">—</span>');
   assert.match(markup.delta(2, 1), /\+2.*−1/);
 });
+
+test('бейдж отставания есть только когда есть отставание', function () {
+  assert.strictEqual(markup.aheadHtml({ commits_ahead: 0, branch: 'br' }), '');
+  assert.strictEqual(markup.aheadHtml({ commits_ahead: null, branch: 'br' }), '');
+  var html = markup.aheadHtml({ commits_ahead: 3, branch: 'br' });
+  assert.match(html, /ветка \+3/);
+  assert.match(html, /data-tip="[^"]*br[^"]*"/);
+});

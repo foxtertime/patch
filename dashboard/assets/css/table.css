@@ -182,6 +182,10 @@ tr.detail-row > td { background: var(--card); padding: .85rem .7rem 1.1rem 2.2re
    число читалось не как счётчик блока, а как чьё-то чужое. */
 .bl .n { font-variant-numeric: tabular-nums; letter-spacing: 0;
   margin-left: .45rem; }
+/* «Ветка +N» в шапке блока патчей: не метка строки и не счётчик, поэтому
+   свой вид — янтарный, как у предупреждающих меток, но без плашки. */
+.bl .ahead { margin-left: .4rem; font-size: .7rem; font-weight: 700;
+             letter-spacing: .03em; color: var(--major); cursor: help; }
 .kv { display: flex; gap: .5rem; font-size: .82rem; padding: .08rem 0; }
 /* Ключ не переносится: «каталог PATCH», разорванный надвое, оставлял
    значение на первой строке и читался как два разных поля. Столбец

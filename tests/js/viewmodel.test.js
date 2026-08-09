@@ -29,6 +29,8 @@ function build(name, over) {
                host: 'h', project: 'g/' + name, ref: ref, ref_kind: refKind,
                web_url: 'https://gl/tree' };
     if (has(over, 'ahead')) source.commits_ahead = over.ahead;
+    if (has(over, 'commit')) source.commit = over.commit;
+    if (has(over, 'commit_url')) source.commit_url = over.commit_url;
   }
   return { nvr: name + '-' + version + '-1.el9', name: name, version: version,
            release: '1.el9', epoch: null, build_id: 1, task_id: 2,
@@ -39,6 +41,8 @@ function build(name, over) {
            source: source,
            patch_dir_present: has(over, 'present') ? over.present : true,
            patches: has(over, 'patches') ? over.patches : [],
+           patches_ref: has(over, 'patches_ref') ? over.patches_ref : undefined,
+           ghost_patches: has(over, 'ghosts') ? over.ghosts : undefined,
            rpms: has(over, 'rpms') ? over.rpms : ['a.x86_64'],
            problems: has(over, 'problems') ? over.problems : [] };
 }
@@ -361,6 +365,38 @@ test('ветка на месте — метки нет', function () {
 test('снапшот без нового поля метки не получает', function () {
   var rows = data([snap('os-9.2', [build('nginx')])]).snapshots[0].builds;
   assert.strictEqual(rows[0].marks.indexOf('branch-ahead'), -1);
+});
+
+test('коммит и отставание доезжают до строки', function () {
+  var row = data([snap('os-9.2', [build('nginx', {
+    commit: 'abc123', commit_url: 'https://gl/g/r/-/tree/abc123', ahead: 3,
+    patches_ref: 'abc123',
+    ghosts: [{ path: 'PATCH/x.patch', name: 'x.patch', 'class': 'CVE',
+               cves: ['CVE-2026-9'], web_url: 'https://gl/x',
+               ghost: 'branch' }]
+  })])]).snapshots[0].builds[0];
+  assert.strictEqual(row.commit, 'abc123');
+  assert.strictEqual(row.commit_url, 'https://gl/g/r/-/tree/abc123');
+  assert.strictEqual(row.commits_ahead, 3);
+  assert.strictEqual(row.patches_ref, 'abc123');
+  assert.strictEqual(row.ghosts.length, 1);
+  assert.strictEqual(row.ghosts[0].ghost, 'branch');
+  assert.strictEqual(row.ghosts[0]['class'], 'CVE');
+});
+
+test('старый снапшот даёт пустые новые поля, а не undefined', function () {
+  var row = data([snap('os-9.2', [build('nginx')])]).snapshots[0].builds[0];
+  assert.strictEqual(row.commit, null);
+  assert.strictEqual(row.commits_ahead, null);
+  assert.strictEqual(row.patches_ref, null);
+  assert.deepStrictEqual(row.ghosts, []);
+});
+
+test('у обычного патча ghost пуст, а не отсутствует', function () {
+  var row = data([snap('os-9.2', [build('nginx', {
+    patches: [patch('CVE-2024-7347.patch', 'CVE')]
+  })])]).snapshots[0].builds[0];
+  assert.strictEqual(row.patches[0].ghost, null);
 });
 
 test('метка внутренней ошибки', function () {
