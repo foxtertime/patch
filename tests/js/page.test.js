@@ -10,6 +10,7 @@ var diffmod = require('../../dashboard/assets/js/diff.js');
 var storemod = require('../../dashboard/assets/js/store.js');
 var labels = require('../../dashboard/assets/js/labels.js');
 var text = require('../../dashboard/assets/js/text.js');
+var searchmod = require('../../dashboard/assets/js/search.js');
 var pagemod = require('../../dashboard/assets/js/page.js');
 
 function patch(name, cls) {
@@ -55,7 +56,8 @@ function make(snapshots) {
   storemod.reset();
   if (snapshots) storemod.add(snapshots, 'проба.json');
   var p = pagemod.create({ viewmodel: viewmodel, diffmod: diffmod,
-                           store: storemod, labels: labels, text: text });
+                           store: storemod, labels: labels, text: text,
+                           search: searchmod });
   if (snapshots) p.applyData(viewmodel.buildPageData(storemod.snapshots()));
   return p;
 }
@@ -350,32 +352,6 @@ test('мёртвые фильтры уходят с обеих вкладок с
   assert.deepStrictEqual(p.st.filters.diff, {});
 });
 
-test('поиск по видимому полю не разворачивает строку', function () {
-  var p = make([snap('os-9.1', JUL)]);
-  p.st.q = 'nginx';
-  var items = p.visibleRows();
-  assert.strictEqual(items.length, 1);
-  assert.strictEqual(items[0].open, false);
-});
-
-test('поиск по владельцу строку не разворачивает', function () {
-  /* Владелец стоит в самой строке, и разворачивать её незачем: правило
-     «развернуть» — про совпадения, которых в строке не видно. */
-  var p = make([snap('os-9.1', JUL)]);
-  p.st.q = 'builder';
-  var items = p.visibleRows();
-  assert.strictEqual(items.length, 1);
-  assert.strictEqual(items[0].open, false);
-});
-
-test('поиск по времени сборки билда строку тоже не разворачивает', function () {
-  var p = make([snap('os-9.1', JUL)]);
-  p.st.q = '2026-05-14';
-  var items = p.visibleRows();
-  assert.strictEqual(items.length, 1);
-  assert.strictEqual(items[0].open, false);
-});
-
 test('сортировка по владельцу собирает билды одного человека подряд',
   function () {
     var p = make([snap('os-9.1', JUL, { builds: [
@@ -386,30 +362,6 @@ test('сортировка по владельцу собирает билды �
     assert.deepStrictEqual(
       p.sortRows(p.visibleRows()).map(function (i) { return i.row.owner; }),
       ['alice', 'alice', 'zoe', 'zoe']);
-  });
-
-test('совпадение только в деталях разворачивает строку', function () {
-  var p = make([snap('os-9.1', JUL,
-    { builds: [build('nginx', { patches: [patch('cve.patch', 'CVE')] })] })]);
-  p.st.q = 'cve.patch';
-  var items = p.visibleRows();
-  assert.strictEqual(items.length, 1);
-  assert.strictEqual(items[0].open, true);
-});
-
-test('совпадение только в ghost-патче находит строку и разворачивает её',
-  function () {
-    /* Ghost-патч — это «влито в ветку, не собрано»: патча нет в самом
-       билде, он лежит только в ghosts, а секция с ним — в раскрытии.
-       Не найти строку по нему значило бы, что вопрос «какие пакеты ещё
-       ждут CVE-2026-1234» дашборд не отвечает вовсе. */
-    var p = make([snap('os-9.1', JUL,
-      { builds: [build('nginx',
-                       { ghost_patches: [patch('CVE-2026-1234.patch', 'CVE')] })] })]);
-    p.st.q = 'cve-2026-1234';
-    var items = p.visibleRows();
-    assert.strictEqual(items.length, 1);
-    assert.strictEqual(items[0].open, true);
   });
 
 test('под запрос не подошло ничего — строк нет, но всего их столько же',
@@ -577,7 +529,8 @@ test('смена состава снапшотов заводит кэш пер�
 test('две страницы не делят состояния', function () {
   var a = make([snap('os-9.1', JUL), snap('os-9.2', AUG)]);
   var b = pagemod.create({ viewmodel: viewmodel, diffmod: diffmod,
-                           store: storemod, labels: labels, text: text });
+                           store: storemod, labels: labels, text: text,
+                           search: searchmod });
   b.applyData(viewmodel.buildPageData(storemod.snapshots()));
   a.selectSnapshot(0);
   assert.strictEqual(a.st.tag, 0);

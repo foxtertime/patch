@@ -14,19 +14,20 @@
                              require('./page.js'), require('./hash.js'),
                              require('./rail.js'), require('./files.js'),
                              require('./tips.js'), require('./toasts.js'),
-                             require('./filters.js'));
+                             require('./filters.js'), require('./search.js'));
   } else {
     root.KP = root.KP || {};
     root.KP.ui = factory(root.KP.viewmodel, root.KP.store, root.KP.diff,
                          root.KP.text, root.KP.labels, root.KP.markup,
                          root.KP.tables, root.KP.cards, root.KP.page,
                          root.KP.hash, root.KP.rail, root.KP.files,
-                         root.KP.tips, root.KP.toasts, root.KP.filters);
+                         root.KP.tips, root.KP.toasts, root.KP.filters,
+                         root.KP.search);
   }
 }(typeof globalThis !== 'undefined' ? globalThis : this,
   function (viewmodel, store, diffmod, text, labels, markup, tables, cards,
             pagemod, hash, railmod, filesmod, tipsmod, toastsmod,
-            filtersmod) {
+            filtersmod, searchmod) {
   'use strict';
 
   /* Состояние страницы живёт в page.js: там же и всё, что из него
@@ -34,7 +35,8 @@
      сортировка. Здесь — короткие имена для того, что зовут отсюда чаще
      всего. */
   let page = pagemod.create({ viewmodel: viewmodel, diffmod: diffmod,
-                              store: store, labels: labels, text: text });
+                              store: store, labels: labels, text: text,
+                              search: searchmod });
   const st = page.st;
   const curSnap = page.curSnap, curPair = page.curPair;
   const visibleRows = page.visibleRows, sortRows = page.sortRows;
