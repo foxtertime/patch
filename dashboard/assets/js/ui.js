@@ -14,7 +14,8 @@
                              require('./page.js'), require('./hash.js'),
                              require('./rail.js'), require('./files.js'),
                              require('./tips.js'), require('./toasts.js'),
-                             require('./filters.js'), require('./search.js'));
+                             require('./filters.js'), require('./search.js'),
+                             require('./copy.js'));
   } else {
     root.KP = root.KP || {};
     root.KP.ui = factory(root.KP.viewmodel, root.KP.store, root.KP.diff,
@@ -22,12 +23,12 @@
                          root.KP.tables, root.KP.cards, root.KP.page,
                          root.KP.hash, root.KP.rail, root.KP.files,
                          root.KP.tips, root.KP.toasts, root.KP.filters,
-                         root.KP.search);
+                         root.KP.search, root.KP.copy);
   }
 }(typeof globalThis !== 'undefined' ? globalThis : this,
   function (viewmodel, store, diffmod, text, labels, markup, tables, cards,
             pagemod, hash, railmod, filesmod, tipsmod, toastsmod,
-            filtersmod, searchmod) {
+            filtersmod, searchmod, copymod) {
   'use strict';
 
   /* Состояние страницы живёт в page.js: там же и всё, что из него
@@ -318,58 +319,6 @@
     return true;
   }
 
-  /* ---------- копирование ---------- */
-
-  /* NVR диффа собирается из имени и evr: evr — это «epoch:version-release»,
-     а в NVR эпохи нет, поэтому ведущее «N:» отбрасываем. */
-  function nvrOf(row) {
-    if (row.nvr) return row.nvr;
-    const evr = row.new_evr || row.old_evr;
-    return evr ? row.name + '-' + String(evr).replace(/^[0-9]+:/, '') : row.name;
-  }
-
-  /* Подпись кнопки берём один раз при загрузке: если запомнить текущую, то
-     второй клик подряд запомнит «Скопировано» и вернёт кнопку к нему навсегда. */
-  const COPY_LABEL = copyBtn.textContent;
-  let flashTimer = null;
-
-  function flash(text) {
-    copyBtn.textContent = text;
-    if (flashTimer) clearTimeout(flashTimer);
-    flashTimer = setTimeout(() => {
-      flashTimer = null;
-      copyBtn.textContent = COPY_LABEL;
-    }, 1400);
-  }
-
-  function copyFallback(text) {
-    const area = document.createElement('textarea');
-    area.value = text;
-    area.setAttribute('readonly', 'readonly');
-    area.style.position = 'fixed';
-    area.style.left = '-9999px';
-    document.body.appendChild(area);
-    area.select();
-    let ok = false;
-    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
-    document.body.removeChild(area);
-    flash(ok ? 'Скопировано' : 'Не вышло');
-  }
-
-  function copyNvr() {
-    let items = sortRows(visibleRows()), lines = [], i;
-    for (i = 0; i < items.length; i++) lines.push(nvrOf(items[i].row));
-    const text = lines.join('\n');
-    if (!text) return;
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(
-        () => { flash(`Скопировано ${lines.length}`); },
-        () => { copyFallback(text); });
-    } else {
-      copyFallback(text);
-    }
-  }
-
   /* ---------- события ---------- */
 
   /* Переключаем от того состояния, которое человек видит на экране, а не от
@@ -500,8 +449,6 @@
     render();
   });
 
-  copyBtn.addEventListener('click', copyNvr);
-
   window.addEventListener('hashchange', () => {
     if (hashLock) return;
     if (readHash()) { page.dropDeadFilters(); showTab(st.tab); rebuild(); }
@@ -528,6 +475,9 @@
   app.render = render;
   app.renderStateCards = renderStateCards;
   app.renderDiffCards = renderDiffCards;
+  const copier = copymod.create({
+    button: copyBtn,
+    rowsOf: () => sortRows(visibleRows()).map((item) => item.row) });
 
 
   /* ---------- «липкая» шапка ---------- */
