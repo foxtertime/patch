@@ -583,6 +583,36 @@ test('ссылка строки пары ведёт на хаб своего с�
             rows.nginx.koji_url);
 });
 
+test('sha патча доезжает до страницы', function () {
+  var rows = data([snap('os-9.2', [build('nginx', {
+    patches: [{ path: 'PATCH/a.patch', name: 'a.patch', 'class': 'CVE',
+                cves: [], web_url: 'https://gl/a', sha: 'blob-a' }]
+  })])]).snapshots[0].builds;
+  assert.strictEqual(rows[0].patches[0].sha, 'blob-a');
+});
+
+test('патч без sha даёт null, а не undefined', function () {
+  var rows = data([snap('os-9.2', [build('nginx', {
+    patches: [patch('a.patch', 'CVE')]
+  })])]).snapshots[0].builds;
+  assert.strictEqual(rows[0].patches[0].sha, null);
+});
+
+test('переписанный патч даёт метку patches~', function () {
+  var withSha = function (sha, over) {
+    return build('nginx', Object.assign({
+      patches: [{ path: 'PATCH/a.patch', name: 'a.patch', 'class': 'CVE',
+                  cves: [], web_url: 'https://gl/a', sha: sha }]
+    }, over || {}));
+  };
+  var pair = data([snap('os-9.1', [withSha('aaa')]),
+                   snap('os-9.2', [withSha('bbb', { version: '1.2' })])])
+             .pairs[0];
+  var row = pair.rows[0];
+  assert.deepStrictEqual(row.patches_rewritten, ['PATCH/a.patch']);
+  assert.ok(row.marks.indexOf('patches~') !== -1);
+});
+
 function readJson(rel) {
   return JSON.parse(fs.readFileSync(path.join(__dirname, rel), 'utf8'));
 }

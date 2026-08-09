@@ -179,7 +179,8 @@
   function patchDict(patch) {
     return { path: orNull(patch.path), name: orNull(patch.name),
              'class': orNull(patch['class']), cves: (patch.cves || []).slice(),
-             url: orNull(patch.web_url), ghost: orNull(patch.ghost) };
+             url: orNull(patch.web_url), ghost: orNull(patch.ghost),
+             sha: orNull(patch.sha) };
   }
 
   function patchDicts(patches) {
@@ -264,6 +265,7 @@
     if (component.repackaged) marks.push('repackaged');
     if (component.patches_added.length) marks.push('patches+');
     if (component.patches_removed.length) marks.push('patches-');
+    if (component.patches_rewritten.length) marks.push('patches~');
     if (component.branch_changed) marks.push('branch-changed');
     if (component.tag_changed) marks.push('tag-changed');
     return marks;
@@ -291,6 +293,7 @@
         ? orNull(fresh.source.ref_kind) : null,
       patches_added: component.patches_added.slice(),
       patches_removed: component.patches_removed.slice(),
+      patches_rewritten: component.patches_rewritten.slice(),
       rpms_added: component.rpms_added.slice(),
       rpms_removed: component.rpms_removed.slice(),
       old_patches: patchDicts(old ? (old.patches || []) : []),
