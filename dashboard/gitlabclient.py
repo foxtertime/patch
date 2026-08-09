@@ -13,6 +13,7 @@ from urllib.parse import quote
 from .httpclient import HttpClient, server_message
 
 TreeResult = namedtuple("TreeResult", "present paths problem")
+CompareResult = namedtuple("CompareResult", "head ahead problem")
 
 logger = logging.getLogger(__name__)
 
@@ -163,6 +164,54 @@ class GitlabClient:
                      project, ref, response.status, server_message(response))
         return TreeResult(None, [],
                           "gitlab: %s %s" % (response.status, server_message(response)))
+
+    # -- сравнение коммитов -----------------------------------------------
+    def compare(self, host, project, from_sha, to_ref) -> CompareResult:
+        """Вершина ветки и сколько коммитов легло после точки сборки.
+
+        Число считается от точки расхождения, а не двухточечным сравнением:
+        отличить перебазированную ветку от обычной без второго запроса
+        нельзя, а ради формулировки лишний запрос на каждый билд не стоит
+        того. Поэтому и в модели, и на странице число зовётся «коммитов
+        после точки, из которой собран билд» — это верно при любой форме
+        истории. Ghost-патчи от формы истории не зависят вовсе: они
+        считаются сравнением деревьев, а не журнала.
+        """
+        if not from_sha or not to_ref:
+            return CompareResult(None, None, "gitlab: нечего сравнивать")
+        key = ("compare", host, project, from_sha, to_ref)
+        with self._lock:
+            if key in self._cache:
+                logger.debug("кэш: сравнение %s %s %s..%s", host, project,
+                             from_sha, to_ref)
+                return self._cache[key]
+        result = self._fetch_compare(host, project, from_sha, to_ref)
+        with self._lock:
+            self._cache[key] = result
+        return result
+
+    def _fetch_compare(self, host, project, from_sha, to_ref) -> CompareResult:
+        cfg = self._host_config(host)
+        if cfg is None:
+            return CompareResult(None, None, "gitlab: unknown host %s" % host)
+        url = "%s/projects/%s/repository/compare" % (
+            cfg.api.rstrip("/"), quote(project, safe=""))
+        headers = {"PRIVATE-TOKEN": self._token} if self._token else {}
+        response = self._http.get(url, headers,
+                                  {"from": from_sha, "to": to_ref})
+        if isinstance(response, str):
+            return CompareResult(None, None, response)
+        if response.status >= 400:
+            return CompareResult(None, None,
+                                 "gitlab: %s %s" % (response.status,
+                                                    server_message(response)))
+        body = response.body or {}
+        head = (body.get("commit") or {}).get("id")
+        # compare_timeout значит «список коммитов усечён»: показывать по
+        # нему число нельзя, оно будет меньше настоящего
+        if body.get("compare_timeout"):
+            return CompareResult(head, None, None)
+        return CompareResult(head, len(body.get("commits") or []), None)
 
 
 def _path(value) -> str:
