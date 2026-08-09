@@ -68,7 +68,7 @@ def blob(project, ref, name):
     return "https://gl/%s/-/blob/%s/PATCH/%s" % (project, ref, name)
 
 
-def pat(project, ref, name, cls, cves=(), ghost=None):
+def pat(project, ref, name, cls, cves=(), ghost=None, sha=None):
     """Патч со ссылкой на то состояние репозитория, из которого он прочитан.
 
     Ref здесь не украшение: у патчей билда и у ghost-стороны build он
@@ -77,7 +77,7 @@ def pat(project, ref, name, cls, cves=(), ghost=None):
     демонстрацией и становится выдумкой.
     """
     return Patch(path="PATCH/" + name, name=name, cls=cls, cves=list(cves),
-                 ghost=ghost, web_url=blob(project, ref, name))
+                 ghost=ghost, web_url=blob(project, ref, name), sha=sha)
 
 
 def src_at(project, branch, commit, ahead=0, head=None):
@@ -809,6 +809,14 @@ ZLIB_PINNED = "2b7d48a06e1f5c3b9d2a7e4f60c81b533f5a1c9e"
 # разом ничего не объясняют, а мешают друг другу.
 DRIFT_TAG = "os-9.8"
 
+# Blob sha демонстрационной цепочки. У distsuffix их два: до пересборки в
+# пакете лежит прежняя редакция, после — та, что уже была в ветке. На этой
+# паре и видно исход «патч переписан», которого до 2.3.0 не существовало.
+BLOB_CVE_3010 = "1a2b3c4d5e6f70819293a4b5c6d7e8f900112233"
+BLOB_CVE_3011 = "2b3c4d5e6f70819293a4b5c6d7e8f90011223344"
+BLOB_DIST_OLD = "3c4d5e6f70819293a4b5c6d7e8f9001122334455"
+BLOB_DIST_NEW = "4d5e6f70819293a4b5c6d7e8f900112233445566"
+
 
 def legacy_snapshot():
     """Тот же тег, снятый до перехода на коммит сборки.
@@ -918,15 +926,19 @@ def drift_snapshot():
                   patches_ref=NGINX_BUILT, patch_dir_present=True,
                   patches=[
                       pat("web/nginx", NGINX_BUILT, "CVE-2026-3010.patch",
-                          "CVE", ["CVE-2026-3010"]),
+                          "CVE", ["CVE-2026-3010"], sha=BLOB_CVE_3010),
                       pat("web/nginx", NGINX_BUILT, "nginx-distsuffix.patch",
-                          "DISTSUFFIX"),
+                          "DISTSUFFIX", sha=BLOB_DIST_OLD),
                   ],
                   ghost_patches=[
                       pat("web/nginx", tag, "CVE-2026-3011.patch", "CVE",
-                          ["CVE-2026-3011"], ghost="branch"),
+                          ["CVE-2026-3011"], ghost="branch",
+                          sha=BLOB_CVE_3011),
+                      # сторона changed читается с вершины ветки, где уже
+                      # лежит новая редакция, — её же билд и получит,
+                      # когда его пересоберут
                       pat("web/nginx", tag, "nginx-distsuffix.patch",
-                          "DISTSUFFIX", ghost="changed"),
+                          "DISTSUFFIX", ghost="changed", sha=BLOB_DIST_NEW),
                   ],
                   rpms=["nginx-1.26.0-3.el9.x86_64",
                         "nginx-1.26.0-3.el9.src"]),
@@ -1058,11 +1070,11 @@ def caught_up_snapshot():
                   patches_ref=NGINX_HEAD, patch_dir_present=True,
                   patches=[
                       pat("web/nginx", NGINX_HEAD, "CVE-2026-3010.patch",
-                          "CVE", ["CVE-2026-3010"]),
+                          "CVE", ["CVE-2026-3010"], sha=BLOB_CVE_3010),
                       pat("web/nginx", NGINX_HEAD, "CVE-2026-3011.patch",
-                          "CVE", ["CVE-2026-3011"]),
+                          "CVE", ["CVE-2026-3011"], sha=BLOB_CVE_3011),
                       pat("web/nginx", NGINX_HEAD, "nginx-distsuffix.patch",
-                          "DISTSUFFIX"),
+                          "DISTSUFFIX", sha=BLOB_DIST_NEW),
                   ],
                   rpms=["nginx-1.26.0-4.el9.x86_64",
                         "nginx-1.26.0-4.el9.src"]),

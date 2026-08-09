@@ -284,6 +284,30 @@ class DriftChainTest(unittest.TestCase):
                           for p in after["python3"].ghost_patches],
                          [("CVE-2026-3030.patch", "branch")])
 
+    def test_a_patch_is_rewritten_between_the_two_new_snapshots(self):
+        # Пересборка с вершины: имя то же, содержимое другое. До 2.3.0
+        # такой патч был неотличим от уцелевшего.
+        before = snapshot("rich-drift.json").by_name()["nginx"]
+        after = snapshot("rich-caught-up.json").by_name()["nginx"]
+        was = {p.name: p.sha for p in before.patches}
+        now = {p.name: p.sha for p in after.patches}
+        self.assertEqual(was["CVE-2026-3010.patch"],
+                         now["CVE-2026-3010.patch"])
+        self.assertNotEqual(was["nginx-distsuffix.patch"],
+                            now["nginx-distsuffix.patch"])
+        # ghost-сторона changed несёт ту редакцию, что уже лежала в ветке,
+        # — и она же оказалась в пакете после пересборки
+        ghost = {p.name: p.sha for p in before.ghost_patches
+                 if p.ghost == "changed"}
+        self.assertEqual(ghost["nginx-distsuffix.patch"],
+                         now["nginx-distsuffix.patch"])
+
+    def test_legacy_carries_no_sha_at_all(self):
+        # молчание в паре со старым снапшотом — тоже случай, и он тут
+        for build in snapshot("rich-legacy.json").builds:
+            for patch in build.patches:
+                self.assertIsNone(patch.sha, patch.name)
+
 
 if __name__ == "__main__":
     unittest.main()

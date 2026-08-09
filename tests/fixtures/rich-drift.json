@@ -14,7 +14,7 @@
       "ghost": "branch",
       "name": "CVE-2026-3011.patch",
       "path": "PATCH/CVE-2026-3011.patch",
-      "sha": null,
+      "sha": "2b3c4d5e6f70819293a4b5c6d7e8f90011223344",
       "web_url": "https://gl/web/nginx/-/blob/os-9.8/PATCH/CVE-2026-3011.patch"
      },
      {
@@ -23,7 +23,7 @@
       "ghost": "changed",
       "name": "nginx-distsuffix.patch",
       "path": "PATCH/nginx-distsuffix.patch",
-      "sha": null,
+      "sha": "4d5e6f70819293a4b5c6d7e8f900112233445566",
       "web_url": "https://gl/web/nginx/-/blob/os-9.8/PATCH/nginx-distsuffix.patch"
      }
     ],
@@ -40,7 +40,7 @@
       "ghost": null,
       "name": "CVE-2026-3010.patch",
       "path": "PATCH/CVE-2026-3010.patch",
-      "sha": null,
+      "sha": "1a2b3c4d5e6f70819293a4b5c6d7e8f900112233",
       "web_url": "https://gl/web/nginx/-/blob/3f5a1c9e2b7d48a06e1f5c3b9d2a7e4f60c81b53/PATCH/CVE-2026-3010.patch"
      },
      {
@@ -49,7 +49,7 @@
       "ghost": null,
       "name": "nginx-distsuffix.patch",
       "path": "PATCH/nginx-distsuffix.patch",
-      "sha": null,
+      "sha": "3c4d5e6f70819293a4b5c6d7e8f9001122334455",
       "web_url": "https://gl/web/nginx/-/blob/3f5a1c9e2b7d48a06e1f5c3b9d2a7e4f60c81b53/PATCH/nginx-distsuffix.patch"
      }
     ],
