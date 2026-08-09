@@ -261,7 +261,8 @@ def _attach_patches(build: Build, info: dict, cfg, gitlab_client,
         build.problems.append(result.problem)
     for path in result.paths:
         build.patches.append(_patch(path, parsed, ref, classifier,
-                                    gitlab_client))
+                                    gitlab_client,
+                                    sha=result.blobs.get(path)))
 
     # Сравнивать есть с чем, только когда билд собран с ветки: у сборки
     # прямо с коммита ветки нет, а без хеша нет и точки отсчёта.
@@ -369,18 +370,22 @@ def _ghosts(built, tip, parsed, commit, classifier, gitlab_client):
     out = []
     for side in _GHOST_SIDES:
         # ссылка ведёт туда, где файл есть: у стороны build его в ветке уже
-        # нет, и ссылка на ветку вела бы в никуда
+        # нет, и ссылка на ветку вела бы в никуда. sha берётся оттуда же:
+        # разойдись они, снапшот утверждал бы, что по этому адресу лежит
+        # файл вот с таким содержимым, — и врал бы.
         ref = commit if side == "build" else parsed.ref
+        blobs = built.blobs if side == "build" else tip.blobs
         for path in paths[side]:
             out.append(_patch(path, parsed, ref, classifier, gitlab_client,
-                              ghost=side))
+                              ghost=side, sha=blobs.get(path)))
     return out
 
 
-def _patch(path, parsed, ref, classifier, gitlab_client, ghost=None):
+def _patch(path, parsed, ref, classifier, gitlab_client, ghost=None,
+           sha=None):
     name = os.path.basename(path)
     return Patch(path=path, name=name, cls=classifier.classify(name),
-                 cves=find_cves(name), ghost=ghost,
+                 cves=find_cves(name), ghost=ghost, sha=sha,
                  web_url=gitlab_client.blob_url(parsed.host, parsed.project,
                                                 ref, path))
 

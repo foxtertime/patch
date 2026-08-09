@@ -158,6 +158,36 @@ test('в «было» пометок нет ни одной', function () {
   assert.doesNotMatch(out, /is-added|is-removed|class="sign"/, out);
 });
 
+function withSha(name, sha) {
+  return { path: 'PATCH/' + name, name: name, 'class': 'CVE', cves: [],
+           url: 'https://gl/' + name, sha: sha };
+}
+
+test('переписанный патч помечен знаком и классом', function () {
+  var html = markup.patchesChangeHtml([withSha('a.patch', 'aaa')],
+                                      [withSha('a.patch', 'bbb')], '');
+  assert.match(html, /class="is-rewritten"/);
+  assert.match(html, /<span class="sign">~<\/span>/);
+});
+
+test('тот же sha не метится ничем', function () {
+  var html = markup.patchesChangeHtml([withSha('a.patch', 'aaa')],
+                                      [withSha('a.patch', 'aaa')], '');
+  assert.strictEqual(html.indexOf('is-rewritten'), -1);
+});
+
+test('sha только с одной стороны — не метится', function () {
+  var html = markup.patchesChangeHtml([withSha('a.patch', undefined)],
+                                      [withSha('a.patch', 'bbb')], '');
+  assert.strictEqual(html.indexOf('is-rewritten'), -1);
+});
+
+test('сторона «было» по-прежнему не метится', function () {
+  var html = markup.patchesHtml([withSha('a.patch', 'aaa')], '');
+  assert.strictEqual(html.indexOf('is-rewritten'), -1);
+  assert.strictEqual(html.indexOf('class="sign"'), -1);
+});
+
 test('пакеты режутся на блоки по смене архитектуры', function () {
   var out = markup.rpmsHtml(['p-1-1.src', 'p-1-1.x86_64', 'q-1-1.x86_64'], '');
   assert.match(out, /src <span class="n">1<\/span>/);

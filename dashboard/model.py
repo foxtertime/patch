@@ -24,17 +24,25 @@ class Patch:
     # из ветки убран; "changed" — путь тот же, содержимое в ветке другое.
     # У патчей самого билда поле пустое.
     ghost: Optional[str] = None
+    # blob sha файла: тот же объект, что git кладёт в дерево, — sha1 от
+    # «blob <длина>\0» и содержимого. Адресуется содержимым, а не адресом,
+    # поэтому одинаковые файлы дают одинаковый sha в любом репозитории и в
+    # любом прогоне: по нему сравнимы два снапшота, даже если компонент
+    # переехал в другой проект. None — не знаем: снапшот собран до 2.3.0
+    # или дерево не прочиталось.
+    sha: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {"path": self.path, "name": self.name, "class": self.cls,
                 "cves": list(self.cves), "web_url": self.web_url,
-                "ghost": self.ghost}
+                "ghost": self.ghost, "sha": self.sha}
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "Patch":
         return cls(path=data["path"], name=data["name"], cls=data["class"],
                    cves=list(data.get("cves") or []),
-                   web_url=data.get("web_url"), ghost=data.get("ghost"))
+                   web_url=data.get("web_url"), ghost=data.get("ghost"),
+                   sha=data.get("sha"))
 
 
 @dataclass

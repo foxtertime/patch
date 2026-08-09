@@ -167,6 +167,7 @@
     return Boolean(component.status !== 'unchanged'
                    || component.patches_added.length
                    || component.patches_removed.length
+                   || component.patches_rewritten.length
                    || component.repackaged
                    || component.branch_changed
                    || component.tag_changed);
@@ -177,6 +178,7 @@
     for (const s of STATUSES) result[s] = 0;
     result.patches_added = 0;
     result.patches_removed = 0;
+    result.patches_rewritten = 0;
     result.repackaged = 0;
     result.branch_changed = 0;
     result.tag_changed = 0;
@@ -185,6 +187,7 @@
       result[component.status] += 1;
       if (component.patches_added.length) result.patches_added += 1;
       if (component.patches_removed.length) result.patches_removed += 1;
+      if (component.patches_rewritten.length) result.patches_rewritten += 1;
       if (component.repackaged) result.repackaged += 1;
       if (component.branch_changed) result.branch_changed += 1;
       if (component.tag_changed) result.tag_changed += 1;
@@ -202,6 +205,28 @@
   function setMinus(a, b) {
     const out = [];
     a.forEach((item) => { if (!b.has(item)) out.push(item); });
+    return out.sort();
+  }
+
+  function pathShas(build) {
+    const out = new Map();
+    for (const p of (build.patches || [])) out.set(p.path, p.sha || null);
+    return out;
+  }
+
+  /* Путь есть с обеих сторон, а содержимое разное. Сравнение по одним
+     именам этот случай пропускает, а он самый опасный из трёх:
+     переписанный после сборки патч CVE выглядит как уцелевший.
+
+     Молчим, когда sha неизвестен хоть с одной стороны: снапшоты до 2.3.0
+     его не несут. Объявить такой патч уцелевшим — меньшее зло, чем
+     объявить переписанным то, чего мы не сравнивали. */
+  function rewritten(oldShas, newShas) {
+    const out = [];
+    oldShas.forEach((sha, path) => {
+      const other = newShas.get(path);
+      if (sha && other && sha !== other) out.push(path);
+    });
     return out.sort();
   }
 
@@ -223,18 +248,22 @@
       if (oldBuild === null) {
         component = { name, status: 'added', old: null, new: newBuild,
                        patches_added: [], patches_removed: [],
+                       patches_rewritten: [],
                        rpms_added: [], rpms_removed: [],
                        branch_changed: false, repackaged: false,
                        tag_changed: false };
       } else if (newBuild === null) {
         component = { name, status: 'removed', old: oldBuild, new: null,
                        patches_added: [], patches_removed: [],
+                       patches_rewritten: [],
                        rpms_added: [], rpms_removed: [],
                        branch_changed: false, repackaged: false,
                        tag_changed: false };
       } else {
-        const oldPatches = new Set((oldBuild.patches || []).map((p) => p.path));
-        const newPatches = new Set((newBuild.patches || []).map((p) => p.path));
+        const oldShas = pathShas(oldBuild);
+        const newShas = pathShas(newBuild);
+        const oldPatches = new Set(oldShas.keys());
+        const newPatches = new Set(newShas.keys());
         const oldRpms = rpmKeys(oldBuild);
         const newRpms = rpmKeys(newBuild);
         const repackaged = oldRpms.size !== newRpms.size
@@ -245,6 +274,7 @@
           old: oldBuild, new: newBuild,
           patches_added: setMinus(newPatches, oldPatches),
           patches_removed: setMinus(oldPatches, newPatches),
+          patches_rewritten: rewritten(oldShas, newShas),
           rpms_added: rpmDelta(newRpms, oldRpms),
           rpms_removed: rpmDelta(oldRpms, newRpms),
           branch_changed: refOf(oldBuild) !== refOf(newBuild),

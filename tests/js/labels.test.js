@@ -92,6 +92,14 @@ test('branch-ahead подписан и лежит в группе свойств
   assert.ok(build.keys.indexOf('branch-ahead') !== -1);
 });
 
+test('patches~ подписан и лежит в группе изменений', function () {
+  assert.strictEqual(labels.label('patches~'), 'патчи переписаны');
+  var change = labels.groups('diff').filter(function (g) {
+    return g.id === 'change';
+  })[0];
+  assert.ok(change.keys.indexOf('patches~') !== -1);
+});
+
 test('каждый ключ группы называется по-русски', function () {
   labels.setClasses([]);
   ['state', 'diff'].forEach(function (tab) {

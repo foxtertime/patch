@@ -19,6 +19,7 @@
       "ghost": null,
       "name": "CVE-2024-7347.patch",
       "path": "PATCH/CVE-2024-7347.patch",
+      "sha": null,
       "web_url": "https://gl/blob/PATCH/CVE-2024-7347.patch"
      },
      {
@@ -27,6 +28,7 @@
       "ghost": null,
       "name": "changelog.yaml",
       "path": "PATCH/changelog.yaml",
+      "sha": null,
       "web_url": "https://gl/blob/PATCH/changelog.yaml"
      },
      {
@@ -35,6 +37,7 @@
       "ghost": null,
       "name": "dast-fuzz.patch",
       "path": "PATCH/dast-fuzz.patch",
+      "sha": null,
       "web_url": "https://gl/blob/PATCH/dast-fuzz.patch"
      }
     ],
@@ -121,6 +124,7 @@
       "ghost": null,
       "name": "sast-zlib.patch",
       "path": "PATCH/sast-zlib.patch",
+      "sha": null,
       "web_url": "https://gl/blob/PATCH/sast-zlib.patch"
      },
      {
@@ -129,6 +133,7 @@
       "ghost": null,
       "name": "weird.diff",
       "path": "PATCH/weird.diff",
+      "sha": null,
       "web_url": "https://gl/blob/PATCH/weird.diff"
      }
     ],
@@ -175,6 +180,7 @@
       "ghost": null,
       "name": "source.tar.gz",
       "path": "PATCH/source.tar.gz",
+      "sha": null,
       "web_url": "https://gl/blob/PATCH/source.tar.gz"
      }
     ],
@@ -205,7 +211,7 @@
     "version": "8.0"
    }
   ],
-  "dashboard": "2.1.0",
+  "dashboard": "2.2.0",
   "generated": "2026-08-01T00:00:00+03:00",
   "koji_hub": "https://hub/kojihub",
   "koji_web": "https://hub/koji",

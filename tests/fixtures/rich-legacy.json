@@ -19,6 +19,7 @@
       "ghost": null,
       "name": "CVE-2026-3010.patch",
       "path": "PATCH/CVE-2026-3010.patch",
+      "sha": null,
       "web_url": "https://gl/web/nginx/-/blob/os-9.8/PATCH/CVE-2026-3010.patch"
      },
      {
@@ -29,6 +30,7 @@
       "ghost": null,
       "name": "CVE-2026-3011.patch",
       "path": "PATCH/CVE-2026-3011.patch",
+      "sha": null,
       "web_url": "https://gl/web/nginx/-/blob/os-9.8/PATCH/CVE-2026-3011.patch"
      },
      {
@@ -37,6 +39,7 @@
       "ghost": null,
       "name": "nginx-distsuffix.patch",
       "path": "PATCH/nginx-distsuffix.patch",
+      "sha": null,
       "web_url": "https://gl/web/nginx/-/blob/os-9.8/PATCH/nginx-distsuffix.patch"
      }
     ],
@@ -85,6 +88,7 @@
       "ghost": null,
       "name": "CVE-2026-3020.patch",
       "path": "PATCH/CVE-2026-3020.patch",
+      "sha": null,
       "web_url": "https://gl/web/httpd/-/blob/os-9.8/PATCH/CVE-2026-3020.patch"
      },
      {
@@ -93,6 +97,7 @@
       "ghost": null,
       "name": "httpd-license.patch",
       "path": "PATCH/httpd-license.patch",
+      "sha": null,
       "web_url": "https://gl/web/httpd/-/blob/os-9.8/PATCH/httpd-license.patch"
      }
     ],
@@ -138,6 +143,7 @@
       "ghost": null,
       "name": "sast-openssl.patch",
       "path": "PATCH/sast-openssl.patch",
+      "sha": null,
       "web_url": "https://gl/core/openssl/-/blob/os-9.8/PATCH/sast-openssl.patch"
      }
     ],
@@ -184,6 +190,7 @@
       "ghost": null,
       "name": "curl-distsuffix.patch",
       "path": "PATCH/curl-distsuffix.patch",
+      "sha": null,
       "web_url": "https://gl/core/curl/-/blob/os-9.8/PATCH/curl-distsuffix.patch"
      }
     ],
@@ -229,6 +236,7 @@
       "ghost": null,
       "name": "coverage-glibc.patch",
       "path": "PATCH/coverage-glibc.patch",
+      "sha": null,
       "web_url": "https://gl/core/glibc/-/blob/os-9.8/PATCH/coverage-glibc.patch"
      }
     ],
