@@ -553,5 +553,94 @@ class _ExplodingGitlab:
         raise RuntimeError("boom")
 
 
+def tree(paths):
+    """Ответ дерева: пути и id блобов, id по порядку."""
+    return Response(200, [{"id": str(i + 1), "type": "blob", "path": p,
+                           "name": p.rsplit("/", 1)[-1]}
+                          for i, p in enumerate(paths)], {})
+
+
+NGINX_TREE = TREE % "g%2Fnginx"
+
+
+class PatchesComeFromCommitTest(unittest.TestCase):
+    def _nginx(self, routes):
+        koji, gitlab, transport = clients_with_source(
+            routes, "git+ssh://git@gitlab.example.com/g/nginx#" + SHA)
+        snapshot = collect_tag("os-9.2", config(), koji, gitlab, jobs=1)
+        return snapshot.by_name()["nginx"], transport
+
+    def test_tree_is_read_at_the_commit(self):
+        build, transport = self._nginx({
+            (NGINX_TREE, (("path", "PATCH"), ("per_page", "100"),
+                          ("recursive", "true"), ("ref", SHA))):
+                tree(["PATCH/CVE-2026-1.patch"]),
+        })
+        self.assertEqual(build.patches_ref, SHA)
+        self.assertEqual([p.name for p in build.patches],
+                         ["CVE-2026-1.patch"])
+        refs = [params.get("ref") for url, params, _ in transport.requests
+                if url == NGINX_TREE]
+        self.assertIn(SHA, refs)
+
+    def test_without_a_hash_the_branch_is_read_as_before(self):
+        koji, gitlab, _ = clients_with_source({
+            (NGINX_TREE, (("path", "PATCH"), ("per_page", "100"),
+                          ("recursive", "true"), ("ref", "br"))):
+                tree(["PATCH/CVE-2026-1.patch"]),
+        }, None)
+        build = collect_tag("os-9.2", config(), koji, gitlab,
+                            jobs=1).by_name()["nginx"]
+        self.assertEqual(build.patches_ref, "br")
+        self.assertEqual(len(build.patches), 1)
+
+    def test_missing_commit_falls_back_to_the_branch_and_says_so(self):
+        # дерево на хеше отвечает 404, доразбор коммита — тоже: коммита нет
+        build, _ = self._nginx({
+            (NGINX_TREE, (("path", "PATCH"), ("per_page", "100"),
+                          ("recursive", "true"), ("ref", SHA))):
+                Response(404, {"message": "404 Tree Not Found"}, {}),
+            COMMITS % ("g%2Fnginx", SHA): Response(404, {"message": "404"}, {}),
+            (NGINX_TREE, (("path", "PATCH"), ("per_page", "100"),
+                          ("recursive", "true"), ("ref", "br"))):
+                tree(["PATCH/CVE-2026-1.patch"]),
+        })
+        self.assertEqual(build.patches_ref, "br")
+        self.assertEqual(len(build.patches), 1)
+        self.assertTrue(any("недоступен" in p for p in build.problems))
+
+    def test_network_failure_does_not_silently_read_the_branch(self):
+        # отказ сети — не «коммита нет»: второе чтение ничего не исправит,
+        # а патчи с ветки, выданные за патчи коммита, соврут
+        build, transport = self._nginx({NGINX_TREE: Response(500, {}, {})})
+        self.assertEqual(build.patches_ref, SHA)
+        self.assertEqual(build.patches, [])
+        self.assertTrue(build.problems)
+
+    def test_url_without_a_fragment_is_healed_by_the_hash(self):
+        # у такого билда сегодня стоит «no ref in source url» и патчей нет:
+        # адреса не было. Хеш его даёт, и проблема исчезает.
+        builds = {bid: dict(info) for bid, info in BUILDS.items()}
+        builds[1] = dict(builds[1])
+        builds[1]["extra"] = {"source": {"original_url":
+            "git+https://gitlab.example.com/g/nginx"}}
+        builds[1]["source"] = "git+ssh://git@gitlab.example.com/g/nginx#" + SHA
+        session = FakeKojiSession(tagged=TAGGED, builds=builds, rpms=RPMS,
+                                  tags=TAGS)
+        gitlab = GitlabClient(HOSTS, token=None, sleeper=lambda _s: None,
+                              transport=FakeTransport({
+                                  (NGINX_TREE, (("path", "PATCH"),
+                                                ("per_page", "100"),
+                                                ("recursive", "true"),
+                                                ("ref", SHA))):
+                                      tree(["PATCH/CVE-2026-1.patch"])}))
+        build = collect_tag("os-9.2", config(), KojiClient(session), gitlab,
+                            jobs=1).by_name()["nginx"]
+        self.assertEqual(build.source.ref_kind, "none")
+        self.assertEqual(build.patches_ref, SHA)
+        self.assertEqual(len(build.patches), 1)
+        self.assertEqual(build.problems, [])
+
+
 if __name__ == "__main__":
     unittest.main()

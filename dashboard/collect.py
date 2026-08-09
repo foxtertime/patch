@@ -237,7 +237,12 @@ def _attach_patches(build: Build, info: dict, cfg, gitlab_client,
         commit=commit, commit_source=commit_from,
         commit_url=gitlab_client.tree_url(parsed.host, parsed.project, commit))
 
-    result = gitlab_client.patch_files(parsed.host, parsed.project, parsed.ref)
+    ref, result = _read_patch_dir(build, gitlab_client, parsed, commit)
+    if ref != commit:
+        # откат на ветку: коммита в репозитории нет, и сравнивать с ним
+        # ветку бессмысленно — точка отсчёта пропала вместе с коммитом
+        commit = None
+    build.patches_ref = ref
     build.patch_dir_present = result.present
     if result.problem:
         # проблема не обязательно означает, что читать нечего: подменённый
@@ -245,12 +250,43 @@ def _attach_patches(build: Build, info: dict, cfg, gitlab_client,
         # чтений paths и так пустой.
         build.problems.append(result.problem)
     for path in result.paths:
-        name = os.path.basename(path)
-        build.patches.append(Patch(
-            path=path, name=name, cls=classifier.classify(name),
-            cves=find_cves(name),
-            web_url=gitlab_client.blob_url(parsed.host, parsed.project,
-                                           parsed.ref, path)))
+        build.patches.append(_patch(path, parsed, ref, classifier,
+                                    gitlab_client))
+
+
+# Единственный ответ дерева, по которому видно, что коммита в репозитории
+# уже нет: его выдаёт доразбор 404 в GitlabClient. Отказ сети выглядит
+# иначе, и путать их нельзя — на отказе сети чтение ветки ничего не
+# исправит, а патчи с ветки, выданные за патчи коммита, соврут.
+_REF_GONE = "gitlab: ref not found"
+
+
+def _read_patch_dir(build, gitlab_client, parsed, commit):
+    """Дерево патчей билда и ref, с которого оно снято.
+
+    Патчи билда — это то, что лежало в PATCH на коммите сборки. Ветку
+    читаем, только когда хеша нет вовсе или когда коммита в репозитории
+    уже не осталось: ветку могли форс-пушнуть, а коммит — собрать мусором.
+    Во втором случае данные деградировали, и молчать об этом нельзя.
+    """
+    if not commit:
+        return parsed.ref, gitlab_client.patch_files(parsed.host,
+                                                     parsed.project, parsed.ref)
+    result = gitlab_client.patch_files(parsed.host, parsed.project, commit)
+    if result.problem != _REF_GONE:
+        return commit, result
+    build.problems.append(
+        "gitlab: коммит %s недоступен, патчи сняты с ветки" % commit[:12])
+    return parsed.ref, gitlab_client.patch_files(parsed.host, parsed.project,
+                                                 parsed.ref)
+
+
+def _patch(path, parsed, ref, classifier, gitlab_client, ghost=None):
+    name = os.path.basename(path)
+    return Patch(path=path, name=name, cls=classifier.classify(name),
+                 cves=find_cves(name), ghost=ghost,
+                 web_url=gitlab_client.blob_url(parsed.host, parsed.project,
+                                                ref, path))
 
 
 # Проблемы, у которых после двоеточия стоит произвольный текст: в сводке их
