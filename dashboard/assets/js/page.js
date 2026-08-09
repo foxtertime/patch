@@ -321,14 +321,24 @@
     function stateMatches(row) { return matches(row, 'state'); }
     function diffMatches(row) { return matches(row, 'diff'); }
 
+    /* Строки вкладки. Правило «откуда их брать» одно на четверых —
+       счётчики меню, отсев мёртвых фильтров, видимые строки и общее
+       число, — и все четверо обязаны спрашивать в одном месте. Вкладка
+       приходит доводом: судить приходится и о той, на которой человека
+       сейчас нет. */
+    function rowsOf(tab) {
+      const host = tab === 'diff' ? curPair() : curSnap();
+      if (!host) return [];
+      return tab === 'diff' ? host.rows : host.builds;
+    }
+
     /* Сколько строк вкладки подходит под каждый признак само по себе, без
        оглядки на другие фильтры: так же считают плашки. Зовут это при
        открытии меню, а не на каждую перерисовку — иначе лишний проход по
        всем строкам на каждый клик. */
     function filterCounts() {
       const tab = st.tab;
-      const host = tab === 'diff' ? curPair() : curSnap();
-      const list = host ? (tab === 'diff' ? host.rows : host.builds) : [];
+      const list = rowsOf(tab);
       const out = {};
       for (const group of labels.groups(tab)) {
         for (const key of group.keys) {
@@ -353,8 +363,7 @@
       for (i = 0; i < classes.length; i++) {
         if (slug(classes[i]) === key) return true;
       }
-      const host = tab === 'diff' ? curPair() : curSnap();
-      const rows = host ? (tab === 'diff' ? host.rows : host.builds) : [];
+      const rows = rowsOf(tab);
       for (i = 0; i < rows.length; i++) {
         if (rows[i].marks.indexOf(key) !== -1) return true;
       }
@@ -465,21 +474,12 @@
     }
 
     function visibleRows() {
-      if (st.tab === 'diff') {
-        const pair = curPair();
-        return pick(pair ? pair.rows : [], diffMatches, scanDiff);
-      }
-      const snap = curSnap();
-      return pick(snap ? snap.builds : [], stateMatches, scanState);
+      if (st.tab === 'diff') return pick(rowsOf('diff'), diffMatches, scanDiff);
+      return pick(rowsOf('state'), stateMatches, scanState);
     }
 
     function totalRows() {
-      if (st.tab === 'diff') {
-        const pair = curPair();
-        return pair ? pair.rows.length : 0;
-      }
-      const s = curSnap();
-      return s ? s.builds.length : 0;
+      return rowsOf(st.tab).length;
     }
 
     /* Ключ раскрытой строки. Снапшот и пара названы полными именами по той же
