@@ -171,18 +171,6 @@ test('переписанный патч помечен знаком и клас�
   assert.match(html, /<span class="sign">~<\/span>/);
 });
 
-test('тот же sha не метится ничем', function () {
-  var html = markup.patchesChangeHtml([withSha('a.patch', 'aaa')],
-                                      [withSha('a.patch', 'aaa')], [], '');
-  assert.strictEqual(html.indexOf('is-rewritten'), -1);
-});
-
-test('sha только с одной стороны — не метится', function () {
-  var html = markup.patchesChangeHtml([withSha('a.patch', undefined)],
-                                      [withSha('a.patch', 'bbb')], [], '');
-  assert.strictEqual(html.indexOf('is-rewritten'), -1);
-});
-
 /* Правило «переписан» живёт в diff.js и только там. Разметка красит то,
    что ей сказали: патч с разными sha, которого нет в списке, остаётся
    непомеченным, а патч из списка помечается, какими бы ни были его sha.
