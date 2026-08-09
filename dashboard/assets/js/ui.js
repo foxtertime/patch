@@ -15,7 +15,7 @@
                              require('./rail.js'), require('./files.js'),
                              require('./tips.js'), require('./toasts.js'),
                              require('./filters.js'), require('./search.js'),
-                             require('./copy.js'));
+                             require('./copy.js'), require('./viewport.js'));
   } else {
     root.KP = root.KP || {};
     root.KP.ui = factory(root.KP.viewmodel, root.KP.store, root.KP.diff,
@@ -23,12 +23,12 @@
                          root.KP.tables, root.KP.cards, root.KP.page,
                          root.KP.hash, root.KP.rail, root.KP.files,
                          root.KP.tips, root.KP.toasts, root.KP.filters,
-                         root.KP.search, root.KP.copy);
+                         root.KP.search, root.KP.copy, root.KP.viewport);
   }
 }(typeof globalThis !== 'undefined' ? globalThis : this,
   function (viewmodel, store, diffmod, text, labels, markup, tables, cards,
             pagemod, hash, railmod, filesmod, tipsmod, toastsmod,
-            filtersmod, searchmod, copymod) {
+            filtersmod, searchmod, copymod, viewportmod) {
   'use strict';
 
   /* Состояние страницы живёт в page.js: там же и всё, что из него
@@ -480,45 +480,8 @@
     rowsOf: () => sortRows(visibleRows()).map((item) => item.row) });
 
 
-  /* ---------- «липкая» шапка ---------- */
-
-  function syncStickyOffset() {
-    if (!controls || !document.documentElement.style.setProperty) return;
-    document.documentElement.style.setProperty(
-      '--controls-h', controls.getBoundingClientRect().height + 'px');
-  }
-  if (typeof ResizeObserver === 'function') {
-    new ResizeObserver(syncStickyOffset).observe(controls);
-  } else {
-    window.addEventListener('resize', syncStickyOffset);
-  }
-  /* Ширина карточки посчитана от ширины окна и переживает её изменение не
-     сама: окно сузили — в строку влезает меньше, и делить надо заново. */
-  window.addEventListener('resize', fitAllCards);
-
-  /* ---------- кнопка «наверх» ---------- */
-
-  const toTop = document.getElementById('totop');
-
-  /* Порог — высота окна, а не круглое число точек: «ниже первого экрана»
-     человек видит глазами, а «ниже шестисот точек» ни о чём не говорит и
-     на разных окнах срабатывает по-разному. */
-  function syncToTop() {
-    toTop.hidden = window.pageYOffset <= window.innerHeight;
-  }
-
-  toTop.addEventListener('click', () => {
-    /* Плавную прокрутку понимают не все браузеры, и её отдельно просят
-       отключить те, кому от движения плохо. В обоих случаях поднимаемся
-       прыжком: доехать важнее, чем доехать красиво. */
-    const smooth = 'scrollBehavior' in document.documentElement.style
-      && !(window.matchMedia
-           && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-    if (smooth) window.scrollTo({ top: 0, behavior: 'smooth' });
-    else window.scrollTo(0, 0);
-  });
-
-  window.addEventListener('scroll', syncToTop);
+  viewportmod.create({ controls: controls, toTop: document.getElementById('totop'),
+                       onResize: fitAllCards });
 
   /* ---------- загрузка снапшотов ---------- */
 
@@ -610,11 +573,6 @@
   (function start() {
     syncEmpty();
     renderSources();
-    syncStickyOffset();
-    /* Браузер восстанавливает прокрутку при перезагрузке, и страница может
-       открыться уже внизу — тогда кнопка нужна сразу, не дожидаясь, пока
-       человек тронет колесо. */
-    syncToTop();
   }());
 
   return { applyData: applyData };
