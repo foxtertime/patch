@@ -61,6 +61,89 @@ def config():
                                  ("other", ".*")])
 
 
+SHA = "0f1a2b3c4d5e6f70819293a4b5c6d7e8f9001122"
+
+
+def build_with_source(source_url):
+    """Копия фикстуры билдов, где у nginx свой верхнеуровневый source."""
+    builds = {bid: dict(info) for bid, info in BUILDS.items()}
+    builds[1] = dict(builds[1])
+    if source_url is None:
+        builds[1].pop("source", None)
+    else:
+        builds[1]["source"] = source_url
+    return builds
+
+
+def clients_with_source(routes, source_url):
+    session = FakeKojiSession(tagged=TAGGED, builds=build_with_source(source_url),
+                              rpms=RPMS, tags=TAGS)
+    transport = FakeTransport(routes)
+    gitlab = GitlabClient(HOSTS, token=None, transport=transport,
+                          sleeper=lambda _s: None)
+    return KojiClient(session), gitlab, transport
+
+
+class CommitFromKojiSourceTest(unittest.TestCase):
+    def _nginx(self, source_url, routes=None):
+        koji, gitlab, _ = clients_with_source(routes or {}, source_url)
+        snapshot = collect_tag("os-9.2", config(), koji, gitlab, jobs=1)
+        return snapshot.by_name()["nginx"]
+
+    def test_hash_is_taken_from_koji_source(self):
+        build = self._nginx("git+ssh://git@gitlab.example.com/g/nginx#" + SHA)
+        self.assertEqual(build.source.commit, SHA)
+        self.assertEqual(build.source.commit_source, "koji_source")
+        self.assertEqual(build.source.ref, "br")
+        self.assertEqual(build.source.ref_kind, "branch")
+        self.assertIn(SHA, build.source.commit_url)
+
+    def test_ssh_host_does_not_replace_the_https_one(self):
+        build = self._nginx("git+ssh://git@internal.example.com/g/nginx#" + SHA)
+        self.assertEqual(build.source.host, "gitlab.example.com")
+        self.assertEqual(build.source.commit, SHA)
+        self.assertNotIn("host", " ".join(build.problems))
+
+    def test_other_project_is_not_trusted(self):
+        build = self._nginx("git+ssh://git@gitlab.example.com/g/other#" + SHA)
+        self.assertIsNone(build.source.commit)
+        self.assertIsNone(build.source.commit_source)
+
+    def test_branch_in_koji_source_gives_no_hash(self):
+        build = self._nginx("git+ssh://git@gitlab.example.com/g/nginx#other-br")
+        self.assertIsNone(build.source.commit)
+
+    def test_no_koji_source_at_all(self):
+        build = self._nginx(None)
+        self.assertIsNone(build.source.commit)
+        self.assertIsNone(build.source.commit_source)
+
+    def test_unparsable_koji_source_is_not_a_problem(self):
+        # мусор в source не должен превращаться в проблему билда: сам билд
+        # в порядке, у него просто не добылся хеш
+        build = self._nginx("cli-build/17/nginx.src.rpm")
+        self.assertIsNone(build.source.commit)
+        self.assertFalse([p for p in build.problems if "source" in p])
+
+
+class CommitFromOriginalUrlTest(unittest.TestCase):
+    def test_hash_in_original_url_is_marked_as_such(self):
+        builds = {bid: dict(info) for bid, info in BUILDS.items()}
+        builds[1] = dict(builds[1])
+        builds[1]["extra"] = {"source": {"original_url":
+            "git+https://gitlab.example.com/g/nginx#" + SHA}}
+        session = FakeKojiSession(tagged=TAGGED, builds=builds, rpms=RPMS,
+                                  tags=TAGS)
+        gitlab = GitlabClient(HOSTS, token=None, transport=FakeTransport({}),
+                              sleeper=lambda _s: None)
+        snapshot = collect_tag("os-9.2", config(), KojiClient(session), gitlab,
+                               jobs=1)
+        source = snapshot.by_name()["nginx"].source
+        self.assertEqual(source.commit, SHA)
+        self.assertEqual(source.commit_source, "original_url")
+        self.assertEqual(source.ref_kind, "commit")
+
+
 class CollectTagTest(unittest.TestCase):
     def setUp(self):
         self.routes = {

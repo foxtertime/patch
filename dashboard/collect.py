@@ -43,6 +43,51 @@ def _original_url(info: dict) -> Optional[str]:
     return source.get("original_url") or None
 
 
+def _koji_source(info: dict) -> Optional[str]:
+    """Верхнеуровневое поле source: чем сборка пошла на самом деле.
+
+    В extra.source.original_url лежит то, что ввёл человек, — обычно ветка.
+    Здесь же koji хранит разрешённый адрес, и у сборок из git в нём стоит
+    полный хеш: git+ssh://<host>/<group>/<repo>#<hash>.
+    """
+    value = info.get("source")
+    return value if isinstance(value, str) and value.strip() else None
+
+
+def _same_project(left: Optional[str], right: Optional[str]) -> bool:
+    if not left or not right:
+        return False
+    return left.strip("/").lower() == right.strip("/").lower()
+
+
+def _commit_of(info: dict, parsed):
+    """Хеш коммита сборки и то, откуда он взят.
+
+    Из верхнеуровневого source берётся ТОЛЬКО хеш: ssh-хост в нём может не
+    совпасть с https-хостом из original_url, и пусти мы его дальше —
+    сработала бы подстановка хоста в GitlabClient, и здоровые билды
+    получили бы проблему «host не описан в конфиге».
+
+    Проекты при этом сверяются. Разошлись — хеш не берём: это другой
+    репозиторий, а не уточнение, и приклеить билду чужой коммит хуже, чем
+    не показать коммита вовсе. Хост в сверке не участвует по причине выше.
+    """
+    if parsed.ref_kind == "commit":
+        return parsed.ref, "original_url"
+    raw = _koji_source(info)
+    if not raw:
+        return None, None
+    try:
+        other = parse_source_url(raw)
+    except SourceUrlError:
+        return None, None
+    if other.ref_kind != "commit":
+        return None, None
+    if not _same_project(other.project, parsed.project):
+        return None, None
+    return other.ref, "koji_source"
+
+
 def collect_tag(tag: str, cfg, koji_client, gitlab_client, jobs: int = 8,
                 now: Optional[str] = None) -> Snapshot:
     """Собирает билды тега, их патчи и RPM в один снапшот."""
@@ -184,10 +229,13 @@ def _attach_patches(build: Build, info: dict, cfg, gitlab_client,
         build.source = Source(raw=raw_url, ref=parsed.ref, ref_kind="srpm")
         return
 
+    commit, commit_from = _commit_of(info, parsed)
     build.source = Source(
         raw=raw_url, host=parsed.host, project=parsed.project, ref=parsed.ref,
         ref_kind=parsed.ref_kind,
-        web_url=gitlab_client.tree_url(parsed.host, parsed.project, parsed.ref))
+        web_url=gitlab_client.tree_url(parsed.host, parsed.project, parsed.ref),
+        commit=commit, commit_source=commit_from,
+        commit_url=gitlab_client.tree_url(parsed.host, parsed.project, commit))
 
     result = gitlab_client.patch_files(parsed.host, parsed.project, parsed.ref)
     build.patch_dir_present = result.present
