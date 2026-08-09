@@ -116,7 +116,7 @@
   /* Порядок меток состояния после классов патчей. Он же порядок в колонке
      «метки»: сперва откуда билд, потом что не так с патчами, потом ошибки. */
   const STATE_TAG_ORDER = ['inherited', 'no-source', 'from-commit',
-                           'from-srpm', 'no-patch',
+                           'from-srpm', 'branch-ahead', 'no-patch',
                            'gitlab-error', 'internal-error'];
 
   /* Позиция метки в строке. Классы патчей идут первыми, в порядке списка
@@ -159,6 +159,10 @@
        каталог PATCH читать негде — но это не «нет источника», источник
        у него как раз известен, просто другого рода. */
     else if (build.source.ref_kind === 'srpm') marks.push('from-srpm');
+    /* Ветка ушла вперёд: патчи билда сняты с коммита, а в ветке с тех пор
+       что-то появилось. Метка нужна не сама по себе — без неё несобранный
+       патч CVE ищется на теге в сотни билдов только перебором раскрытий. */
+    if (build.source && build.source.commits_ahead) marks.push('branch-ahead');
     if (build.patch_dir_present === false) marks.push('no-patch');
     for (i = 0; i < problems.length; i++) {
       if (problems[i].indexOf('gitlab:') === 0
@@ -175,7 +179,7 @@
   function patchDict(patch) {
     return { path: orNull(patch.path), name: orNull(patch.name),
              'class': orNull(patch['class']), cves: (patch.cves || []).slice(),
-             url: orNull(patch.web_url) };
+             url: orNull(patch.web_url), ghost: orNull(patch.ghost) };
   }
 
   function patchDicts(patches) {
@@ -196,6 +200,12 @@
       ref_kind: source ? orNull(source.ref_kind) : 'none',
       project: source ? orNull(source.project) : null,
       source_url: source ? orNull(source.web_url) : null,
+      // Коммит сборки — единственная вечная ссылка в дашборде: ветка
+      // уедет, а дерево на хеше останется тем же и через полгода.
+      commit: source ? orNull(source.commit) : null,
+      commit_url: source ? orNull(source.commit_url) : null,
+      commits_ahead: source ? orNull(source.commits_ahead) : null,
+      patches_ref: orNull(build.patches_ref),
       koji_url: kojiUrl(kojiWeb, build.nvr),
       completed: toMsk(build.completed), owner: orNull(build.owner),
       build_id: orNull(build.build_id), task_id: orNull(build.task_id),
@@ -205,6 +215,9 @@
       tagged_in: orNull(build.tag_name), inherited: inheritedIn(build, tag),
       koji_tags: (build.tags || []).slice(),
       patches: patchDicts(patches),
+      // Ghost-патчи стоят отдельно и в patch_counts не идут: это то, чего
+      // в билде нет, и счётчики строки о нём молчат нарочно.
+      ghosts: patchDicts(build.ghost_patches || []),
       // порядок задаём здесь: дашборд режет список на блоки по смене
       // архитектуры и сам ничего не пересортировывает
       patch_counts: counts, rpms: rpmsmod.sortRpms(build.rpms || []),

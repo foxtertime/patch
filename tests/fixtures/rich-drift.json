@@ -1,0 +1,393 @@
+[
+ {
+  "builds": [
+   {
+    "build_id": 1201,
+    "completed": "2026-07-02 12:00:00",
+    "epoch": null,
+    "ghost_patches": [
+     {
+      "class": "CVE",
+      "cves": [
+       "CVE-2026-3011"
+      ],
+      "ghost": "branch",
+      "name": "CVE-2026-3011.patch",
+      "path": "PATCH/CVE-2026-3011.patch",
+      "web_url": "https://gl/web/nginx/-/blob/os-9.8/PATCH/CVE-2026-3011.patch"
+     },
+     {
+      "class": "DISTSUFFIX",
+      "cves": [],
+      "ghost": "changed",
+      "name": "nginx-distsuffix.patch",
+      "path": "PATCH/nginx-distsuffix.patch",
+      "web_url": "https://gl/web/nginx/-/blob/os-9.8/PATCH/nginx-distsuffix.patch"
+     }
+    ],
+    "name": "nginx",
+    "nvr": "nginx-1.26.0-3.el9",
+    "owner": "builder",
+    "patch_dir_present": true,
+    "patches": [
+     {
+      "class": "CVE",
+      "cves": [
+       "CVE-2026-3010"
+      ],
+      "ghost": null,
+      "name": "CVE-2026-3010.patch",
+      "path": "PATCH/CVE-2026-3010.patch",
+      "web_url": "https://gl/web/nginx/-/blob/3f5a1c9e2b7d48a06e1f5c3b9d2a7e4f60c81b53/PATCH/CVE-2026-3010.patch"
+     },
+     {
+      "class": "DISTSUFFIX",
+      "cves": [],
+      "ghost": null,
+      "name": "nginx-distsuffix.patch",
+      "path": "PATCH/nginx-distsuffix.patch",
+      "web_url": "https://gl/web/nginx/-/blob/3f5a1c9e2b7d48a06e1f5c3b9d2a7e4f60c81b53/PATCH/nginx-distsuffix.patch"
+     }
+    ],
+    "patches_ref": "3f5a1c9e2b7d48a06e1f5c3b9d2a7e4f60c81b53",
+    "problems": [],
+    "release": "3.el9",
+    "rpms": [
+     "nginx-1.26.0-3.el9.x86_64",
+     "nginx-1.26.0-3.el9.src"
+    ],
+    "source": {
+     "branch_head": "9d4e7b12c05af3689e2d1a7c4b53f80e6a91d2c7",
+     "commit": "3f5a1c9e2b7d48a06e1f5c3b9d2a7e4f60c81b53",
+     "commit_source": "koji_source",
+     "commit_url": "https://gl/web/nginx/-/tree/3f5a1c9e2b7d48a06e1f5c3b9d2a7e4f60c81b53",
+     "commits_ahead": 3,
+     "host": "gl",
+     "project": "web/nginx",
+     "raw": "git+https://gl/web/nginx?#os-9.8",
+     "ref": "os-9.8",
+     "ref_kind": "branch",
+     "web_url": "https://gl/web/nginx/-/tree/os-9.8"
+    },
+    "tag_name": "os-9.8",
+    "tags": [
+     "os-9.8"
+    ],
+    "task_id": 2201,
+    "version": "1.26.0"
+   },
+   {
+    "build_id": 1202,
+    "completed": "2026-06-30 09:00:00",
+    "epoch": 1,
+    "ghost_patches": [
+     {
+      "class": "LICENSE",
+      "cves": [],
+      "ghost": "build",
+      "name": "httpd-license.patch",
+      "path": "PATCH/httpd-license.patch",
+      "web_url": "https://gl/web/httpd/-/blob/c81b5390a2f74e6d15b8c3097e2a4d6f81035b9c/PATCH/httpd-license.patch"
+     }
+    ],
+    "name": "httpd",
+    "nvr": "httpd-2.4.62-10.el9",
+    "owner": "apache",
+    "patch_dir_present": true,
+    "patches": [
+     {
+      "class": "CVE",
+      "cves": [
+       "CVE-2026-3020"
+      ],
+      "ghost": null,
+      "name": "CVE-2026-3020.patch",
+      "path": "PATCH/CVE-2026-3020.patch",
+      "web_url": "https://gl/web/httpd/-/blob/c81b5390a2f74e6d15b8c3097e2a4d6f81035b9c/PATCH/CVE-2026-3020.patch"
+     },
+     {
+      "class": "LICENSE",
+      "cves": [],
+      "ghost": null,
+      "name": "httpd-license.patch",
+      "path": "PATCH/httpd-license.patch",
+      "web_url": "https://gl/web/httpd/-/blob/c81b5390a2f74e6d15b8c3097e2a4d6f81035b9c/PATCH/httpd-license.patch"
+     }
+    ],
+    "patches_ref": "c81b5390a2f74e6d15b8c3097e2a4d6f81035b9c",
+    "problems": [],
+    "release": "10.el9",
+    "rpms": [
+     "httpd-2.4.62-10.el9.x86_64"
+    ],
+    "source": {
+     "branch_head": "1a7f34d6b92e05c8437f6a1d29b0c5e83f47a612",
+     "commit": "c81b5390a2f74e6d15b8c3097e2a4d6f81035b9c",
+     "commit_source": "koji_source",
+     "commit_url": "https://gl/web/httpd/-/tree/c81b5390a2f74e6d15b8c3097e2a4d6f81035b9c",
+     "commits_ahead": 1,
+     "host": "gl",
+     "project": "web/httpd",
+     "raw": "git+https://gl/web/httpd?#os-9.8",
+     "ref": "os-9.8",
+     "ref_kind": "branch",
+     "web_url": "https://gl/web/httpd/-/tree/os-9.8"
+    },
+    "tag_name": "os-9.8",
+    "tags": [
+     "os-9.8"
+    ],
+    "task_id": 2202,
+    "version": "2.4.62"
+   },
+   {
+    "build_id": 1203,
+    "completed": "2026-06-20 08:00:00",
+    "epoch": null,
+    "ghost_patches": [],
+    "name": "openssl",
+    "nvr": "openssl-3.2.1-5.el9",
+    "owner": "crypto",
+    "patch_dir_present": true,
+    "patches": [
+     {
+      "class": "SAST",
+      "cves": [],
+      "ghost": null,
+      "name": "sast-openssl.patch",
+      "path": "PATCH/sast-openssl.patch",
+      "web_url": "https://gl/core/openssl/-/blob/7e2d19b4c60a3f85d17e94b2a538c06f2d914e7b/PATCH/sast-openssl.patch"
+     }
+    ],
+    "patches_ref": "7e2d19b4c60a3f85d17e94b2a538c06f2d914e7b",
+    "problems": [],
+    "release": "5.el9",
+    "rpms": [
+     "openssl-3.2.1-5.el9.x86_64",
+     "openssl-libs-3.2.1-5.el9.x86_64"
+    ],
+    "source": {
+     "branch_head": "b53f80e6a91d2c74f36a1e8d052b9c7f43e6081a",
+     "commit": "7e2d19b4c60a3f85d17e94b2a538c06f2d914e7b",
+     "commit_source": "koji_source",
+     "commit_url": "https://gl/core/openssl/-/tree/7e2d19b4c60a3f85d17e94b2a538c06f2d914e7b",
+     "commits_ahead": 7,
+     "host": "gl",
+     "project": "core/openssl",
+     "raw": "git+https://gl/core/openssl?#os-9.8",
+     "ref": "os-9.8",
+     "ref_kind": "branch",
+     "web_url": "https://gl/core/openssl/-/tree/os-9.8"
+    },
+    "tag_name": "os-9.8",
+    "tags": [
+     "os-9.8"
+    ],
+    "task_id": 2203,
+    "version": "3.2.1"
+   },
+   {
+    "build_id": 1204,
+    "completed": "2026-06-15 07:00:00",
+    "epoch": null,
+    "ghost_patches": [],
+    "name": "curl",
+    "nvr": "curl-8.6.0-2.el9",
+    "owner": "builder",
+    "patch_dir_present": true,
+    "patches": [
+     {
+      "class": "DISTSUFFIX",
+      "cves": [],
+      "ghost": null,
+      "name": "curl-distsuffix.patch",
+      "path": "PATCH/curl-distsuffix.patch",
+      "web_url": "https://gl/core/curl/-/blob/os-9.8/PATCH/curl-distsuffix.patch"
+     }
+    ],
+    "patches_ref": "os-9.8",
+    "problems": [],
+    "release": "2.el9",
+    "rpms": [
+     "curl-8.6.0-2.el9.x86_64"
+    ],
+    "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
+     "host": "gl",
+     "project": "core/curl",
+     "raw": "git+https://gl/core/curl?#os-9.8",
+     "ref": "os-9.8",
+     "ref_kind": "branch",
+     "web_url": "https://gl/core/curl/-/tree/os-9.8"
+    },
+    "tag_name": "os-9.8",
+    "tags": [
+     "os-9.8"
+    ],
+    "task_id": 2204,
+    "version": "8.6.0"
+   },
+   {
+    "build_id": 1205,
+    "completed": "2026-06-10 06:00:00",
+    "epoch": null,
+    "ghost_patches": [],
+    "name": "glibc",
+    "nvr": "glibc-2.34-61.el9",
+    "owner": "core",
+    "patch_dir_present": true,
+    "patches": [
+     {
+      "class": "COVERAGE",
+      "cves": [],
+      "ghost": null,
+      "name": "coverage-glibc.patch",
+      "path": "PATCH/coverage-glibc.patch",
+      "web_url": "https://gl/core/glibc/-/blob/os-9.8/PATCH/coverage-glibc.patch"
+     }
+    ],
+    "patches_ref": "os-9.8",
+    "problems": [
+     "gitlab: коммит 5c0a7f31d84b недоступен, патчи сняты с ветки"
+    ],
+    "release": "61.el9",
+    "rpms": [
+     "glibc-2.34-61.el9.x86_64"
+    ],
+    "source": {
+     "branch_head": null,
+     "commit": "5c0a7f31d84b26e9057c3a1f6b28d40e7913a5c6",
+     "commit_source": "koji_source",
+     "commit_url": "https://gl/core/glibc/-/tree/5c0a7f31d84b26e9057c3a1f6b28d40e7913a5c6",
+     "commits_ahead": null,
+     "host": "gl",
+     "project": "core/glibc",
+     "raw": "git+https://gl/core/glibc?#os-9.8",
+     "ref": "os-9.8",
+     "ref_kind": "branch",
+     "web_url": "https://gl/core/glibc/-/tree/os-9.8"
+    },
+    "tag_name": "os-9.8",
+    "tags": [
+     "os-9.8"
+    ],
+    "task_id": 2205,
+    "version": "2.34"
+   },
+   {
+    "build_id": 1206,
+    "completed": "2026-06-05 05:00:00",
+    "epoch": null,
+    "ghost_patches": [],
+    "name": "zlib",
+    "nvr": "zlib-1.3.1-1.el9",
+    "owner": "builder",
+    "patch_dir_present": true,
+    "patches": [
+     {
+      "class": "SAST",
+      "cves": [],
+      "ghost": null,
+      "name": "sast-zlib.patch",
+      "path": "PATCH/sast-zlib.patch",
+      "web_url": "https://gl/core/zlib/-/blob/2b7d48a06e1f5c3b9d2a7e4f60c81b533f5a1c9e/PATCH/sast-zlib.patch"
+     }
+    ],
+    "patches_ref": "2b7d48a06e1f5c3b9d2a7e4f60c81b533f5a1c9e",
+    "problems": [],
+    "release": "1.el9",
+    "rpms": [
+     "zlib-1.3.1-1.el9.x86_64"
+    ],
+    "source": {
+     "branch_head": null,
+     "commit": "2b7d48a06e1f5c3b9d2a7e4f60c81b533f5a1c9e",
+     "commit_source": "original_url",
+     "commit_url": "https://gl/core/zlib/-/tree/2b7d48a06e1f5c3b9d2a7e4f60c81b533f5a1c9e",
+     "commits_ahead": null,
+     "host": "gl",
+     "project": "core/zlib",
+     "raw": "git+https://gl/core/zlib?#2b7d48a06e1f5c3b9d2a7e4f60c81b533f5a1c9e",
+     "ref": "2b7d48a06e1f5c3b9d2a7e4f60c81b533f5a1c9e",
+     "ref_kind": "commit",
+     "web_url": "https://gl/core/zlib/-/tree/2b7d48a06e1f5c3b9d2a7e4f60c81b533f5a1c9e"
+    },
+    "tag_name": "os-9.8",
+    "tags": [
+     "os-9.8"
+    ],
+    "task_id": 2206,
+    "version": "1.3.1"
+   },
+   {
+    "build_id": 1207,
+    "completed": "2026-06-01 04:00:00",
+    "epoch": null,
+    "ghost_patches": [],
+    "name": "python3",
+    "nvr": "python3-3.11.9-1.el9",
+    "owner": "builder",
+    "patch_dir_present": true,
+    "patches": [
+     {
+      "class": "DISTSUFFIX",
+      "cves": [],
+      "ghost": null,
+      "name": "python3-distsuffix.patch",
+      "path": "PATCH/python3-distsuffix.patch",
+      "web_url": "https://gl/core/python3/-/blob/e91d2c74f36a1e8d052b9c7f43e6081ab53f80e6/PATCH/python3-distsuffix.patch"
+     }
+    ],
+    "patches_ref": "e91d2c74f36a1e8d052b9c7f43e6081ab53f80e6",
+    "problems": [],
+    "release": "1.el9",
+    "rpms": [
+     "python3-3.11.9-1.el9.x86_64",
+     "python3-libs-3.11.9-1.el9.x86_64"
+    ],
+    "source": {
+     "branch_head": "e91d2c74f36a1e8d052b9c7f43e6081ab53f80e6",
+     "commit": "e91d2c74f36a1e8d052b9c7f43e6081ab53f80e6",
+     "commit_source": "koji_source",
+     "commit_url": "https://gl/core/python3/-/tree/e91d2c74f36a1e8d052b9c7f43e6081ab53f80e6",
+     "commits_ahead": 0,
+     "host": "gl",
+     "project": "core/python3",
+     "raw": "git+https://gl/core/python3?#os-9.8",
+     "ref": "os-9.8",
+     "ref_kind": "branch",
+     "web_url": "https://gl/core/python3/-/tree/os-9.8"
+    },
+    "tag_name": "os-9.8",
+    "tags": [
+     "os-9.8"
+    ],
+    "task_id": 2207,
+    "version": "3.11.9"
+   }
+  ],
+  "dashboard": "2.2.0",
+  "generated": "2026-08-07T00:00:00+03:00",
+  "koji_hub": "https://hub/kojihub",
+  "koji_web": "https://hub/koji",
+  "patch_classes": [
+   "AUTOGEN",
+   "CVE",
+   "SAST",
+   "DAST",
+   "COVERAGE",
+   "DISTSUFFIX",
+   "LICENSE",
+   "SPEC",
+   "CHANGELOG",
+   "FILES",
+   "other"
+  ],
+  "schema": 1,
+  "tag": "os-9.8"
+ }
+]

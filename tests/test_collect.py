@@ -61,6 +61,89 @@ def config():
                                  ("other", ".*")])
 
 
+SHA = "0f1a2b3c4d5e6f70819293a4b5c6d7e8f9001122"
+
+
+def build_with_source(source_url):
+    """Копия фикстуры билдов, где у nginx свой верхнеуровневый source."""
+    builds = {bid: dict(info) for bid, info in BUILDS.items()}
+    builds[1] = dict(builds[1])
+    if source_url is None:
+        builds[1].pop("source", None)
+    else:
+        builds[1]["source"] = source_url
+    return builds
+
+
+def clients_with_source(routes, source_url):
+    session = FakeKojiSession(tagged=TAGGED, builds=build_with_source(source_url),
+                              rpms=RPMS, tags=TAGS)
+    transport = FakeTransport(routes)
+    gitlab = GitlabClient(HOSTS, token=None, transport=transport,
+                          sleeper=lambda _s: None)
+    return KojiClient(session), gitlab, transport
+
+
+class CommitFromKojiSourceTest(unittest.TestCase):
+    def _nginx(self, source_url, routes=None):
+        koji, gitlab, _ = clients_with_source(routes or {}, source_url)
+        snapshot = collect_tag("os-9.2", config(), koji, gitlab, jobs=1)
+        return snapshot.by_name()["nginx"]
+
+    def test_hash_is_taken_from_koji_source(self):
+        build = self._nginx("git+ssh://git@gitlab.example.com/g/nginx#" + SHA)
+        self.assertEqual(build.source.commit, SHA)
+        self.assertEqual(build.source.commit_source, "koji_source")
+        self.assertEqual(build.source.ref, "br")
+        self.assertEqual(build.source.ref_kind, "branch")
+        self.assertIn(SHA, build.source.commit_url)
+
+    def test_ssh_host_does_not_replace_the_https_one(self):
+        build = self._nginx("git+ssh://git@internal.example.com/g/nginx#" + SHA)
+        self.assertEqual(build.source.host, "gitlab.example.com")
+        self.assertEqual(build.source.commit, SHA)
+        self.assertNotIn("host", " ".join(build.problems))
+
+    def test_other_project_is_not_trusted(self):
+        build = self._nginx("git+ssh://git@gitlab.example.com/g/other#" + SHA)
+        self.assertIsNone(build.source.commit)
+        self.assertIsNone(build.source.commit_source)
+
+    def test_branch_in_koji_source_gives_no_hash(self):
+        build = self._nginx("git+ssh://git@gitlab.example.com/g/nginx#other-br")
+        self.assertIsNone(build.source.commit)
+
+    def test_no_koji_source_at_all(self):
+        build = self._nginx(None)
+        self.assertIsNone(build.source.commit)
+        self.assertIsNone(build.source.commit_source)
+
+    def test_unparsable_koji_source_is_not_a_problem(self):
+        # мусор в source не должен превращаться в проблему билда: сам билд
+        # в порядке, у него просто не добылся хеш
+        build = self._nginx("cli-build/17/nginx.src.rpm")
+        self.assertIsNone(build.source.commit)
+        self.assertFalse([p for p in build.problems if "source" in p])
+
+
+class CommitFromOriginalUrlTest(unittest.TestCase):
+    def test_hash_in_original_url_is_marked_as_such(self):
+        builds = {bid: dict(info) for bid, info in BUILDS.items()}
+        builds[1] = dict(builds[1])
+        builds[1]["extra"] = {"source": {"original_url":
+            "git+https://gitlab.example.com/g/nginx#" + SHA}}
+        session = FakeKojiSession(tagged=TAGGED, builds=builds, rpms=RPMS,
+                                  tags=TAGS)
+        gitlab = GitlabClient(HOSTS, token=None, transport=FakeTransport({}),
+                              sleeper=lambda _s: None)
+        snapshot = collect_tag("os-9.2", config(), KojiClient(session), gitlab,
+                               jobs=1)
+        source = snapshot.by_name()["nginx"].source
+        self.assertEqual(source.commit, SHA)
+        self.assertEqual(source.commit_source, "original_url")
+        self.assertEqual(source.ref_kind, "commit")
+
+
 class CollectTagTest(unittest.TestCase):
     def setUp(self):
         self.routes = {
@@ -468,6 +551,307 @@ class _ExplodingGitlab:
 
     def patch_files(self, host, project, ref):
         raise RuntimeError("boom")
+
+
+def tree(paths):
+    """Ответ дерева: пути и id блобов, id по порядку."""
+    return Response(200, [{"id": str(i + 1), "type": "blob", "path": p,
+                           "name": p.rsplit("/", 1)[-1]}
+                          for i, p in enumerate(paths)], {})
+
+
+NGINX_TREE = TREE % "g%2Fnginx"
+
+
+class PatchesComeFromCommitTest(unittest.TestCase):
+    def _nginx(self, routes):
+        koji, gitlab, transport = clients_with_source(
+            routes, "git+ssh://git@gitlab.example.com/g/nginx#" + SHA)
+        snapshot = collect_tag("os-9.2", config(), koji, gitlab, jobs=1)
+        return snapshot.by_name()["nginx"], transport
+
+    def test_tree_is_read_at_the_commit(self):
+        build, transport = self._nginx({
+            (NGINX_TREE, (("path", "PATCH"), ("per_page", "100"),
+                          ("recursive", "true"), ("ref", SHA))):
+                tree(["PATCH/CVE-2026-1.patch"]),
+        })
+        self.assertEqual(build.patches_ref, SHA)
+        self.assertEqual([p.name for p in build.patches],
+                         ["CVE-2026-1.patch"])
+        refs = [params.get("ref") for url, params, _ in transport.requests
+                if url == NGINX_TREE]
+        self.assertIn(SHA, refs)
+
+    def test_without_a_hash_the_branch_is_read_as_before(self):
+        koji, gitlab, _ = clients_with_source({
+            (NGINX_TREE, (("path", "PATCH"), ("per_page", "100"),
+                          ("recursive", "true"), ("ref", "br"))):
+                tree(["PATCH/CVE-2026-1.patch"]),
+        }, None)
+        build = collect_tag("os-9.2", config(), koji, gitlab,
+                            jobs=1).by_name()["nginx"]
+        self.assertEqual(build.patches_ref, "br")
+        self.assertEqual(len(build.patches), 1)
+
+    def test_missing_commit_falls_back_to_the_branch_and_says_so(self):
+        # дерево на хеше отвечает 404, доразбор коммита — тоже: коммита нет
+        build, _ = self._nginx({
+            (NGINX_TREE, (("path", "PATCH"), ("per_page", "100"),
+                          ("recursive", "true"), ("ref", SHA))):
+                Response(404, {"message": "404 Tree Not Found"}, {}),
+            COMMITS % ("g%2Fnginx", SHA): Response(404, {"message": "404"}, {}),
+            (NGINX_TREE, (("path", "PATCH"), ("per_page", "100"),
+                          ("recursive", "true"), ("ref", "br"))):
+                tree(["PATCH/CVE-2026-1.patch"]),
+        })
+        self.assertEqual(build.patches_ref, "br")
+        self.assertEqual(len(build.patches), 1)
+        self.assertTrue(any("недоступен" in p for p in build.problems))
+
+    def test_vanished_commit_of_a_from_commit_build_says_no_branch(self):
+        # ref_kind == "commit": билд собран прямо с коммита, original_url
+        # указывает на хеш напрямую, а не на ветку с фрагментом. Ветки, на
+        # которую можно откатиться, нет вовсе — сообщение не должно этого
+        # утверждать, и второго запроса дерева тоже быть не должно: он ушёл
+        # бы за тем же самым ref.
+        builds = {bid: dict(info) for bid, info in BUILDS.items()}
+        builds[1] = dict(builds[1])
+        builds[1]["extra"] = {"source": {"original_url":
+            "git+https://gitlab.example.com/g/nginx#" + SHA}}
+        session = FakeKojiSession(tagged=TAGGED, builds=builds, rpms=RPMS,
+                                  tags=TAGS)
+        transport = FakeTransport({
+            (NGINX_TREE, (("path", "PATCH"), ("per_page", "100"),
+                          ("recursive", "true"), ("ref", SHA))):
+                Response(404, {"message": "404 Tree Not Found"}, {}),
+            COMMITS % ("g%2Fnginx", SHA): Response(404, {"message": "404"}, {}),
+        })
+        gitlab = GitlabClient(HOSTS, token=None, transport=transport,
+                              sleeper=lambda _s: None)
+        build = collect_tag("os-9.2", config(), KojiClient(session), gitlab,
+                            jobs=1, now="n").by_name()["nginx"]
+        self.assertEqual(build.source.ref_kind, "commit")
+        self.assertEqual(build.patches_ref, SHA)
+        self.assertEqual(build.patches, [])
+        self.assertTrue(any("недоступен" in p for p in build.problems),
+                        build.problems)
+        self.assertFalse(any("сняты с ветки" in p for p in build.problems),
+                         build.problems)
+        refs = [params.get("ref") for url, params, _ in transport.requests
+                if url == NGINX_TREE]
+        self.assertEqual(refs, [SHA])
+
+    def test_ref_gone_is_recognised_behind_a_substituted_host_note(self):
+        # хост из original_url не описан в конфиге: GitlabClient._fetch
+        # приписывает свою заметку впереди строки problem, и «ref not
+        # found» оказывается не всей строкой, а её концом. Откат на ветку
+        # обязан сработать и в этой комбинации, а не только при чистом
+        # "gitlab: ref not found".
+        tagged = {"os-9.2": [{"build_id": 1, "name": "nginx"}]}
+        builds = {1: dict(BUILDS[1], extra={"source": {"original_url":
+                  "git+ssh://git@old.example.com/g/nginx?#origin/br"}},
+                  source="git+ssh://git@old.example.com/g/nginx#" + SHA)}
+        session = FakeKojiSession(tagged=tagged, builds=builds,
+                                  rpms={1: RPMS[1]})
+        transport = FakeTransport({
+            (NGINX_TREE, (("path", "PATCH"), ("per_page", "100"),
+                          ("recursive", "true"), ("ref", SHA))):
+                Response(404, {"message": "404 Tree Not Found"}, {}),
+            COMMITS % ("g%2Fnginx", SHA): Response(404, {"message": "404"}, {}),
+            (NGINX_TREE, (("path", "PATCH"), ("per_page", "100"),
+                          ("recursive", "true"), ("ref", "br"))):
+                tree(["PATCH/CVE-2026-1.patch"]),
+        })
+        gitlab = GitlabClient(HOSTS, token=None, transport=transport,
+                              sleeper=lambda _s: None, default_host=HOST)
+        build = collect_tag("os-9.2", config(), KojiClient(session), gitlab,
+                            jobs=1, now="n").by_name()["nginx"]
+        self.assertEqual(build.patches_ref, "br")
+        self.assertEqual([p.name for p in build.patches],
+                         ["CVE-2026-1.patch"])
+        self.assertTrue(any("недоступен" in p for p in build.problems),
+                        build.problems)
+        self.assertTrue(any("old.example.com" in p for p in build.problems),
+                        build.problems)
+
+    def test_network_failure_does_not_silently_read_the_branch(self):
+        # отказ сети — не «коммита нет»: второе чтение ничего не исправит,
+        # а патчи с ветки, выданные за патчи коммита, соврут
+        build, transport = self._nginx({NGINX_TREE: Response(500, {}, {})})
+        self.assertEqual(build.patches_ref, SHA)
+        self.assertEqual(build.patches, [])
+        self.assertTrue(build.problems)
+
+    def test_url_without_a_fragment_is_healed_by_the_hash(self):
+        # у такого билда сегодня стоит «no ref in source url» и патчей нет:
+        # адреса не было. Хеш его даёт, и проблема исчезает.
+        builds = {bid: dict(info) for bid, info in BUILDS.items()}
+        builds[1] = dict(builds[1])
+        builds[1]["extra"] = {"source": {"original_url":
+            "git+https://gitlab.example.com/g/nginx"}}
+        builds[1]["source"] = "git+ssh://git@gitlab.example.com/g/nginx#" + SHA
+        session = FakeKojiSession(tagged=TAGGED, builds=builds, rpms=RPMS,
+                                  tags=TAGS)
+        gitlab = GitlabClient(HOSTS, token=None, sleeper=lambda _s: None,
+                              transport=FakeTransport({
+                                  (NGINX_TREE, (("path", "PATCH"),
+                                                ("per_page", "100"),
+                                                ("recursive", "true"),
+                                                ("ref", SHA))):
+                                      tree(["PATCH/CVE-2026-1.patch"])}))
+        build = collect_tag("os-9.2", config(), KojiClient(session), gitlab,
+                            jobs=1).by_name()["nginx"]
+        self.assertEqual(build.source.ref_kind, "none")
+        self.assertEqual(build.patches_ref, SHA)
+        self.assertEqual(len(build.patches), 1)
+        self.assertEqual(build.problems, [])
+
+
+HEAD = "99aabbccddeeff00112233445566778899aabbcc"
+NGINX_COMPARE = ("https://gitlab.example.com/api/v4/projects/g%2Fnginx"
+                 "/repository/compare")
+
+
+def compare_answer(ahead, head=HEAD):
+    return Response(200, {"commit": {"id": head},
+                          "commits": [{"id": "x"}] * ahead}, {})
+
+
+class BranchAheadTest(unittest.TestCase):
+    def _nginx(self, routes, **kwargs):
+        koji, gitlab, transport = clients_with_source(
+            routes, "git+ssh://git@gitlab.example.com/g/nginx#" + SHA)
+        snapshot = collect_tag("os-9.2", config(), koji, gitlab, jobs=1,
+                               **kwargs)
+        return snapshot.by_name()["nginx"], transport
+
+    def test_head_and_count_land_in_the_snapshot(self):
+        build, _ = self._nginx({
+            NGINX_TREE: tree(["PATCH/CVE-2026-1.patch"]),
+            NGINX_COMPARE: compare_answer(3),
+        })
+        self.assertEqual(build.source.branch_head, HEAD)
+        self.assertEqual(build.source.commits_ahead, 3)
+        self.assertEqual(build.problems, [])
+
+    def test_branch_not_moved_is_zero(self):
+        build, _ = self._nginx({
+            NGINX_TREE: tree(["PATCH/CVE-2026-1.patch"]),
+            NGINX_COMPARE: compare_answer(0, head=SHA),
+        })
+        self.assertEqual(build.source.commits_ahead, 0)
+
+    def test_no_hash_means_no_comparison(self):
+        koji, gitlab, transport = clients_with_source(
+            {NGINX_TREE: tree([])}, None)
+        collect_tag("os-9.2", config(), koji, gitlab, jobs=1)
+        self.assertFalse([r for r in transport.requests
+                          if r[0] == NGINX_COMPARE])
+
+    def test_flag_turns_the_comparison_off(self):
+        build, transport = self._nginx({NGINX_TREE: tree([])},
+                                       branch_check=False)
+        self.assertIsNone(build.source.commits_ahead)
+        self.assertFalse([r for r in transport.requests
+                          if r[0] == NGINX_COMPARE])
+
+    def test_failed_comparison_is_a_problem_and_not_a_count(self):
+        build, _ = self._nginx({
+            NGINX_TREE: tree([]),
+            NGINX_COMPARE: Response(500, {"message": "boom"}, {}),
+        })
+        self.assertIsNone(build.source.commits_ahead)
+        self.assertTrue(any("gitlab:" in p for p in build.problems))
+
+
+class GhostPatchesTest(unittest.TestCase):
+    def _nginx(self, built, tip, ahead=2):
+        routes = {
+            (NGINX_TREE, (("path", "PATCH"), ("per_page", "100"),
+                          ("recursive", "true"), ("ref", SHA))): built,
+            (NGINX_TREE, (("path", "PATCH"), ("per_page", "100"),
+                          ("recursive", "true"), ("ref", "br"))): tip,
+            NGINX_COMPARE: compare_answer(ahead),
+        }
+        koji, gitlab, transport = clients_with_source(
+            routes, "git+ssh://git@gitlab.example.com/g/nginx#" + SHA)
+        snapshot = collect_tag("os-9.2", config(), koji, gitlab, jobs=1)
+        return snapshot.by_name()["nginx"], transport
+
+    def test_three_sides(self):
+        built = Response(200, [
+            {"id": "a1", "type": "blob", "path": "PATCH/kept.patch"},
+            {"id": "b1", "type": "blob", "path": "PATCH/rewritten.patch"},
+            {"id": "c1", "type": "blob", "path": "PATCH/dropped.patch"},
+        ], {})
+        tip = Response(200, [
+            {"id": "a1", "type": "blob", "path": "PATCH/kept.patch"},
+            {"id": "b2", "type": "blob", "path": "PATCH/rewritten.patch"},
+            {"id": "d1", "type": "blob", "path": "PATCH/CVE-2026-9.patch"},
+        ], {})
+        build, _ = self._nginx(built, tip)
+        self.assertEqual([(p.name, p.ghost) for p in build.ghost_patches],
+                         [("CVE-2026-9.patch", "branch"),
+                          ("rewritten.patch", "changed"),
+                          ("dropped.patch", "build")])
+        # патчи билда — по-прежнему то, что лежит на коммите
+        self.assertEqual(sorted(p.name for p in build.patches),
+                         ["dropped.patch", "kept.patch", "rewritten.patch"])
+
+    def test_ghosts_are_classified_like_the_rest(self):
+        # id CVE — не меньше четырёх цифр (CVE_RE в classify.py); короткий
+        # "CVE-2026-9" не CVE и уехал бы в "other", а тест как раз о том,
+        # что ghost-патчи классифицируются тем же классификатором, что и
+        # обычные.
+        built = Response(200, [], {})
+        tip = Response(200, [{"id": "d1", "type": "blob",
+                              "path": "PATCH/CVE-2026-9999.patch"}], {})
+        build, _ = self._nginx(built, tip)
+        self.assertEqual(build.ghost_patches[0].cls, "CVE")
+        self.assertEqual(build.ghost_patches[0].cves, ["CVE-2026-9999"])
+
+    def test_ghost_links_point_where_the_file_exists(self):
+        built = Response(200, [{"id": "c1", "type": "blob",
+                                "path": "PATCH/dropped.patch"}], {})
+        tip = Response(200, [{"id": "d1", "type": "blob",
+                              "path": "PATCH/added.patch"}], {})
+        build, _ = self._nginx(built, tip)
+        by_side = {p.ghost: p.web_url for p in build.ghost_patches}
+        self.assertIn("/br/", by_side["branch"])
+        self.assertIn("/%s/" % SHA, by_side["build"])
+
+    def test_branch_at_the_same_place_reads_the_tree_once(self):
+        built = Response(200, [{"id": "a1", "type": "blob",
+                                "path": "PATCH/kept.patch"}], {})
+        build, transport = self._nginx(built, Response(500, {}, {}), ahead=0)
+        self.assertEqual(build.ghost_patches, [])
+        refs = [params.get("ref") for url, params, _ in transport.requests
+                if url == NGINX_TREE]
+        self.assertEqual(refs, [SHA])
+
+    def test_failed_second_read_leaves_the_count_and_says_so(self):
+        built = Response(200, [], {})
+        build, _ = self._nginx(built, Response(500, {"message": "boom"}, {}))
+        self.assertEqual(build.source.commits_ahead, 2)
+        self.assertEqual(build.ghost_patches, [])
+        self.assertTrue(any("gitlab:" in p for p in build.problems))
+
+    def test_failed_first_read_does_not_fabricate_branch_ghosts(self):
+        # Дерево коммита не прочиталось вовсе (500) — result.present is
+        # None, result.blobs пуст. Если бы ghost считался по пустому
+        # built.blobs, каждый файл на вершине ветки выглядел бы как "влит,
+        # но не собран" — хотя на деле мы просто не знаем, что лежало в
+        # коммите. commits_ahead при этом верен сам по себе (не зависит от
+        # дерева патчей) и остаётся в снапшоте.
+        built = Response(500, {"message": "boom"}, {})
+        tip = Response(200, [{"id": "d1", "type": "blob",
+                              "path": "PATCH/CVE-2026-9.patch"}], {})
+        build, _ = self._nginx(built, tip, ahead=2)
+        self.assertIsNone(build.patch_dir_present)
+        self.assertEqual(build.ghost_patches, [])
+        self.assertEqual(build.source.commits_ahead, 2)
+        self.assertTrue(any("gitlab:" in p for p in build.problems))
 
 
 if __name__ == "__main__":

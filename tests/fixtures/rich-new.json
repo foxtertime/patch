@@ -5,6 +5,7 @@
     "build_id": 111,
     "completed": "2026-07-30 23:45:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "nginx",
     "nvr": "nginx-1.26.0-1.el9",
     "owner": "builder",
@@ -15,6 +16,7 @@
       "cves": [
        "CVE-2024-7347"
       ],
+      "ghost": null,
       "name": "CVE-2024-7347.patch",
       "path": "PATCH/CVE-2024-7347.patch",
       "web_url": "https://gl/blob/PATCH/CVE-2024-7347.patch"
@@ -22,6 +24,7 @@
      {
       "class": "CHANGELOG",
       "cves": [],
+      "ghost": null,
       "name": "changelog.yaml",
       "path": "PATCH/changelog.yaml",
       "web_url": "https://gl/blob/PATCH/changelog.yaml"
@@ -29,11 +32,13 @@
      {
       "class": "DAST",
       "cves": [],
+      "ghost": null,
       "name": "dast-fuzz.patch",
       "path": "PATCH/dast-fuzz.patch",
       "web_url": "https://gl/blob/PATCH/dast-fuzz.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "1.el9",
     "rpms": [
@@ -43,6 +48,11 @@
      "nginx-mod-http-1.26.0-1.el9.aarch64"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "web/nginx",
      "raw": "git+https://gl/web/nginx?#os-9.2",
@@ -61,11 +71,13 @@
     "build_id": 102,
     "completed": "2026-04-01 10:00:00",
     "epoch": 1,
+    "ghost_patches": [],
     "name": "httpd",
     "nvr": "httpd-2.4.62-1.el9",
     "owner": "apache",
     "patch_dir_present": false,
     "patches": [],
+    "patches_ref": null,
     "problems": [
      "gitlab: 404 на дереве ветки"
     ],
@@ -74,6 +86,11 @@
      "httpd-2.4.62-1.el9.x86_64"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "web/httpd",
      "raw": "git+https://gl/web/httpd?#abc123",
@@ -92,6 +109,7 @@
     "build_id": 114,
     "completed": "никогда",
     "epoch": null,
+    "ghost_patches": [],
     "name": "zlib",
     "nvr": "zlib-1.3-1.el9",
     "owner": "builder",
@@ -100,6 +118,7 @@
      {
       "class": "SAST",
       "cves": [],
+      "ghost": null,
       "name": "sast-zlib.patch",
       "path": "PATCH/sast-zlib.patch",
       "web_url": "https://gl/blob/PATCH/sast-zlib.patch"
@@ -107,11 +126,13 @@
      {
       "class": "other",
       "cves": [],
+      "ghost": null,
       "name": "weird.diff",
       "path": "PATCH/weird.diff",
       "web_url": "https://gl/blob/PATCH/weird.diff"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "1.el9",
     "rpms": [
@@ -119,6 +140,11 @@
      "zlib-1.3-1.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/zlib",
      "raw": "git+https://gl/core/zlib?#os-9.1",
@@ -137,6 +163,7 @@
     "build_id": 115,
     "completed": "2026-07-31 00:10:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "curl",
     "nvr": "curl-8.0-1.el9",
     "owner": "net",
@@ -145,17 +172,24 @@
      {
       "class": "FILES",
       "cves": [],
+      "ghost": null,
       "name": "source.tar.gz",
       "path": "PATCH/source.tar.gz",
       "web_url": "https://gl/blob/PATCH/source.tar.gz"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "1.el9",
     "rpms": [
      "curl-8.0-1.el9.x86_64"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/curl",
      "raw": "git+https://gl/core/curl?#os-9.2",
@@ -171,7 +205,7 @@
     "version": "8.0"
    }
   ],
-  "dashboard": "2.0.0",
+  "dashboard": "2.1.0",
   "generated": "2026-08-01T00:00:00+03:00",
   "koji_hub": "https://hub/kojihub",
   "koji_web": "https://hub/koji",

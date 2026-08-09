@@ -5,6 +5,7 @@
     "build_id": 151,
     "completed": "2026-10-12 11:40:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "nginx",
     "nvr": "nginx-1.27.0-1.el9",
     "owner": "builder",
@@ -15,6 +16,7 @@
       "cves": [
        "CVE-2025-1112"
       ],
+      "ghost": null,
       "name": "CVE-2025-1112.patch",
       "path": "PATCH/CVE-2025-1112.patch",
       "web_url": "https://gl/blob/PATCH/CVE-2025-1112.patch"
@@ -22,6 +24,7 @@
      {
       "class": "CHANGELOG",
       "cves": [],
+      "ghost": null,
       "name": "changelog.yaml",
       "path": "PATCH/changelog.yaml",
       "web_url": "https://gl/blob/PATCH/changelog.yaml"
@@ -29,6 +32,7 @@
      {
       "class": "SPEC",
       "cves": [],
+      "ghost": null,
       "name": "nginx.spec.patch",
       "path": "PATCH/nginx.spec.patch",
       "web_url": "https://gl/blob/PATCH/nginx.spec.patch"
@@ -36,11 +40,13 @@
      {
       "class": "DISTSUFFIX",
       "cves": [],
+      "ghost": null,
       "name": "nginx-distsuffix.patch",
       "path": "PATCH/nginx-distsuffix.patch",
       "web_url": "https://gl/blob/PATCH/nginx-distsuffix.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "1.el9",
     "rpms": [
@@ -50,6 +56,11 @@
      "nginx-mod-http-1.27.0-1.el9.aarch64"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "web/nginx",
      "raw": "git+https://gl/web/nginx?#os-9.5",
@@ -65,44 +76,104 @@
     "version": "1.27.0"
    },
    {
-    "build_id": 143,
-    "completed": "2026-09-30 12:00:00",
-    "epoch": 1,
+    "build_id": 901,
+    "completed": "2026-07-01 10:00:00",
+    "epoch": null,
+    "ghost_patches": [
+     {
+      "class": "CVE",
+      "cves": [
+       "CVE-2026-9999"
+      ],
+      "ghost": "branch",
+      "name": "CVE-2026-9999.patch",
+      "path": "PATCH/CVE-2026-9999.patch",
+      "web_url": "https://gitlab.example.com/g/httpd/-/blob/os-9.4/PATCH/CVE-2026-9999.patch"
+     },
+     {
+      "class": "DISTSUFFIX",
+      "cves": [],
+      "ghost": "changed",
+      "name": "httpd-distsuffix.patch",
+      "path": "PATCH/httpd-distsuffix.patch",
+      "web_url": "https://gitlab.example.com/g/httpd/-/blob/os-9.4/PATCH/httpd-distsuffix.patch"
+     },
+     {
+      "class": "other",
+      "cves": [],
+      "ghost": "build",
+      "name": "old-fix.patch",
+      "path": "PATCH/old-fix.patch",
+      "web_url": "https://gitlab.example.com/g/httpd/-/blob/0f1a2b3c4d5e6f70819293a4b5c6d7e8f9001122/PATCH/old-fix.patch"
+     }
+    ],
     "name": "httpd",
-    "nvr": "httpd-2.4.62-2.el9",
-    "owner": "httpd-team",
-    "patch_dir_present": false,
-    "patches": [],
+    "nvr": "httpd-2.4.62-13.el9",
+    "owner": "builder",
+    "patch_dir_present": true,
+    "patches": [
+     {
+      "class": "CVE",
+      "cves": [
+       "CVE-2026-1111"
+      ],
+      "ghost": null,
+      "name": "CVE-2026-1111.patch",
+      "path": "PATCH/CVE-2026-1111.patch",
+      "web_url": "https://gitlab.example.com/g/httpd/-/blob/0f1a2b3c4d5e6f70819293a4b5c6d7e8f9001122/PATCH/CVE-2026-1111.patch"
+     },
+     {
+      "class": "DISTSUFFIX",
+      "cves": [],
+      "ghost": null,
+      "name": "httpd-distsuffix.patch",
+      "path": "PATCH/httpd-distsuffix.patch",
+      "web_url": "https://gitlab.example.com/g/httpd/-/blob/0f1a2b3c4d5e6f70819293a4b5c6d7e8f9001122/PATCH/httpd-distsuffix.patch"
+     },
+     {
+      "class": "other",
+      "cves": [],
+      "ghost": null,
+      "name": "old-fix.patch",
+      "path": "PATCH/old-fix.patch",
+      "web_url": "https://gitlab.example.com/g/httpd/-/blob/0f1a2b3c4d5e6f70819293a4b5c6d7e8f9001122/PATCH/old-fix.patch"
+     }
+    ],
+    "patches_ref": "0f1a2b3c4d5e6f70819293a4b5c6d7e8f9001122",
     "problems": [],
-    "release": "2.el9",
+    "release": "13.el9",
     "rpms": [
-     "httpd-2.4.62-2.el9.x86_64"
+     "httpd-2.4.62-13.el9.x86_64"
     ],
     "source": {
-     "host": "gl",
-     "project": "apps/httpd",
-     "raw": "git+https://gl/apps/httpd?#abc123",
-     "ref": "abc123",
-     "ref_kind": "commit",
-     "web_url": "https://gl/apps/httpd/-/tree/abc123"
+     "branch_head": "99aabbccddeeff00112233445566778899aabbcc",
+     "commit": "0f1a2b3c4d5e6f70819293a4b5c6d7e8f9001122",
+     "commit_source": "koji_source",
+     "commit_url": "https://gitlab.example.com/g/httpd/-/tree/0f1a2b3c4d5e6f70819293a4b5c6d7e8f9001122",
+     "commits_ahead": 4,
+     "host": "gitlab.example.com",
+     "project": "g/httpd",
+     "raw": "git+https://gitlab.example.com/g/httpd#origin/os-9.4",
+     "ref": "os-9.4",
+     "ref_kind": "branch",
+     "web_url": "https://gitlab.example.com/g/httpd/-/tree/os-9.4"
     },
-    "tag_name": "os-9.4",
-    "tags": [
-     "os-9.4",
-     "os-9.7"
-    ],
-    "task_id": 243,
+    "tag_name": "os-9.7",
+    "tags": [],
+    "task_id": 9011,
     "version": "2.4.62"
    },
    {
     "build_id": 144,
     "completed": "2026-09-29 07:30:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "zlib",
     "nvr": "zlib-1.3-3.el9",
     "owner": "builder",
     "patch_dir_present": null,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "3.el9",
     "rpms": [
@@ -110,6 +181,11 @@
      "zlib-1.3-3.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": null,
      "project": null,
      "raw": "cli-build/1730000000.5/zlib-1.3-3.el9.src.rpm",
@@ -128,6 +204,7 @@
     "build_id": 103,
     "completed": "2026-05-14",
     "epoch": null,
+    "ghost_patches": [],
     "name": "vim",
     "nvr": "vim-9.0-1.el9",
     "owner": "editor",
@@ -136,11 +213,13 @@
      {
       "class": "COVERAGE",
       "cves": [],
+      "ghost": null,
       "name": "coverage-vim.patch",
       "path": "PATCH/coverage-vim.patch",
       "web_url": "https://gl/blob/PATCH/coverage-vim.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "1.el9",
     "rpms": [
@@ -156,6 +235,7 @@
     "build_id": 140,
     "completed": "2026-09-01 05:05:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "kernel",
     "nvr": "kernel-5.14.0-620.el9",
     "owner": "kernel",
@@ -164,6 +244,7 @@
      {
       "class": "AUTOGEN",
       "cves": [],
+      "ghost": null,
       "name": "autogen-cve-patches.inc.new",
       "path": "PATCH/autogen-cve-patches.inc.new",
       "web_url": "https://gl/blob/PATCH/autogen-cve-patches.inc.new"
@@ -173,6 +254,7 @@
       "cves": [
        "CVE-2025-2003"
       ],
+      "ghost": null,
       "name": "CVE-2025-2003.patch",
       "path": "PATCH/CVE-2025-2003.patch",
       "web_url": "https://gl/blob/PATCH/CVE-2025-2003.patch"
@@ -180,6 +262,7 @@
      {
       "class": "SAST",
       "cves": [],
+      "ghost": null,
       "name": "sast-kernel-net.patch",
       "path": "PATCH/sast-kernel-net.patch",
       "web_url": "https://gl/blob/PATCH/sast-kernel-net.patch"
@@ -187,6 +270,7 @@
      {
       "class": "SAST",
       "cves": [],
+      "ghost": null,
       "name": "sast-kernel-fs.patch",
       "path": "PATCH/sast-kernel-fs.patch",
       "web_url": "https://gl/blob/PATCH/sast-kernel-fs.patch"
@@ -194,6 +278,7 @@
      {
       "class": "DAST",
       "cves": [],
+      "ghost": null,
       "name": "dast-kernel-fuzz.patch",
       "path": "PATCH/dast-kernel-fuzz.patch",
       "web_url": "https://gl/blob/PATCH/dast-kernel-fuzz.patch"
@@ -201,6 +286,7 @@
      {
       "class": "COVERAGE",
       "cves": [],
+      "ghost": null,
       "name": "coverage-kernel.patch",
       "path": "PATCH/coverage-kernel.patch",
       "web_url": "https://gl/blob/PATCH/coverage-kernel.patch"
@@ -208,6 +294,7 @@
      {
       "class": "DISTSUFFIX",
       "cves": [],
+      "ghost": null,
       "name": "kernel.spec.distsuffix.patch",
       "path": "PATCH/kernel.spec.distsuffix.patch",
       "web_url": "https://gl/blob/PATCH/kernel.spec.distsuffix.patch"
@@ -215,6 +302,7 @@
      {
       "class": "SPEC",
       "cves": [],
+      "ghost": null,
       "name": "kernel.spec.patch",
       "path": "PATCH/kernel.spec.patch",
       "web_url": "https://gl/blob/PATCH/kernel.spec.patch"
@@ -222,11 +310,13 @@
      {
       "class": "FILES",
       "cves": [],
+      "ghost": null,
       "name": "linux-5.14.0.tar.gz",
       "path": "PATCH/linux-5.14.0.tar.gz",
       "web_url": "https://gl/blob/PATCH/linux-5.14.0.tar.gz"
      }
     ],
+    "patches_ref": null,
     "problems": [
      "internal error: koji не ответил за 60 с"
     ],
@@ -241,6 +331,11 @@
      "kernel-5.14.0-620.el9.aarch64"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/kernel",
      "raw": "git+https://gl/core/kernel?#os-9.4",
@@ -259,6 +354,7 @@
     "build_id": 115,
     "completed": "2026-07-31 00:10:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "curl",
     "nvr": "curl-8.0-1.el9",
     "owner": "net",
@@ -267,17 +363,24 @@
      {
       "class": "FILES",
       "cves": [],
+      "ghost": null,
       "name": "source.tar.gz",
       "path": "PATCH/source.tar.gz",
       "web_url": "https://gl/blob/PATCH/source.tar.gz"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "1.el9",
     "rpms": [
      "curl-8.0-1.el9.x86_64"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/curl",
      "raw": "git+https://gl/core/curl?#os-9.2",
@@ -296,6 +399,7 @@
     "build_id": 142,
     "completed": null,
     "epoch": null,
+    "ghost_patches": [],
     "name": "openssl",
     "nvr": "openssl-3.2.1-1.el9",
     "owner": null,
@@ -306,6 +410,7 @@
       "cves": [
        "CVE-2025-3001"
       ],
+      "ghost": null,
       "name": "CVE-2025-3001.patch",
       "path": "PATCH/CVE-2025-3001.patch",
       "web_url": "https://gl/blob/PATCH/CVE-2025-3001.patch"
@@ -313,11 +418,13 @@
      {
       "class": "DISTSUFFIX",
       "cves": [],
+      "ghost": null,
       "name": "openssl-distsuffix.patch",
       "path": "PATCH/openssl-distsuffix.patch",
       "web_url": "https://gl/blob/PATCH/openssl-distsuffix.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "1.el9",
     "rpms": [
@@ -326,6 +433,11 @@
      "openssl-3.2.1-1.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/openssl",
      "raw": "git+https://gl/core/openssl?#os-9.4",
@@ -344,6 +456,7 @@
     "build_id": 160,
     "completed": "2026-10-30 02:55:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "chromium",
     "nvr": "chromium-131.0.6778.204-1.el9",
     "owner": "browser-team",
@@ -352,6 +465,7 @@
      {
       "class": "AUTOGEN",
       "cves": [],
+      "ghost": null,
       "name": "autogen-sast-patches.inc.new",
       "path": "PATCH/autogen-sast-patches.inc.new",
       "web_url": "https://gl/blob/PATCH/autogen-sast-patches.inc.new"
@@ -363,6 +477,7 @@
        "CVE-2025-4002",
        "CVE-2025-4003"
       ],
+      "ghost": null,
       "name": "CVE-2025-4001.patch",
       "path": "PATCH/CVE-2025-4001.patch",
       "web_url": "https://gl/blob/PATCH/CVE-2025-4001.patch"
@@ -370,6 +485,7 @@
      {
       "class": "SAST",
       "cves": [],
+      "ghost": null,
       "name": "sast-chromium-ipc.patch",
       "path": "PATCH/sast-chromium-ipc.patch",
       "web_url": "https://gl/blob/PATCH/sast-chromium-ipc.patch"
@@ -377,6 +493,7 @@
      {
       "class": "DAST",
       "cves": [],
+      "ghost": null,
       "name": "dast-chromium-fuzz.patch",
       "path": "PATCH/dast-chromium-fuzz.patch",
       "web_url": "https://gl/blob/PATCH/dast-chromium-fuzz.patch"
@@ -384,6 +501,7 @@
      {
       "class": "COVERAGE",
       "cves": [],
+      "ghost": null,
       "name": "coverage-chromium.patch",
       "path": "PATCH/coverage-chromium.patch",
       "web_url": "https://gl/blob/PATCH/coverage-chromium.patch"
@@ -391,6 +509,7 @@
      {
       "class": "DISTSUFFIX",
       "cves": [],
+      "ghost": null,
       "name": "chromium-distsuffix.patch",
       "path": "PATCH/chromium-distsuffix.patch",
       "web_url": "https://gl/blob/PATCH/chromium-distsuffix.patch"
@@ -398,6 +517,7 @@
      {
       "class": "LICENSE",
       "cves": [],
+      "ghost": null,
       "name": "chromium-license.patch",
       "path": "PATCH/chromium-license.patch",
       "web_url": "https://gl/blob/PATCH/chromium-license.patch"
@@ -405,6 +525,7 @@
      {
       "class": "SPEC",
       "cves": [],
+      "ghost": null,
       "name": "chromium.spec.patch",
       "path": "PATCH/chromium.spec.patch",
       "web_url": "https://gl/blob/PATCH/chromium.spec.patch"
@@ -412,6 +533,7 @@
      {
       "class": "CHANGELOG",
       "cves": [],
+      "ghost": null,
       "name": "changelog.yaml",
       "path": "PATCH/changelog.yaml",
       "web_url": "https://gl/blob/PATCH/changelog.yaml"
@@ -419,6 +541,7 @@
      {
       "class": "FILES",
       "cves": [],
+      "ghost": null,
       "name": "chromium-131.0.6778.204.tar.xz",
       "path": "PATCH/chromium-131.0.6778.204.tar.xz",
       "web_url": "https://gl/blob/PATCH/chromium-131.0.6778.204.tar.xz"
@@ -426,11 +549,13 @@
      {
       "class": "other",
       "cves": [],
+      "ghost": null,
       "name": "no-idea-what-this-is.diff",
       "path": "PATCH/no-idea-what-this-is.diff",
       "web_url": "https://gl/blob/PATCH/no-idea-what-this-is.diff"
      }
     ],
+    "patches_ref": null,
     "problems": [
      "gitlab: 403 на каталоге PATCH",
      "internal error: не разобрать changelog.yaml"
@@ -459,6 +584,11 @@
      "chromium-doc-131.0.6778.204-1.el9.noarch"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "desktop/browsers/chromium-browser-upstream",
      "raw": "git+https://gl/desktop/browsers/chromium-browser-upstream?#9f1c0b5a3d7e46b2c81f0a4d6e29b357ca8d1f04",
@@ -478,6 +608,7 @@
     "build_id": 300,
     "completed": "2026-11-01 00:00:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "bash",
     "nvr": "bash-1.0-1.el9",
     "owner": "builder",
@@ -486,6 +617,7 @@
      {
       "class": "AUTOGEN",
       "cves": [],
+      "ghost": null,
       "name": "autogen-bash.patch",
       "path": "PATCH/autogen-bash.patch",
       "web_url": "https://gl/blob/PATCH/autogen-bash.patch"
@@ -493,11 +625,13 @@
      {
       "class": "SPEC",
       "cves": [],
+      "ghost": null,
       "name": "bash.spec.patch",
       "path": "PATCH/bash.spec.patch",
       "web_url": "https://gl/blob/PATCH/bash.spec.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [
      "gitlab: 404 на дереве ветки"
     ],
@@ -507,6 +641,11 @@
      "bash-1.0-1.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/bash",
      "raw": "git+https://gl/core/bash?#os-9.7",
@@ -525,11 +664,13 @@
     "build_id": 301,
     "completed": "2026-11-02 01:07:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "coreutils",
     "nvr": "coreutils-2.1-2.el9",
     "owner": "core",
     "patch_dir_present": true,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "2.el9",
     "rpms": [
@@ -538,6 +679,11 @@
      "coreutils-2.1-2.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/coreutils",
      "raw": "git+https://gl/core/coreutils?#os-9.7",
@@ -556,6 +702,7 @@
     "build_id": 302,
     "completed": "2026-11-03 02:14:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "systemd",
     "nvr": "systemd-3.2-3.el9",
     "owner": "net",
@@ -564,11 +711,13 @@
      {
       "class": "SAST",
       "cves": [],
+      "ghost": null,
       "name": "sast-systemd.patch",
       "path": "PATCH/sast-systemd.patch",
       "web_url": "https://gl/blob/PATCH/sast-systemd.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "3.el9",
     "rpms": [
@@ -578,6 +727,11 @@
      "systemd-3.2-3.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/systemd",
      "raw": "git+https://gl/core/systemd?#5cacb1c30c69d3e152c99c1c4d90e6376449825f",
@@ -596,11 +750,13 @@
     "build_id": 303,
     "completed": "2026-11-04 03:21:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "glibc",
     "nvr": "glibc-4.3-4.el9",
     "owner": "kernel",
     "patch_dir_present": false,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "4.el9",
     "rpms": [
@@ -611,6 +767,11 @@
      "glibc-4.3-4.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/glibc",
      "raw": "git+https://gl/core/glibc?#os-9.7",
@@ -630,11 +791,13 @@
     "build_id": 304,
     "completed": "2026-11-05 04:28:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "gcc",
     "nvr": "gcc-5.4-1.el9",
     "owner": "release-bot",
     "patch_dir_present": null,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "1.el9",
     "rpms": [
@@ -653,6 +816,7 @@
     "build_id": 305,
     "completed": "2026-11-06 05:35:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "binutils",
     "nvr": "binutils-6.5-2.el9",
     "owner": "builder",
@@ -661,11 +825,13 @@
      {
       "class": "DISTSUFFIX",
       "cves": [],
+      "ghost": null,
       "name": "distsuffix-binutils.patch",
       "path": "PATCH/distsuffix-binutils.patch",
       "web_url": "https://gl/blob/PATCH/distsuffix-binutils.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [
      "internal error: сборка без исходников"
     ],
@@ -676,6 +842,11 @@
      "binutils-6.5-2.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/binutils",
      "raw": "git+https://gl/core/binutils?#os-9.7",
@@ -694,6 +865,7 @@
     "build_id": 306,
     "completed": "2026-11-07 06:42:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "make",
     "nvr": "make-7.6-3.el9",
     "owner": "core",
@@ -702,6 +874,7 @@
      {
       "class": "LICENSE",
       "cves": [],
+      "ghost": null,
       "name": "license-make.patch",
       "path": "PATCH/license-make.patch",
       "web_url": "https://gl/blob/PATCH/license-make.patch"
@@ -709,11 +882,13 @@
      {
       "class": "SPEC",
       "cves": [],
+      "ghost": null,
       "name": "make.spec.patch",
       "path": "PATCH/make.spec.patch",
       "web_url": "https://gl/blob/PATCH/make.spec.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "3.el9",
     "rpms": [
@@ -723,6 +898,11 @@
      "make-7.6-3.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/make",
      "raw": "git+https://gl/core/make?#os-9.7",
@@ -741,11 +921,13 @@
     "build_id": 307,
     "completed": "2026-11-08 07:49:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "python3",
     "nvr": "python3-1.7-4.el9",
     "owner": "net",
     "patch_dir_present": false,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "4.el9",
     "rpms": [
@@ -756,6 +938,11 @@
      "python3-1.7-4.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/python3",
      "raw": "git+https://gl/core/python3?#80dd0a3e16d05b975a9fa37f27c78d7608caf7ae",
@@ -774,6 +961,7 @@
     "build_id": 308,
     "completed": "2026-11-09 08:56:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "perl",
     "nvr": "perl-2.8-1.el9",
     "owner": "kernel",
@@ -782,11 +970,13 @@
      {
       "class": "CHANGELOG",
       "cves": [],
+      "ghost": null,
       "name": "changelog-perl.patch",
       "path": "PATCH/changelog-perl.patch",
       "web_url": "https://gl/blob/PATCH/changelog-perl.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "1.el9",
     "rpms": [
@@ -794,6 +984,11 @@
      "perl-2.8-1.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/perl",
      "raw": "git+https://gl/core/perl?#os-9.7",
@@ -812,6 +1007,7 @@
     "build_id": 309,
     "completed": "2026-11-10 09:03:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "ruby",
     "nvr": "ruby-3.9-2.el9",
     "owner": "release-bot",
@@ -820,11 +1016,13 @@
      {
       "class": "FILES",
       "cves": [],
+      "ghost": null,
       "name": "files-ruby.patch",
       "path": "PATCH/files-ruby.patch",
       "web_url": "https://gl/blob/PATCH/files-ruby.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "2.el9",
     "rpms": [
@@ -833,6 +1031,11 @@
      "ruby-3.9-2.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/ruby",
      "raw": "git+https://gl/core/ruby?#os-9.7",
@@ -851,11 +1054,13 @@
     "build_id": 310,
     "completed": "2026-11-11 10:10:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "rust",
     "nvr": "rust-4.10-3.el9",
     "owner": "builder",
     "patch_dir_present": true,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "3.el9",
     "rpms": [
@@ -865,6 +1070,11 @@
      "rust-4.10-3.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/rust",
      "raw": "git+https://gl/core/rust?#os-9.7",
@@ -884,11 +1094,13 @@
     "build_id": 311,
     "completed": "2026-11-12 11:17:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "golang",
     "nvr": "golang-5.11-4.el9",
     "owner": "core",
     "patch_dir_present": false,
     "patches": [],
+    "patches_ref": null,
     "problems": [
      "gitlab: 404 на дереве ветки"
     ],
@@ -901,6 +1113,11 @@
      "golang-5.11-4.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/golang",
      "raw": "git+https://gl/core/golang?#os-9.7",
@@ -919,6 +1136,7 @@
     "build_id": 312,
     "completed": "2026-11-13 12:24:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "nodejs",
     "nvr": "nodejs-6.12-1.el9",
     "owner": "net",
@@ -929,6 +1147,7 @@
       "cves": [
        "CVE-2025-5012"
       ],
+      "ghost": null,
       "name": "CVE-2025-5012.patch",
       "path": "PATCH/CVE-2025-5012.patch",
       "web_url": "https://gl/blob/PATCH/CVE-2025-5012.patch"
@@ -936,11 +1155,13 @@
      {
       "class": "SPEC",
       "cves": [],
+      "ghost": null,
       "name": "nodejs.spec.patch",
       "path": "PATCH/nodejs.spec.patch",
       "web_url": "https://gl/blob/PATCH/nodejs.spec.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "1.el9",
     "rpms": [
@@ -948,6 +1169,11 @@
      "nodejs-6.12-1.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/nodejs",
      "raw": "git+https://gl/core/nodejs?#9690950bf78d69049eb916154c609783fd2ed40d",
@@ -966,11 +1192,13 @@
     "build_id": 313,
     "completed": "2026-11-14 13:31:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "php",
     "nvr": "php-7.0-2.el9",
     "owner": "kernel",
     "patch_dir_present": null,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "2.el9",
     "rpms": [
@@ -990,6 +1218,7 @@
     "build_id": 314,
     "completed": "2026-11-15 14:38:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "lua",
     "nvr": "lua-1.1-3.el9",
     "owner": "release-bot",
@@ -998,11 +1227,13 @@
      {
       "class": "DAST",
       "cves": [],
+      "ghost": null,
       "name": "dast-lua.patch",
       "path": "PATCH/dast-lua.patch",
       "web_url": "https://gl/blob/PATCH/dast-lua.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "3.el9",
     "rpms": [
@@ -1012,6 +1243,11 @@
      "lua-1.1-3.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/lua",
      "raw": "git+https://gl/core/lua?#os-9.7",
@@ -1030,11 +1266,13 @@
     "build_id": 315,
     "completed": "2026-11-16 15:45:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "openldap",
     "nvr": "openldap-2.2-4.el9",
     "owner": "builder",
     "patch_dir_present": false,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "4.el9",
     "rpms": [
@@ -1045,6 +1283,11 @@
      "openldap-2.2-4.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/openldap",
      "raw": "git+https://gl/core/openldap?#os-9.7",
@@ -1063,11 +1306,13 @@
     "build_id": 316,
     "completed": "2026-11-17 16:52:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "cyrus-sasl",
     "nvr": "cyrus-sasl-3.3-1.el9",
     "owner": "core",
     "patch_dir_present": true,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "1.el9",
     "rpms": [
@@ -1075,6 +1320,11 @@
      "cyrus-sasl-3.3-1.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/cyrus-sasl",
      "raw": "git+https://gl/core/cyrus-sasl?#os-9.7",
@@ -1093,6 +1343,7 @@
     "build_id": 317,
     "completed": "2026-11-18 17:59:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "krb5",
     "nvr": "krb5-4.4-2.el9",
     "owner": "net",
@@ -1101,11 +1352,13 @@
      {
       "class": "LICENSE",
       "cves": [],
+      "ghost": null,
       "name": "license-krb5.patch",
       "path": "PATCH/license-krb5.patch",
       "web_url": "https://gl/blob/PATCH/license-krb5.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "2.el9",
     "rpms": [
@@ -1114,6 +1367,11 @@
      "krb5-4.4-2.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/krb5",
      "raw": "git+https://gl/core/krb5?#ac9c40fdd3fd2e1fa6a7b3e5c310b5e00c6ff6de",
@@ -1133,6 +1391,7 @@
     "build_id": 318,
     "completed": "2026-11-19 18:06:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "pam",
     "nvr": "pam-5.5-3.el9",
     "owner": "kernel",
@@ -1141,6 +1400,7 @@
      {
       "class": "SPEC",
       "cves": [],
+      "ghost": null,
       "name": "spec-pam.patch",
       "path": "PATCH/spec-pam.patch",
       "web_url": "https://gl/blob/PATCH/spec-pam.patch"
@@ -1148,11 +1408,13 @@
      {
       "class": "SPEC",
       "cves": [],
+      "ghost": null,
       "name": "pam.spec.patch",
       "path": "PATCH/pam.spec.patch",
       "web_url": "https://gl/blob/PATCH/pam.spec.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [
      "internal error: сборка без исходников"
     ],
@@ -1164,6 +1426,11 @@
      "pam-5.5-3.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/pam",
      "raw": "git+https://gl/core/pam?#os-9.7",
@@ -1182,11 +1449,13 @@
     "build_id": 319,
     "completed": "2026-11-20 19:13:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "shadow-utils",
     "nvr": "shadow-utils-6.6-4.el9",
     "owner": "release-bot",
     "patch_dir_present": false,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "4.el9",
     "rpms": [
@@ -1197,6 +1466,11 @@
      "shadow-utils-6.6-4.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/shadow-utils",
      "raw": "git+https://gl/core/shadow-utils?#os-9.7",
@@ -1215,6 +1489,7 @@
     "build_id": 320,
     "completed": "2026-11-21 20:20:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "sudo",
     "nvr": "sudo-7.7-1.el9",
     "owner": "builder",
@@ -1223,11 +1498,13 @@
      {
       "class": "FILES",
       "cves": [],
+      "ghost": null,
       "name": "files-sudo.patch",
       "path": "PATCH/files-sudo.patch",
       "web_url": "https://gl/blob/PATCH/files-sudo.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "1.el9",
     "rpms": [
@@ -1235,6 +1512,11 @@
      "sudo-7.7-1.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/sudo",
      "raw": "git+https://gl/core/sudo?#os-9.7",
@@ -1253,6 +1535,7 @@
     "build_id": 321,
     "completed": "2026-11-22 21:27:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "audit",
     "nvr": "audit-1.8-2.el9",
     "owner": "core",
@@ -1261,11 +1544,13 @@
      {
       "class": "other",
       "cves": [],
+      "ghost": null,
       "name": "other-audit.patch",
       "path": "PATCH/other-audit.patch",
       "web_url": "https://gl/blob/PATCH/other-audit.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "2.el9",
     "rpms": [
@@ -1274,6 +1559,11 @@
      "audit-1.8-2.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/audit",
      "raw": "git+https://gl/core/audit?#os-9.7",
@@ -1292,11 +1582,13 @@
     "build_id": 322,
     "completed": "2026-11-23 22:34:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "selinux-policy",
     "nvr": "selinux-policy-2.9-3.el9",
     "owner": "net",
     "patch_dir_present": null,
     "patches": [],
+    "patches_ref": null,
     "problems": [
      "gitlab: 404 на дереве ветки"
     ],
@@ -1319,11 +1611,13 @@
     "build_id": 323,
     "completed": "2026-11-24 23:41:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "policycoreutils",
     "nvr": "policycoreutils-3.10-4.el9",
     "owner": "kernel",
     "patch_dir_present": false,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "4.el9",
     "rpms": [
@@ -1334,6 +1628,11 @@
      "policycoreutils-3.10-4.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/policycoreutils",
      "raw": "git+https://gl/core/policycoreutils?#os-9.7",
@@ -1352,6 +1651,7 @@
     "build_id": 324,
     "completed": "2026-11-25 00:48:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "libselinux",
     "nvr": "libselinux-4.11-1.el9",
     "owner": "release-bot",
@@ -1360,6 +1660,7 @@
      {
       "class": "SAST",
       "cves": [],
+      "ghost": null,
       "name": "sast-libselinux.patch",
       "path": "PATCH/sast-libselinux.patch",
       "web_url": "https://gl/blob/PATCH/sast-libselinux.patch"
@@ -1367,11 +1668,13 @@
      {
       "class": "SPEC",
       "cves": [],
+      "ghost": null,
       "name": "libselinux.spec.patch",
       "path": "PATCH/libselinux.spec.patch",
       "web_url": "https://gl/blob/PATCH/libselinux.spec.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "1.el9",
     "rpms": [
@@ -1379,6 +1682,11 @@
      "libselinux-4.11-1.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/libselinux",
      "raw": "git+https://gl/core/libselinux?#os-9.7",
@@ -1398,11 +1706,13 @@
     "build_id": 325,
     "completed": "2026-11-26 01:55:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "libsemanage",
     "nvr": "libsemanage-5.12-2.el9",
     "owner": "builder",
     "patch_dir_present": true,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "2.el9",
     "rpms": [
@@ -1411,6 +1721,11 @@
      "libsemanage-5.12-2.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/libsemanage",
      "raw": "git+https://gl/core/libsemanage?#os-9.7",
@@ -1429,6 +1744,7 @@
     "build_id": 326,
     "completed": "2026-11-27 02:02:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "rpm",
     "nvr": "rpm-6.0-3.el9",
     "owner": "core",
@@ -1437,11 +1753,13 @@
      {
       "class": "COVERAGE",
       "cves": [],
+      "ghost": null,
       "name": "coverage-rpm.patch",
       "path": "PATCH/coverage-rpm.patch",
       "web_url": "https://gl/blob/PATCH/coverage-rpm.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "3.el9",
     "rpms": [
@@ -1451,6 +1769,11 @@
      "rpm-6.0-3.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/rpm",
      "raw": "git+https://gl/core/rpm?#os-9.7",
@@ -1469,11 +1792,13 @@
     "build_id": 327,
     "completed": "2026-11-28 03:09:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "dnf",
     "nvr": "dnf-7.1-4.el9",
     "owner": "net",
     "patch_dir_present": false,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "4.el9",
     "rpms": [
@@ -1484,6 +1809,11 @@
      "dnf-7.1-4.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/dnf",
      "raw": "git+https://gl/core/dnf?#fa4234450e05c64925263f07ff2a6b2fef01ebde",
@@ -1502,11 +1832,13 @@
     "build_id": 328,
     "completed": "2026-11-01 04:16:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "libdnf",
     "nvr": "libdnf-1.2-1.el9",
     "owner": "kernel",
     "patch_dir_present": true,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "1.el9",
     "rpms": [
@@ -1514,6 +1846,11 @@
      "libdnf-1.2-1.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/libdnf",
      "raw": "git+https://gl/core/libdnf?#os-9.7",
@@ -1532,6 +1869,7 @@
     "build_id": 329,
     "completed": "2026-11-02 05:23:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "librepo",
     "nvr": "librepo-2.3-2.el9",
     "owner": "release-bot",
@@ -1540,11 +1878,13 @@
      {
       "class": "SPEC",
       "cves": [],
+      "ghost": null,
       "name": "spec-librepo.patch",
       "path": "PATCH/spec-librepo.patch",
       "web_url": "https://gl/blob/PATCH/spec-librepo.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "2.el9",
     "rpms": [
@@ -1553,6 +1893,11 @@
      "librepo-2.3-2.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/librepo",
      "raw": "git+https://gl/core/librepo?#os-9.7",
@@ -1571,6 +1916,7 @@
     "build_id": 330,
     "completed": "2026-11-03 06:30:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "createrepo_c",
     "nvr": "createrepo_c-3.4-3.el9",
     "owner": "builder",
@@ -1579,6 +1925,7 @@
      {
       "class": "CHANGELOG",
       "cves": [],
+      "ghost": null,
       "name": "changelog-createrepo_c.patch",
       "path": "PATCH/changelog-createrepo_c.patch",
       "web_url": "https://gl/blob/PATCH/changelog-createrepo_c.patch"
@@ -1586,11 +1933,13 @@
      {
       "class": "SPEC",
       "cves": [],
+      "ghost": null,
       "name": "createrepo_c.spec.patch",
       "path": "PATCH/createrepo_c.spec.patch",
       "web_url": "https://gl/blob/PATCH/createrepo_c.spec.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "3.el9",
     "rpms": [
@@ -1600,6 +1949,11 @@
      "createrepo_c-3.4-3.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/createrepo_c",
      "raw": "git+https://gl/core/createrepo_c?#os-9.7",
@@ -1618,11 +1972,13 @@
     "build_id": 331,
     "completed": "2026-11-04 07:37:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "libsolv",
     "nvr": "libsolv-4.5-4.el9",
     "owner": "core",
     "patch_dir_present": null,
     "patches": [],
+    "patches_ref": null,
     "problems": [
      "internal error: сборка без исходников"
     ],
@@ -1647,6 +2003,7 @@
     "build_id": 332,
     "completed": "2026-11-05 08:44:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "sqlite",
     "nvr": "sqlite-5.6-1.el9",
     "owner": "net",
@@ -1655,11 +2012,13 @@
      {
       "class": "other",
       "cves": [],
+      "ghost": null,
       "name": "other-sqlite.patch",
       "path": "PATCH/other-sqlite.patch",
       "web_url": "https://gl/blob/PATCH/other-sqlite.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "1.el9",
     "rpms": [
@@ -1667,6 +2026,11 @@
      "sqlite-5.6-1.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/sqlite",
      "raw": "git+https://gl/core/sqlite?#6d64a5ee3d4875588bfd6dfd8a79cc338887ac1d",
@@ -1685,6 +2049,7 @@
     "build_id": 333,
     "completed": "2026-11-06 09:51:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "libxml2",
     "nvr": "libxml2-6.7-2.el9",
     "owner": "kernel",
@@ -1693,11 +2058,13 @@
      {
       "class": "AUTOGEN",
       "cves": [],
+      "ghost": null,
       "name": "autogen-libxml2.patch",
       "path": "PATCH/autogen-libxml2.patch",
       "web_url": "https://gl/blob/PATCH/autogen-libxml2.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [
      "gitlab: 404 на дереве ветки"
     ],
@@ -1708,6 +2075,11 @@
      "libxml2-6.7-2.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/libxml2",
      "raw": "git+https://gl/core/libxml2?#os-9.7",
@@ -1726,11 +2098,13 @@
     "build_id": 334,
     "completed": "2026-11-07 10:58:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "libxslt",
     "nvr": "libxslt-7.8-3.el9",
     "owner": "release-bot",
     "patch_dir_present": true,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "3.el9",
     "rpms": [
@@ -1740,6 +2114,11 @@
      "libxslt-7.8-3.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/libxslt",
      "raw": "git+https://gl/core/libxslt?#os-9.7",
@@ -1758,11 +2137,13 @@
     "build_id": 335,
     "completed": "2026-11-08 11:05:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "expat",
     "nvr": "expat-1.9-4.el9",
     "owner": "builder",
     "patch_dir_present": false,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "4.el9",
     "rpms": [
@@ -1773,6 +2154,11 @@
      "expat-1.9-4.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/expat",
      "raw": "git+https://gl/core/expat?#os-9.7",
@@ -1791,6 +2177,7 @@
     "build_id": 336,
     "completed": "2026-11-09 12:12:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "json-c",
     "nvr": "json-c-2.10-1.el9",
     "owner": "core",
@@ -1799,6 +2186,7 @@
      {
       "class": "DAST",
       "cves": [],
+      "ghost": null,
       "name": "dast-json-c.patch",
       "path": "PATCH/dast-json-c.patch",
       "web_url": "https://gl/blob/PATCH/dast-json-c.patch"
@@ -1806,11 +2194,13 @@
      {
       "class": "SPEC",
       "cves": [],
+      "ghost": null,
       "name": "json-c.spec.patch",
       "path": "PATCH/json-c.spec.patch",
       "web_url": "https://gl/blob/PATCH/json-c.spec.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "1.el9",
     "rpms": [
@@ -1818,6 +2208,11 @@
      "json-c-2.10-1.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/json-c",
      "raw": "git+https://gl/core/json-c?#os-9.7",
@@ -1836,11 +2231,13 @@
     "build_id": 337,
     "completed": "2026-11-10 13:19:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "libyaml",
     "nvr": "libyaml-3.11-2.el9",
     "owner": "net",
     "patch_dir_present": true,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "2.el9",
     "rpms": [
@@ -1849,6 +2246,11 @@
      "libyaml-3.11-2.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/libyaml",
      "raw": "git+https://gl/core/libyaml?#e750aae6469e6c77377e2f031e5e4ca5e573cc81",
@@ -1867,6 +2269,7 @@
     "build_id": 338,
     "completed": "2026-11-11 14:26:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "openssh",
     "nvr": "openssh-4.12-3.el9",
     "owner": "kernel",
@@ -1875,11 +2278,13 @@
      {
       "class": "DISTSUFFIX",
       "cves": [],
+      "ghost": null,
       "name": "distsuffix-openssh.patch",
       "path": "PATCH/distsuffix-openssh.patch",
       "web_url": "https://gl/blob/PATCH/distsuffix-openssh.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "3.el9",
     "rpms": [
@@ -1889,6 +2294,11 @@
      "openssh-4.12-3.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/openssh",
      "raw": "git+https://gl/core/openssh?#os-9.7",
@@ -1908,11 +2318,13 @@
     "build_id": 339,
     "completed": "2026-11-12 15:33:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "gnutls",
     "nvr": "gnutls-5.0-4.el9",
     "owner": "release-bot",
     "patch_dir_present": false,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "4.el9",
     "rpms": [
@@ -1923,6 +2335,11 @@
      "gnutls-5.0-4.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/gnutls",
      "raw": "git+https://gl/core/gnutls?#os-9.7",
@@ -1941,11 +2358,13 @@
     "build_id": 340,
     "completed": "2026-11-13 16:40:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "nss",
     "nvr": "nss-6.1-1.el9",
     "owner": "builder",
     "patch_dir_present": null,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "1.el9",
     "rpms": [
@@ -1964,6 +2383,7 @@
     "build_id": 341,
     "completed": "2026-11-14 17:47:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "libgcrypt",
     "nvr": "libgcrypt-7.2-2.el9",
     "owner": "core",
@@ -1972,11 +2392,13 @@
      {
       "class": "CHANGELOG",
       "cves": [],
+      "ghost": null,
       "name": "changelog-libgcrypt.patch",
       "path": "PATCH/changelog-libgcrypt.patch",
       "web_url": "https://gl/blob/PATCH/changelog-libgcrypt.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "2.el9",
     "rpms": [
@@ -1985,6 +2407,11 @@
      "libgcrypt-7.2-2.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/libgcrypt",
      "raw": "git+https://gl/core/libgcrypt?#os-9.7",
@@ -2003,6 +2430,7 @@
     "build_id": 342,
     "completed": "2026-11-15 18:54:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "gpgme",
     "nvr": "gpgme-1.3-3.el9",
     "owner": "net",
@@ -2011,6 +2439,7 @@
      {
       "class": "FILES",
       "cves": [],
+      "ghost": null,
       "name": "files-gpgme.patch",
       "path": "PATCH/files-gpgme.patch",
       "web_url": "https://gl/blob/PATCH/files-gpgme.patch"
@@ -2018,11 +2447,13 @@
      {
       "class": "SPEC",
       "cves": [],
+      "ghost": null,
       "name": "gpgme.spec.patch",
       "path": "PATCH/gpgme.spec.patch",
       "web_url": "https://gl/blob/PATCH/gpgme.spec.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "3.el9",
     "rpms": [
@@ -2032,6 +2463,11 @@
      "gpgme-1.3-3.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/gpgme",
      "raw": "git+https://gl/core/gpgme?#c59521b258ef3836c23e18b479b8a8ac416a95d1",
@@ -2050,11 +2486,13 @@
     "build_id": 343,
     "completed": "2026-11-16 19:01:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "p11-kit",
     "nvr": "p11-kit-2.4-4.el9",
     "owner": "kernel",
     "patch_dir_present": false,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "4.el9",
     "rpms": [
@@ -2065,6 +2503,11 @@
      "p11-kit-2.4-4.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/p11-kit",
      "raw": "git+https://gl/core/p11-kit?#os-9.7",
@@ -2083,6 +2526,7 @@
     "build_id": 344,
     "completed": "2026-11-17 20:08:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "postgresql",
     "nvr": "postgresql-3.5-1.el9",
     "owner": "release-bot",
@@ -2091,11 +2535,13 @@
      {
       "class": "AUTOGEN",
       "cves": [],
+      "ghost": null,
       "name": "autogen-postgresql.patch",
       "path": "PATCH/autogen-postgresql.patch",
       "web_url": "https://gl/blob/PATCH/autogen-postgresql.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [
      "gitlab: 404 на дереве ветки",
      "internal error: сборка без исходников"
@@ -2106,6 +2552,11 @@
      "postgresql-3.5-1.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/postgresql",
      "raw": "git+https://gl/core/postgresql?#os-9.7",
@@ -2124,6 +2575,7 @@
     "build_id": 345,
     "completed": "2026-11-18 21:15:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "mariadb",
     "nvr": "mariadb-4.6-2.el9",
     "owner": "builder",
@@ -2134,11 +2586,13 @@
       "cves": [
        "CVE-2025-5045"
       ],
+      "ghost": null,
       "name": "CVE-2025-5045.patch",
       "path": "PATCH/CVE-2025-5045.patch",
       "web_url": "https://gl/blob/PATCH/CVE-2025-5045.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "2.el9",
     "rpms": [
@@ -2147,6 +2601,11 @@
      "mariadb-4.6-2.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/mariadb",
      "raw": "git+https://gl/core/mariadb?#os-9.7",
@@ -2166,11 +2625,13 @@
     "build_id": 346,
     "completed": "2026-11-19 22:22:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "redis",
     "nvr": "redis-5.7-3.el9",
     "owner": "core",
     "patch_dir_present": true,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "3.el9",
     "rpms": [
@@ -2180,6 +2641,11 @@
      "redis-5.7-3.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/redis",
      "raw": "git+https://gl/core/redis?#os-9.7",
@@ -2198,11 +2664,13 @@
     "build_id": 347,
     "completed": "2026-11-20 23:29:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "memcached",
     "nvr": "memcached-6.8-4.el9",
     "owner": "net",
     "patch_dir_present": false,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "4.el9",
     "rpms": [
@@ -2213,6 +2681,11 @@
      "memcached-6.8-4.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/memcached",
      "raw": "git+https://gl/core/memcached?#ebf4a2fb4c21393bd3b0f15341b36c9367fc8350",
@@ -2231,6 +2704,7 @@
     "build_id": 348,
     "completed": "2026-11-21 00:36:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "rabbitmq-server",
     "nvr": "rabbitmq-server-7.9-1.el9",
     "owner": "kernel",
@@ -2239,6 +2713,7 @@
      {
       "class": "COVERAGE",
       "cves": [],
+      "ghost": null,
       "name": "coverage-rabbitmq-server.patch",
       "path": "PATCH/coverage-rabbitmq-server.patch",
       "web_url": "https://gl/blob/PATCH/coverage-rabbitmq-server.patch"
@@ -2246,11 +2721,13 @@
      {
       "class": "SPEC",
       "cves": [],
+      "ghost": null,
       "name": "rabbitmq-server.spec.patch",
       "path": "PATCH/rabbitmq-server.spec.patch",
       "web_url": "https://gl/blob/PATCH/rabbitmq-server.spec.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "1.el9",
     "rpms": [
@@ -2258,6 +2735,11 @@
      "rabbitmq-server-7.9-1.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/rabbitmq-server",
      "raw": "git+https://gl/core/rabbitmq-server?#os-9.7",
@@ -2276,11 +2758,13 @@
     "build_id": 349,
     "completed": "2026-11-22 01:43:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "tomcat",
     "nvr": "tomcat-1.10-2.el9",
     "owner": "release-bot",
     "patch_dir_present": null,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "2.el9",
     "rpms": [
@@ -2300,6 +2784,7 @@
     "build_id": 350,
     "completed": "2026-11-23 02:50:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "java-17-openjdk",
     "nvr": "java-17-openjdk-2.11-3.el9",
     "owner": "builder",
@@ -2308,11 +2793,13 @@
      {
       "class": "LICENSE",
       "cves": [],
+      "ghost": null,
       "name": "license-java-17-openjdk.patch",
       "path": "PATCH/license-java-17-openjdk.patch",
       "web_url": "https://gl/blob/PATCH/license-java-17-openjdk.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "3.el9",
     "rpms": [
@@ -2322,6 +2809,11 @@
      "java-17-openjdk-2.11-3.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/java-17-openjdk",
      "raw": "git+https://gl/core/java-17-openjdk?#os-9.7",
@@ -2340,11 +2832,13 @@
     "build_id": 351,
     "completed": "2026-11-24 03:57:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "maven",
     "nvr": "maven-3.12-4.el9",
     "owner": "core",
     "patch_dir_present": false,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "4.el9",
     "rpms": [
@@ -2355,6 +2849,11 @@
      "maven-3.12-4.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/maven",
      "raw": "git+https://gl/core/maven?#os-9.7",
@@ -2373,11 +2872,13 @@
     "build_id": 352,
     "completed": "2026-11-25 04:04:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "ant",
     "nvr": "ant-4.0-1.el9",
     "owner": "net",
     "patch_dir_present": true,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "1.el9",
     "rpms": [
@@ -2385,6 +2886,11 @@
      "ant-4.0-1.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/ant",
      "raw": "git+https://gl/core/ant?#64bd05d89142566144bce27f4904a322d8d9e836",
@@ -2404,6 +2910,7 @@
     "build_id": 353,
     "completed": "2026-11-26 05:11:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "log4j",
     "nvr": "log4j-5.1-2.el9",
     "owner": "kernel",
@@ -2412,11 +2919,13 @@
      {
       "class": "FILES",
       "cves": [],
+      "ghost": null,
       "name": "files-log4j.patch",
       "path": "PATCH/files-log4j.patch",
       "web_url": "https://gl/blob/PATCH/files-log4j.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "2.el9",
     "rpms": [
@@ -2425,6 +2934,11 @@
      "log4j-5.1-2.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/log4j",
      "raw": "git+https://gl/core/log4j?#os-9.7",
@@ -2443,6 +2957,7 @@
     "build_id": 354,
     "completed": "2026-11-27 06:18:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "dbus",
     "nvr": "dbus-6.2-3.el9",
     "owner": "release-bot",
@@ -2451,6 +2966,7 @@
      {
       "class": "other",
       "cves": [],
+      "ghost": null,
       "name": "other-dbus.patch",
       "path": "PATCH/other-dbus.patch",
       "web_url": "https://gl/blob/PATCH/other-dbus.patch"
@@ -2458,11 +2974,13 @@
      {
       "class": "SPEC",
       "cves": [],
+      "ghost": null,
       "name": "dbus.spec.patch",
       "path": "PATCH/dbus.spec.patch",
       "web_url": "https://gl/blob/PATCH/dbus.spec.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "3.el9",
     "rpms": [
@@ -2472,6 +2990,11 @@
      "dbus-6.2-3.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/dbus",
      "raw": "git+https://gl/core/dbus?#os-9.7",
@@ -2490,11 +3013,13 @@
     "build_id": 355,
     "completed": "2026-11-28 07:25:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "polkit",
     "nvr": "polkit-7.3-4.el9",
     "owner": "builder",
     "patch_dir_present": false,
     "patches": [],
+    "patches_ref": null,
     "problems": [
      "gitlab: 404 на дереве ветки"
     ],
@@ -2507,6 +3032,11 @@
      "polkit-7.3-4.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/polkit",
      "raw": "git+https://gl/core/polkit?#os-9.7",
@@ -2525,6 +3055,7 @@
     "build_id": 356,
     "completed": "2026-11-01 08:32:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "udisks2",
     "nvr": "udisks2-1.4-1.el9",
     "owner": "core",
@@ -2535,11 +3066,13 @@
       "cves": [
        "CVE-2025-5056"
       ],
+      "ghost": null,
       "name": "CVE-2025-5056.patch",
       "path": "PATCH/CVE-2025-5056.patch",
       "web_url": "https://gl/blob/PATCH/CVE-2025-5056.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "1.el9",
     "rpms": [
@@ -2547,6 +3080,11 @@
      "udisks2-1.4-1.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/udisks2",
      "raw": "git+https://gl/core/udisks2?#os-9.7",
@@ -2565,6 +3103,7 @@
     "build_id": 357,
     "completed": "2026-11-02 09:39:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "upower",
     "nvr": "upower-2.5-2.el9",
     "owner": "net",
@@ -2573,11 +3112,13 @@
      {
       "class": "SAST",
       "cves": [],
+      "ghost": null,
       "name": "sast-upower.patch",
       "path": "PATCH/sast-upower.patch",
       "web_url": "https://gl/blob/PATCH/sast-upower.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [
      "internal error: сборка без исходников"
     ],
@@ -2588,6 +3129,11 @@
      "upower-2.5-2.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/upower",
      "raw": "git+https://gl/core/upower?#53f20f47c8140712a4cc34fe585b2349ac546a75",
@@ -2606,11 +3152,13 @@
     "build_id": 358,
     "completed": "2026-11-03 10:46:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "NetworkManager",
     "nvr": "NetworkManager-3.6-3.el9",
     "owner": "kernel",
     "patch_dir_present": null,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "3.el9",
     "rpms": [
@@ -2631,11 +3179,13 @@
     "build_id": 359,
     "completed": "2026-11-04 11:53:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "firewalld",
     "nvr": "firewalld-4.7-4.el9",
     "owner": "release-bot",
     "patch_dir_present": false,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "4.el9",
     "rpms": [
@@ -2646,6 +3196,11 @@
      "firewalld-4.7-4.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/firewalld",
      "raw": "git+https://gl/core/firewalld?#os-9.7",
@@ -2665,6 +3220,7 @@
     "build_id": 360,
     "completed": "2026-11-05 12:00:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "iproute",
     "nvr": "iproute-5.8-1.el9",
     "owner": "builder",
@@ -2673,6 +3229,7 @@
      {
       "class": "DISTSUFFIX",
       "cves": [],
+      "ghost": null,
       "name": "distsuffix-iproute.patch",
       "path": "PATCH/distsuffix-iproute.patch",
       "web_url": "https://gl/blob/PATCH/distsuffix-iproute.patch"
@@ -2680,11 +3237,13 @@
      {
       "class": "SPEC",
       "cves": [],
+      "ghost": null,
       "name": "iproute.spec.patch",
       "path": "PATCH/iproute.spec.patch",
       "web_url": "https://gl/blob/PATCH/iproute.spec.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "1.el9",
     "rpms": [
@@ -2692,6 +3251,11 @@
      "iproute-5.8-1.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/iproute",
      "raw": "git+https://gl/core/iproute?#os-9.7",
@@ -2710,11 +3274,13 @@
     "build_id": 361,
     "completed": "2026-11-06 13:07:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "iptables",
     "nvr": "iptables-6.9-2.el9",
     "owner": "core",
     "patch_dir_present": true,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "2.el9",
     "rpms": [
@@ -2723,6 +3289,11 @@
      "iptables-6.9-2.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/iptables",
      "raw": "git+https://gl/core/iptables?#os-9.7",
@@ -2741,6 +3312,7 @@
     "build_id": 362,
     "completed": "2026-11-07 14:14:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "nftables",
     "nvr": "nftables-7.10-3.el9",
     "owner": "net",
@@ -2749,11 +3321,13 @@
      {
       "class": "SPEC",
       "cves": [],
+      "ghost": null,
       "name": "spec-nftables.patch",
       "path": "PATCH/spec-nftables.patch",
       "web_url": "https://gl/blob/PATCH/spec-nftables.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "3.el9",
     "rpms": [
@@ -2763,6 +3337,11 @@
      "nftables-7.10-3.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/nftables",
      "raw": "git+https://gl/core/nftables?#8dd80164d7872180a17484636fe03999cb33c618",
@@ -2781,11 +3360,13 @@
     "build_id": 363,
     "completed": "2026-11-08 15:21:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "bind",
     "nvr": "bind-1.11-4.el9",
     "owner": "kernel",
     "patch_dir_present": false,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "4.el9",
     "rpms": [
@@ -2796,6 +3377,11 @@
      "bind-1.11-4.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/bind",
      "raw": "git+https://gl/core/bind?#os-9.7",
@@ -2814,11 +3400,13 @@
     "build_id": 364,
     "completed": "2026-11-09 16:28:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "dhcp",
     "nvr": "dhcp-2.12-1.el9",
     "owner": "release-bot",
     "patch_dir_present": true,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "1.el9",
     "rpms": [
@@ -2826,6 +3414,11 @@
      "dhcp-2.12-1.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/dhcp",
      "raw": "git+https://gl/core/dhcp?#os-9.7",
@@ -2844,6 +3437,7 @@
     "build_id": 365,
     "completed": "2026-11-10 17:35:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "chrony",
     "nvr": "chrony-3.0-2.el9",
     "owner": "builder",
@@ -2852,11 +3446,13 @@
      {
       "class": "other",
       "cves": [],
+      "ghost": null,
       "name": "other-chrony.patch",
       "path": "PATCH/other-chrony.patch",
       "web_url": "https://gl/blob/PATCH/other-chrony.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "2.el9",
     "rpms": [
@@ -2865,6 +3461,11 @@
      "chrony-3.0-2.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/chrony",
      "raw": "git+https://gl/core/chrony?#os-9.7",
@@ -2883,6 +3484,7 @@
     "build_id": 366,
     "completed": "2026-11-11 18:42:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "grub2",
     "nvr": "grub2-4.1-3.el9",
     "owner": "core",
@@ -2891,6 +3493,7 @@
      {
       "class": "AUTOGEN",
       "cves": [],
+      "ghost": null,
       "name": "autogen-grub2.patch",
       "path": "PATCH/autogen-grub2.patch",
       "web_url": "https://gl/blob/PATCH/autogen-grub2.patch"
@@ -2898,11 +3501,13 @@
      {
       "class": "SPEC",
       "cves": [],
+      "ghost": null,
       "name": "grub2.spec.patch",
       "path": "PATCH/grub2.spec.patch",
       "web_url": "https://gl/blob/PATCH/grub2.spec.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [
      "gitlab: 404 на дереве ветки"
     ],
@@ -2914,6 +3519,11 @@
      "grub2-4.1-3.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/grub2",
      "raw": "git+https://gl/core/grub2?#os-9.7",
@@ -2933,11 +3543,13 @@
     "build_id": 367,
     "completed": "2026-11-12 19:49:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "shim",
     "nvr": "shim-5.2-4.el9",
     "owner": "net",
     "patch_dir_present": null,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "4.el9",
     "rpms": [
@@ -2959,6 +3571,7 @@
     "build_id": 368,
     "completed": "2026-11-13 20:56:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "dracut",
     "nvr": "dracut-6.3-1.el9",
     "owner": "kernel",
@@ -2967,11 +3580,13 @@
      {
       "class": "SAST",
       "cves": [],
+      "ghost": null,
       "name": "sast-dracut.patch",
       "path": "PATCH/sast-dracut.patch",
       "web_url": "https://gl/blob/PATCH/sast-dracut.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "1.el9",
     "rpms": [
@@ -2979,6 +3594,11 @@
      "dracut-6.3-1.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/dracut",
      "raw": "git+https://gl/core/dracut?#os-9.7",
@@ -2997,6 +3617,7 @@
     "build_id": 369,
     "completed": "2026-11-14 21:03:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "kmod",
     "nvr": "kmod-7.4-2.el9",
     "owner": "release-bot",
@@ -3005,11 +3626,13 @@
      {
       "class": "DAST",
       "cves": [],
+      "ghost": null,
       "name": "dast-kmod.patch",
       "path": "PATCH/dast-kmod.patch",
       "web_url": "https://gl/blob/PATCH/dast-kmod.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "2.el9",
     "rpms": [
@@ -3018,6 +3641,11 @@
      "kmod-7.4-2.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/kmod",
      "raw": "git+https://gl/core/kmod?#os-9.7",
@@ -3036,11 +3664,13 @@
     "build_id": 370,
     "completed": "2026-11-15 22:10:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "lvm2",
     "nvr": "lvm2-1.5-3.el9",
     "owner": "builder",
     "patch_dir_present": true,
     "patches": [],
+    "patches_ref": null,
     "problems": [
      "internal error: сборка без исходников"
     ],
@@ -3052,6 +3682,11 @@
      "lvm2-1.5-3.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/lvm2",
      "raw": "git+https://gl/core/lvm2?#os-9.7",
@@ -3070,11 +3705,13 @@
     "build_id": 371,
     "completed": "2026-11-16 23:17:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "device-mapper",
     "nvr": "device-mapper-2.6-4.el9",
     "owner": "core",
     "patch_dir_present": false,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "4.el9",
     "rpms": [
@@ -3085,6 +3722,11 @@
      "device-mapper-2.6-4.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/device-mapper",
      "raw": "git+https://gl/core/device-mapper?#os-9.7",
@@ -3103,6 +3745,7 @@
     "build_id": 372,
     "completed": "2026-11-17 00:24:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "e2fsprogs",
     "nvr": "e2fsprogs-3.7-1.el9",
     "owner": "net",
@@ -3111,6 +3754,7 @@
      {
       "class": "LICENSE",
       "cves": [],
+      "ghost": null,
       "name": "license-e2fsprogs.patch",
       "path": "PATCH/license-e2fsprogs.patch",
       "web_url": "https://gl/blob/PATCH/license-e2fsprogs.patch"
@@ -3118,11 +3762,13 @@
      {
       "class": "SPEC",
       "cves": [],
+      "ghost": null,
       "name": "e2fsprogs.spec.patch",
       "path": "PATCH/e2fsprogs.spec.patch",
       "web_url": "https://gl/blob/PATCH/e2fsprogs.spec.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "1.el9",
     "rpms": [
@@ -3130,6 +3776,11 @@
      "e2fsprogs-3.7-1.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/e2fsprogs",
      "raw": "git+https://gl/core/e2fsprogs?#51c906da15c990a6ec9ad5f00d2a4f1a47fc5f2f",
@@ -3148,11 +3799,13 @@
     "build_id": 373,
     "completed": "2026-11-18 01:31:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "xfsprogs",
     "nvr": "xfsprogs-4.8-2.el9",
     "owner": "kernel",
     "patch_dir_present": true,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "2.el9",
     "rpms": [
@@ -3161,6 +3814,11 @@
      "xfsprogs-4.8-2.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/xfsprogs",
      "raw": "git+https://gl/core/xfsprogs?#os-9.7",
@@ -3180,6 +3838,7 @@
     "build_id": 374,
     "completed": "2026-11-19 02:38:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "btrfs-progs",
     "nvr": "btrfs-progs-5.9-3.el9",
     "owner": "release-bot",
@@ -3188,11 +3847,13 @@
      {
       "class": "CHANGELOG",
       "cves": [],
+      "ghost": null,
       "name": "changelog-btrfs-progs.patch",
       "path": "PATCH/changelog-btrfs-progs.patch",
       "web_url": "https://gl/blob/PATCH/changelog-btrfs-progs.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "3.el9",
     "rpms": [
@@ -3202,6 +3863,11 @@
      "btrfs-progs-5.9-3.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/btrfs-progs",
      "raw": "git+https://gl/core/btrfs-progs?#os-9.7",
@@ -3220,11 +3886,13 @@
     "build_id": 375,
     "completed": "2026-11-20 03:45:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "parted",
     "nvr": "parted-6.10-4.el9",
     "owner": "builder",
     "patch_dir_present": false,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "4.el9",
     "rpms": [
@@ -3235,6 +3903,11 @@
      "parted-6.10-4.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/parted",
      "raw": "git+https://gl/core/parted?#os-9.7",
@@ -3253,11 +3926,13 @@
     "build_id": 376,
     "completed": "2026-11-21 04:52:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "util-linux",
     "nvr": "util-linux-7.11-1.el9",
     "owner": "core",
     "patch_dir_present": null,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "1.el9",
     "rpms": [
@@ -3276,6 +3951,7 @@
     "build_id": 377,
     "completed": "2026-11-22 05:59:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "tar",
     "nvr": "tar-1.12-2.el9",
     "owner": "net",
@@ -3284,11 +3960,13 @@
      {
       "class": "AUTOGEN",
       "cves": [],
+      "ghost": null,
       "name": "autogen-tar.patch",
       "path": "PATCH/autogen-tar.patch",
       "web_url": "https://gl/blob/PATCH/autogen-tar.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [
      "gitlab: 404 на дереве ветки"
     ],
@@ -3299,6 +3977,11 @@
      "tar-1.12-2.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/tar",
      "raw": "git+https://gl/core/tar?#680254bad1d7ca0d65ec46aaa315d363abf6a50a",
@@ -3317,6 +4000,7 @@
     "build_id": 378,
     "completed": "2026-11-23 06:06:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "gzip",
     "nvr": "gzip-2.0-3.el9",
     "owner": "kernel",
@@ -3327,6 +4011,7 @@
       "cves": [
        "CVE-2025-5078"
       ],
+      "ghost": null,
       "name": "CVE-2025-5078.patch",
       "path": "PATCH/CVE-2025-5078.patch",
       "web_url": "https://gl/blob/PATCH/CVE-2025-5078.patch"
@@ -3334,11 +4019,13 @@
      {
       "class": "SPEC",
       "cves": [],
+      "ghost": null,
       "name": "gzip.spec.patch",
       "path": "PATCH/gzip.spec.patch",
       "web_url": "https://gl/blob/PATCH/gzip.spec.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "3.el9",
     "rpms": [
@@ -3348,6 +4035,11 @@
      "gzip-2.0-3.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/gzip",
      "raw": "git+https://gl/core/gzip?#os-9.7",
@@ -3366,11 +4058,13 @@
     "build_id": 379,
     "completed": "2026-11-24 07:13:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "bzip2",
     "nvr": "bzip2-3.1-4.el9",
     "owner": "release-bot",
     "patch_dir_present": false,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "4.el9",
     "rpms": [
@@ -3381,6 +4075,11 @@
      "bzip2-3.1-4.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/bzip2",
      "raw": "git+https://gl/core/bzip2?#os-9.7",
@@ -3399,6 +4098,7 @@
     "build_id": 380,
     "completed": "2026-11-25 08:20:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "xz",
     "nvr": "xz-4.2-1.el9",
     "owner": "builder",
@@ -3407,11 +4107,13 @@
      {
       "class": "DAST",
       "cves": [],
+      "ghost": null,
       "name": "dast-xz.patch",
       "path": "PATCH/dast-xz.patch",
       "web_url": "https://gl/blob/PATCH/dast-xz.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "1.el9",
     "rpms": [
@@ -3419,6 +4121,11 @@
      "xz-4.2-1.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/xz",
      "raw": "git+https://gl/core/xz?#os-9.7",
@@ -3438,6 +4145,7 @@
     "build_id": 381,
     "completed": "2026-11-26 09:27:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "zstd",
     "nvr": "zstd-5.3-2.el9",
     "owner": "core",
@@ -3446,11 +4154,13 @@
      {
       "class": "COVERAGE",
       "cves": [],
+      "ghost": null,
       "name": "coverage-zstd.patch",
       "path": "PATCH/coverage-zstd.patch",
       "web_url": "https://gl/blob/PATCH/coverage-zstd.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "2.el9",
     "rpms": [
@@ -3459,6 +4169,11 @@
      "zstd-5.3-2.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/zstd",
      "raw": "git+https://gl/core/zstd?#os-9.7",
@@ -3477,11 +4192,13 @@
     "build_id": 382,
     "completed": "2026-11-27 10:34:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "cpio",
     "nvr": "cpio-6.4-3.el9",
     "owner": "net",
     "patch_dir_present": true,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "3.el9",
     "rpms": [
@@ -3491,6 +4208,11 @@
      "cpio-6.4-3.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/cpio",
      "raw": "git+https://gl/core/cpio?#207c4aff16451b2bf5a20384d79fbdac2ec1facd",
@@ -3509,11 +4231,13 @@
     "build_id": 383,
     "completed": "2026-11-28 11:41:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "unzip",
     "nvr": "unzip-7.5-4.el9",
     "owner": "kernel",
     "patch_dir_present": false,
     "patches": [],
+    "patches_ref": null,
     "problems": [
      "internal error: сборка без исходников"
     ],
@@ -3526,6 +4250,11 @@
      "unzip-7.5-4.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/unzip",
      "raw": "git+https://gl/core/unzip?#os-9.7",
@@ -3544,6 +4273,7 @@
     "build_id": 384,
     "completed": "2026-11-01 12:48:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "vim-enhanced",
     "nvr": "vim-enhanced-1.6-1.el9",
     "owner": "release-bot",
@@ -3552,6 +4282,7 @@
      {
       "class": "SPEC",
       "cves": [],
+      "ghost": null,
       "name": "spec-vim-enhanced.patch",
       "path": "PATCH/spec-vim-enhanced.patch",
       "web_url": "https://gl/blob/PATCH/spec-vim-enhanced.patch"
@@ -3559,11 +4290,13 @@
      {
       "class": "SPEC",
       "cves": [],
+      "ghost": null,
       "name": "vim-enhanced.spec.patch",
       "path": "PATCH/vim-enhanced.spec.patch",
       "web_url": "https://gl/blob/PATCH/vim-enhanced.spec.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "1.el9",
     "rpms": [
@@ -3571,6 +4304,11 @@
      "vim-enhanced-1.6-1.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/vim-enhanced",
      "raw": "git+https://gl/core/vim-enhanced?#os-9.7",
@@ -3589,11 +4327,13 @@
     "build_id": 385,
     "completed": "2026-11-02 13:55:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "emacs",
     "nvr": "emacs-2.7-2.el9",
     "owner": "builder",
     "patch_dir_present": null,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "2.el9",
     "rpms": [
@@ -3613,6 +4353,7 @@
     "build_id": 386,
     "completed": "2026-11-03 14:02:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "nano",
     "nvr": "nano-3.8-3.el9",
     "owner": "core",
@@ -3621,11 +4362,13 @@
      {
       "class": "FILES",
       "cves": [],
+      "ghost": null,
       "name": "files-nano.patch",
       "path": "PATCH/files-nano.patch",
       "web_url": "https://gl/blob/PATCH/files-nano.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "3.el9",
     "rpms": [
@@ -3635,6 +4378,11 @@
      "nano-3.8-3.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/nano",
      "raw": "git+https://gl/core/nano?#os-9.7",
@@ -3653,11 +4401,13 @@
     "build_id": 387,
     "completed": "2026-11-04 15:09:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "less",
     "nvr": "less-4.9-4.el9",
     "owner": "net",
     "patch_dir_present": false,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "4.el9",
     "rpms": [
@@ -3668,6 +4418,11 @@
      "less-4.9-4.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/less",
      "raw": "git+https://gl/core/less?#0b439cf4e10f87567e60f4b7818ecd57383dc7f0",
@@ -3687,11 +4442,13 @@
     "build_id": 388,
     "completed": "2026-11-05 16:16:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "grep",
     "nvr": "grep-5.10-1.el9",
     "owner": "kernel",
     "patch_dir_present": true,
     "patches": [],
+    "patches_ref": null,
     "problems": [
      "gitlab: 404 на дереве ветки"
     ],
@@ -3701,6 +4458,11 @@
      "grep-5.10-1.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/grep",
      "raw": "git+https://gl/core/grep?#os-9.7",
@@ -3719,6 +4481,7 @@
     "build_id": 389,
     "completed": "2026-11-06 17:23:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "sed",
     "nvr": "sed-6.11-2.el9",
     "owner": "release-bot",
@@ -3729,11 +4492,13 @@
       "cves": [
        "CVE-2025-5089"
       ],
+      "ghost": null,
       "name": "CVE-2025-5089.patch",
       "path": "PATCH/CVE-2025-5089.patch",
       "web_url": "https://gl/blob/PATCH/CVE-2025-5089.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "2.el9",
     "rpms": [
@@ -3742,6 +4507,11 @@
      "sed-6.11-2.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/sed",
      "raw": "git+https://gl/core/sed?#os-9.7",
@@ -3760,6 +4530,7 @@
     "build_id": 390,
     "completed": "2026-11-07 18:30:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "gawk",
     "nvr": "gawk-7.12-3.el9",
     "owner": "builder",
@@ -3768,6 +4539,7 @@
      {
       "class": "SAST",
       "cves": [],
+      "ghost": null,
       "name": "sast-gawk.patch",
       "path": "PATCH/sast-gawk.patch",
       "web_url": "https://gl/blob/PATCH/sast-gawk.patch"
@@ -3775,11 +4547,13 @@
      {
       "class": "SPEC",
       "cves": [],
+      "ghost": null,
       "name": "gawk.spec.patch",
       "path": "PATCH/gawk.spec.patch",
       "web_url": "https://gl/blob/PATCH/gawk.spec.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "3.el9",
     "rpms": [
@@ -3789,6 +4563,11 @@
      "gawk-7.12-3.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/gawk",
      "raw": "git+https://gl/core/gawk?#os-9.7",
@@ -3807,11 +4586,13 @@
     "build_id": 391,
     "completed": "2026-11-08 19:37:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "findutils",
     "nvr": "findutils-1.0-4.el9",
     "owner": "core",
     "patch_dir_present": false,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "4.el9",
     "rpms": [
@@ -3822,6 +4603,11 @@
      "findutils-1.0-4.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/findutils",
      "raw": "git+https://gl/core/findutils?#os-9.7",
@@ -3840,6 +4626,7 @@
     "build_id": 392,
     "completed": "2026-11-09 20:44:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "diffutils",
     "nvr": "diffutils-2.1-1.el9",
     "owner": "net",
@@ -3848,11 +4635,13 @@
      {
       "class": "COVERAGE",
       "cves": [],
+      "ghost": null,
       "name": "coverage-diffutils.patch",
       "path": "PATCH/coverage-diffutils.patch",
       "web_url": "https://gl/blob/PATCH/coverage-diffutils.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "1.el9",
     "rpms": [
@@ -3860,6 +4649,11 @@
      "diffutils-2.1-1.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/diffutils",
      "raw": "git+https://gl/core/diffutils?#23bdd6d0d6fa0c5984696e29832db282bc9e2112",
@@ -3878,6 +4672,7 @@
     "build_id": 393,
     "completed": "2026-11-10 21:51:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "patch",
     "nvr": "patch-3.2-2.el9",
     "owner": "kernel",
@@ -3886,11 +4681,13 @@
      {
       "class": "DISTSUFFIX",
       "cves": [],
+      "ghost": null,
       "name": "distsuffix-patch.patch",
       "path": "PATCH/distsuffix-patch.patch",
       "web_url": "https://gl/blob/PATCH/distsuffix-patch.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [],
     "release": "2.el9",
     "rpms": [
@@ -3899,6 +4696,11 @@
      "patch-3.2-2.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/patch",
      "raw": "git+https://gl/core/patch?#os-9.7",
@@ -3917,11 +4719,13 @@
     "build_id": 394,
     "completed": "2026-11-11 22:58:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "which",
     "nvr": "which-4.3-3.el9",
     "owner": "release-bot",
     "patch_dir_present": null,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "3.el9",
     "rpms": [
@@ -3943,11 +4747,13 @@
     "build_id": 395,
     "completed": "2026-11-12 23:05:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "file",
     "nvr": "file-5.4-4.el9",
     "owner": "builder",
     "patch_dir_present": false,
     "patches": [],
+    "patches_ref": null,
     "problems": [],
     "release": "4.el9",
     "rpms": [
@@ -3958,6 +4764,11 @@
      "file-5.4-4.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/file",
      "raw": "git+https://gl/core/file?#os-9.7",
@@ -3976,6 +4787,7 @@
     "build_id": 396,
     "completed": "2026-11-13 00:12:00",
     "epoch": null,
+    "ghost_patches": [],
     "name": "procps-ng",
     "nvr": "procps-ng-6.5-1.el9",
     "owner": "core",
@@ -3984,6 +4796,7 @@
      {
       "class": "CHANGELOG",
       "cves": [],
+      "ghost": null,
       "name": "changelog-procps-ng.patch",
       "path": "PATCH/changelog-procps-ng.patch",
       "web_url": "https://gl/blob/PATCH/changelog-procps-ng.patch"
@@ -3991,11 +4804,13 @@
      {
       "class": "SPEC",
       "cves": [],
+      "ghost": null,
       "name": "procps-ng.spec.patch",
       "path": "PATCH/procps-ng.spec.patch",
       "web_url": "https://gl/blob/PATCH/procps-ng.spec.patch"
      }
     ],
+    "patches_ref": null,
     "problems": [
      "internal error: сборка без исходников"
     ],
@@ -4005,6 +4820,11 @@
      "procps-ng-6.5-1.el9.src"
     ],
     "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
      "host": "gl",
      "project": "core/procps-ng",
      "raw": "git+https://gl/core/procps-ng?#os-9.7",

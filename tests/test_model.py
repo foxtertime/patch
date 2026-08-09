@@ -183,5 +183,49 @@ class FileIoTest(unittest.TestCase):
             load_snapshots("/nonexistent/snap.json")
 
 
+class NewFieldsTest(unittest.TestCase):
+    def test_round_trip_keeps_commit_and_ghosts(self):
+        source = Source(raw="git+https://gl/g/r#origin/br", host="gl",
+                        project="g/r", ref="br", ref_kind="branch",
+                        web_url="https://gl/g/r/-/tree/br",
+                        commit="0f1a2b3c", commit_url="https://gl/g/r/-/tree/0f1a2b3c",
+                        commit_source="koji_source", branch_head="99aabbcc",
+                        commits_ahead=3)
+        build = Build(nvr="n-1-1", name="n", version="1", release="1",
+                      source=source, patches_ref="0f1a2b3c",
+                      patches=[Patch(path="PATCH/a.patch", name="a.patch",
+                                     cls="CVE")],
+                      ghost_patches=[Patch(path="PATCH/b.patch",
+                                           name="b.patch", cls="CVE",
+                                           ghost="branch")])
+        snapshot = Snapshot(tag="os-9.2", generated="2026-08-09T00:00:00+03:00",
+                            koji_hub="https://hub", builds=[build])
+        again = snapshot_from_dict(snapshot_to_dict(snapshot)).builds[0]
+        self.assertEqual(again.source.commit, "0f1a2b3c")
+        self.assertEqual(again.source.commit_source, "koji_source")
+        self.assertEqual(again.source.branch_head, "99aabbcc")
+        self.assertEqual(again.source.commits_ahead, 3)
+        self.assertEqual(again.patches_ref, "0f1a2b3c")
+        self.assertIsNone(again.patches[0].ghost)
+        self.assertEqual(again.ghost_patches[0].ghost, "branch")
+
+    def test_old_snapshot_reads_with_empty_new_fields(self):
+        # снапшот, записанный до этой работы: новых ключей в нём нет вовсе
+        data = {"schema": 1, "tag": "os-9.2", "generated": "2026-01-01T00:00:00+03:00",
+                "koji_hub": "https://hub",
+                "builds": [{"nvr": "n-1-1", "name": "n", "version": "1",
+                            "release": "1",
+                            "source": {"raw": "git+https://gl/g/r#origin/br",
+                                       "ref": "br", "ref_kind": "branch"},
+                            "patches": [{"path": "PATCH/a.patch",
+                                         "name": "a.patch", "class": "CVE"}]}]}
+        build = snapshot_from_dict(data).builds[0]
+        self.assertIsNone(build.source.commit)
+        self.assertIsNone(build.source.commits_ahead)
+        self.assertIsNone(build.patches_ref)
+        self.assertEqual(build.ghost_patches, [])
+        self.assertIsNone(build.patches[0].ghost)
+
+
 if __name__ == "__main__":
     unittest.main()

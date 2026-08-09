@@ -237,6 +237,79 @@ class PatchFilesTest(unittest.TestCase):
         self.assertIsNone(result.present)
         self.assertIn("ref", result.problem)
 
+    def test_blob_ids_come_along_with_paths(self):
+        cli, _ = client({TREE_URL: TWO_FILES})
+        result = cli.patch_files("gitlab.example.com", "g/r", "br")
+        self.assertEqual(result.blobs,
+                         {"PATCH/CVE-2024-7347.patch": "1",
+                          "PATCH/sub/sast-x.patch": "3"})
+
+    def test_failed_read_has_empty_blobs_not_none(self):
+        # у неудачного чтения blobs пуст, а не None: сравнивать деревья
+        # придётся всегда, и None заставил бы каждого звонящего проверять
+        cli, _ = client({TREE_URL: Response(500, {"message": "boom"}, {})})
+        result = cli.patch_files("gitlab.example.com", "g/r", "br")
+        self.assertEqual(result.blobs, {})
+
+
+COMPARE_URL = "https://gitlab.example.com/api/v4/projects/g%2Fr/repository/compare"
+SHA = "0f1a2b3c4d5e6f70819293a4b5c6d7e8f9001122"
+HEAD = "99aabbccddeeff00112233445566778899aabbcc"
+
+
+class CompareTest(unittest.TestCase):
+    def test_head_and_count(self):
+        cli, transport = client({COMPARE_URL: Response(200, {
+            "commit": {"id": HEAD},
+            "commits": [{"id": HEAD}, {"id": "cafebabe"}],
+        }, {})})
+        got = cli.compare("gitlab.example.com", "g/r", SHA, "br")
+        self.assertEqual(got.head, HEAD)
+        self.assertEqual(got.ahead, 2)
+        self.assertIsNone(got.problem)
+        url, params, _ = transport.requests[0]
+        self.assertEqual(url, COMPARE_URL)
+        self.assertEqual(params, {"from": SHA, "to": "br"})
+
+    def test_nothing_new_is_zero_not_a_problem(self):
+        cli, _ = client({COMPARE_URL: Response(200, {"commit": {"id": SHA},
+                                                     "commits": []}, {})})
+        got = cli.compare("gitlab.example.com", "g/r", SHA, "br")
+        self.assertEqual(got.ahead, 0)
+        self.assertIsNone(got.problem)
+
+    def test_truncated_answer_gives_unknown_count(self):
+        # усечённый список тише соврёт, чем промолчит: число неизвестно,
+        # но вершину сервер назвал, и она остаётся
+        cli, _ = client({COMPARE_URL: Response(200, {
+            "commit": {"id": HEAD}, "commits": [{"id": HEAD}],
+            "compare_timeout": True}, {})})
+        got = cli.compare("gitlab.example.com", "g/r", SHA, "br")
+        self.assertEqual(got.head, HEAD)
+        self.assertIsNone(got.ahead)
+        self.assertIsNone(got.problem)
+
+    def test_missing_project_is_a_problem(self):
+        cli, _ = client({COMPARE_URL: Response(
+            404, {"message": "404 Project Not Found"}, {})})
+        got = cli.compare("gitlab.example.com", "g/r", SHA, "br")
+        self.assertIsNone(got.head)
+        self.assertIsNone(got.ahead)
+        self.assertIn("Project Not Found", got.problem)
+
+    def test_unknown_host_does_not_go_to_the_network(self):
+        cli, transport = client({})
+        got = cli.compare("elsewhere.example.com", "g/r", SHA, "br")
+        self.assertIn("unknown host", got.problem)
+        self.assertEqual(transport.requests, [])
+
+    def test_result_is_memoized(self):
+        cli, transport = client({COMPARE_URL: Response(200, {
+            "commit": {"id": HEAD}, "commits": []}, {})})
+        cli.compare("gitlab.example.com", "g/r", SHA, "br")
+        cli.compare("gitlab.example.com", "g/r", SHA, "br")
+        self.assertEqual(len(transport.requests), 1)
+
 
 class _TokenLeakingTransport:
     """Транспорт, повторяющий поведение requests на кривом заголовке: значение

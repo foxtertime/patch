@@ -33,6 +33,13 @@ CLASSES_WITH_LICENSE = ["AUTOGEN", "CVE", "SAST", "DAST", "COVERAGE",
                         "DISTSUFFIX", "LICENSE", "SPEC", "CHANGELOG",
                         "FILES", "other"]
 
+# Ссылки демонстрационного билда httpd (собран с коммита, ghost-патчи всех
+# трёх сторон): короткие постоянные рядом с остальными в шапке, чтобы
+# длинные адреса не расползались по строкам самих Build().
+BLOB = ("https://gitlab.example.com/g/httpd/-/blob/"
+        "0f1a2b3c4d5e6f70819293a4b5c6d7e8f9001122/PATCH/%s")
+BLOB_BRANCH = "https://gitlab.example.com/g/httpd/-/blob/os-9.4/PATCH/%s"
+
 
 def src(project, ref, kind="branch"):
     return Source(raw="git+https://gl/%s?#%s" % (project, ref), host="gl",
@@ -55,6 +62,37 @@ def srpm(name):
 def patch(name, cls, cves=()):
     return Patch(path="PATCH/" + name, name=name, cls=cls, cves=list(cves),
                  web_url="https://gl/blob/PATCH/" + name)
+
+
+def blob(project, ref, name):
+    return "https://gl/%s/-/blob/%s/PATCH/%s" % (project, ref, name)
+
+
+def pat(project, ref, name, cls, cves=(), ghost=None):
+    """Патч со ссылкой на то состояние репозитория, из которого он прочитан.
+
+    Ref здесь не украшение: у патчей билда и у ghost-стороны build он
+    коммит, у сторон branch и changed — ветка, ровно так же их строит
+    collect. Фикстура, разошедшаяся с коллектором, перестаёт быть
+    демонстрацией и становится выдумкой.
+    """
+    return Patch(path="PATCH/" + name, name=name, cls=cls, cves=list(cves),
+                 ghost=ghost, web_url=blob(project, ref, name))
+
+
+def src_at(project, branch, commit, ahead=0, head=None):
+    """Источник билда с ветки, у которого известен коммит сборки.
+
+    head по умолчанию равен коммиту: ветка стоит там же, где её оставила
+    сборка, и это самый обычный случай, а не редкость.
+    """
+    return Source(raw="git+https://gl/%s?#%s" % (project, branch), host="gl",
+                  project=project, ref=branch, ref_kind="branch",
+                  web_url="https://gl/%s/-/tree/%s" % (project, branch),
+                  commit=commit,
+                  commit_url="https://gl/%s/-/tree/%s" % (project, commit),
+                  commit_source="koji_source",
+                  branch_head=head or commit, commits_ahead=ahead)
 
 
 def same(prev, name, tag, **changes):
@@ -675,25 +713,404 @@ def many_snapshot():
 
     Прежние компоненты цепочки на месте: без них диапазон os-9.6 → os-9.7
     состоял бы из одних появившихся, и смотреть в нём было бы нечего.
+
+    Здесь же httpd впервые за всю цепочку затегован прямо, а не унаследован:
+    пересобран с ветки os-9.4 (тег в этом мире не изменил самой ветки — она
+    просто отстала от него), коммит сборки известен из `source`, и с тех пор
+    ветка ушла на четыре коммита вперёд. На таком билде видны разом: бейдж
+    «ветка +N», метка `branch-ahead` и ghost-патчи всех трёх сторон — то, чего
+    ни один прежний компонент цепочки не показывал.
     """
     prev = wide_snapshot().by_name()
+    tag = "os-9.7"
     builds = [
-        same(prev, "nginx", "os-9.7"),
-        same(prev, "httpd", "os-9.7", tag_name="os-9.4",
-             tags=["os-9.4", "os-9.7"]),
-        same(prev, "zlib", "os-9.7"),
-        same(prev, "vim", "os-9.7", tag_name=None, tags=[]),
-        same(prev, "kernel", "os-9.7"),
-        same(prev, "curl", "os-9.7"),
-        same(prev, "openssl", "os-9.7"),
-        same(prev, "chromium", "os-9.7", tag_name="os-9.5",
-             tags=["os-9.5", "os-9.7"]),
+        same(prev, "nginx", tag),
+        # ghost-патчи всех трёх сторон и «ветка +N»: собран с коммита ветки
+        # os-9.4, которая с тех пор ушла на четыре коммита вперёд. Ссылки не
+        # случайны — у патчей билда и у стороны build они ведут на коммит, у
+        # branch и changed — на ветку, так же как их строит collect
+        Build(nvr="httpd-2.4.62-13.el9", name="httpd", version="2.4.62",
+              release="13.el9", build_id=901, task_id=9011, owner="builder",
+              completed="2026-07-01 10:00:00", tag_name=tag,
+              source=Source(
+                  raw="git+https://gitlab.example.com/g/httpd#origin/os-9.4",
+                  host="gitlab.example.com", project="g/httpd",
+                  ref="os-9.4", ref_kind="branch",
+                  web_url="https://gitlab.example.com/g/httpd/-/tree/os-9.4",
+                  commit="0f1a2b3c4d5e6f70819293a4b5c6d7e8f9001122",
+                  commit_url="https://gitlab.example.com/g/httpd/-/tree/"
+                             "0f1a2b3c4d5e6f70819293a4b5c6d7e8f9001122",
+                  commit_source="koji_source",
+                  branch_head="99aabbccddeeff00112233445566778899aabbcc",
+                  commits_ahead=4),
+              patches_ref="0f1a2b3c4d5e6f70819293a4b5c6d7e8f9001122",
+              patch_dir_present=True,
+              rpms=["httpd-2.4.62-13.el9.x86_64"],
+              patches=[
+                  Patch(path="PATCH/CVE-2026-1111.patch",
+                        name="CVE-2026-1111.patch", cls="CVE",
+                        cves=["CVE-2026-1111"],
+                        web_url=BLOB % "CVE-2026-1111.patch"),
+                  Patch(path="PATCH/httpd-distsuffix.patch",
+                        name="httpd-distsuffix.patch", cls="DISTSUFFIX",
+                        web_url=BLOB % "httpd-distsuffix.patch"),
+                  Patch(path="PATCH/old-fix.patch", name="old-fix.patch",
+                        cls="other", web_url=BLOB % "old-fix.patch"),
+              ],
+              ghost_patches=[
+                  Patch(path="PATCH/CVE-2026-9999.patch",
+                        name="CVE-2026-9999.patch", cls="CVE",
+                        cves=["CVE-2026-9999"], ghost="branch",
+                        web_url=BLOB_BRANCH % "CVE-2026-9999.patch"),
+                  Patch(path="PATCH/httpd-distsuffix.patch",
+                        name="httpd-distsuffix.patch", cls="DISTSUFFIX",
+                        ghost="changed",
+                        web_url=BLOB_BRANCH % "httpd-distsuffix.patch"),
+                  Patch(path="PATCH/old-fix.patch", name="old-fix.patch",
+                        cls="other", ghost="build",
+                        web_url=BLOB % "old-fix.patch"),
+              ]),
+        same(prev, "zlib", tag),
+        same(prev, "vim", tag, tag_name=None, tags=[]),
+        same(prev, "kernel", tag),
+        same(prev, "curl", tag),
+        same(prev, "openssl", tag),
+        same(prev, "chromium", tag, tag_name="os-9.5",
+             tags=["os-9.5", tag]),
     ]
     return Snapshot(
-        tag="os-9.7", generated="2026-12-01T00:00:00+03:00",
+        tag=tag, generated="2026-12-01T00:00:00+03:00",
         koji_hub="https://hub/kojihub", koji_web="https://hub/koji",
         patch_classes=list(CLASSES_WITH_LICENSE),
         builds=builds + many_builds())
+
+
+# Тег os-9.5, снятый трижды: до перехода на коммит сборки, сразу после и
+# ещё раз, когда часть отставаний догнали пересборкой. Хеши выписаны
+# постоянными, потому что каждый встречается в двух-трёх снапшотах сразу:
+# в одном как коммит сборки, в другом как вершина ветки, до которой сборка
+# наконец доехала. Разъехавшись, они превратили бы историю в бессмыслицу.
+NGINX_BUILT = "3f5a1c9e2b7d48a06e1f5c3b9d2a7e4f60c81b53"
+NGINX_HEAD = "9d4e7b12c05af3689e2d1a7c4b53f80e6a91d2c7"
+HTTPD_BUILT = "c81b5390a2f74e6d15b8c3097e2a4d6f81035b9c"
+HTTPD_HEAD = "1a7f34d6b92e05c8437f6a1d29b0c5e83f47a612"
+OPENSSL_BUILT = "7e2d19b4c60a3f85d17e94b2a538c06f2d914e7b"
+OPENSSL_HEAD = "b53f80e6a91d2c74f36a1e8d052b9c7f43e6081a"
+OPENSSL_HEAD_LATER = "4b53f80e6a91d2c74f36a1e8d052b9c7f43e6081"
+GLIBC_GONE = "5c0a7f31d84b26e9057c3a1f6b28d40e7913a5c6"
+GLIBC_REBUILT = "8d052b9c7f43e6081ab53f80e6a91d2c74f36a1e"
+PYTHON_BUILT = "e91d2c74f36a1e8d052b9c7f43e6081ab53f80e6"
+PYTHON_HEAD_LATER = "f36a1e8d052b9c7f43e6081ab53f80e6a91d2c74"
+ZLIB_PINNED = "2b7d48a06e1f5c3b9d2a7e4f60c81b533f5a1c9e"
+
+# Свой тег, а не занятый: os-9.5 висит на зеркальном снапшоте с другого
+# хаба, и цепочка встала бы с ним на один рельс, добавив к предупреждению
+# о двух видах ещё и предупреждение о разных хабах. Два предупреждения
+# разом ничего не объясняют, а мешают друг другу.
+DRIFT_TAG = "os-9.8"
+
+
+def legacy_snapshot():
+    """Тот же тег, снятый до перехода на коммит сборки.
+
+    Ни одного нового поля: ни коммита, ни patches_ref, ни ghost — так
+    выглядит файл, записанный любым выпуском до 2.2.0. Лежит он здесь не
+    ради ностальгии, а ради двух вещей, которые больше проверить нечем:
+    что старый снапшот открывается нынешней страницей без единой ошибки, и
+    что рядом с новым он поднимает предупреждение о снапшотах двух видов —
+    потому что часть разницы патчей между ними будет следом смены смысла, а
+    не событием в репозитории.
+
+    Патчи здесь сняты с вершины ветки, как их и снимали: у nginx в списке
+    стоит CVE-2026-3011, который в билд на самом деле не входил. Ровно то
+    враньё, ради устранения которого всё и затевалось, — и увидеть его
+    можно, только положив этот файл рядом со следующим.
+    """
+    tag = DRIFT_TAG
+    return Snapshot(
+        tag=tag, generated="2026-06-01T00:00:00+03:00",
+        koji_hub="https://hub/kojihub", koji_web="https://hub/koji",
+        patch_classes=list(CLASSES_WITH_LICENSE),
+        builds=[
+            Build(nvr="nginx-1.26.0-2.el9", name="nginx", version="1.26.0",
+                  release="2.el9", build_id=1101, task_id=2101,
+                  owner="builder", completed="2026-05-20 11:00:00",
+                  tag_name=tag, tags=[tag],
+                  source=src("web/nginx", tag), patch_dir_present=True,
+                  patches=[
+                      pat("web/nginx", tag, "CVE-2026-3010.patch", "CVE",
+                          ["CVE-2026-3010"]),
+                      # его в билде нет и не было: он лежит в ветке
+                      pat("web/nginx", tag, "CVE-2026-3011.patch", "CVE",
+                          ["CVE-2026-3011"]),
+                      pat("web/nginx", tag, "nginx-distsuffix.patch",
+                          "DISTSUFFIX"),
+                  ],
+                  rpms=["nginx-1.26.0-2.el9.x86_64",
+                        "nginx-1.26.0-2.el9.src"]),
+            Build(nvr="httpd-2.4.62-9.el9", name="httpd", version="2.4.62",
+                  release="9.el9", epoch=1, build_id=1102, task_id=2102,
+                  owner="apache", completed="2026-05-18 09:30:00",
+                  tag_name=tag, tags=[tag],
+                  source=src("web/httpd", tag), patch_dir_present=True,
+                  patches=[
+                      pat("web/httpd", tag, "CVE-2026-3020.patch", "CVE",
+                          ["CVE-2026-3020"]),
+                      pat("web/httpd", tag, "httpd-license.patch", "LICENSE"),
+                  ],
+                  rpms=["httpd-2.4.62-9.el9.x86_64"]),
+            Build(nvr="openssl-3.2.1-4.el9", name="openssl", version="3.2.1",
+                  release="4.el9", build_id=1103, task_id=2103,
+                  owner="crypto", completed="2026-05-11 08:00:00",
+                  tag_name=tag, tags=[tag],
+                  source=src("core/openssl", tag), patch_dir_present=True,
+                  patches=[pat("core/openssl", tag, "sast-openssl.patch",
+                               "SAST")],
+                  rpms=["openssl-3.2.1-4.el9.x86_64",
+                        "openssl-libs-3.2.1-4.el9.x86_64"]),
+            Build(nvr="curl-8.6.0-1.el9", name="curl", version="8.6.0",
+                  release="1.el9", build_id=1104, task_id=2104,
+                  owner="builder", completed="2026-05-09 07:00:00",
+                  tag_name=tag, tags=[tag],
+                  source=src("core/curl", tag), patch_dir_present=True,
+                  patches=[pat("core/curl", tag, "curl-distsuffix.patch",
+                               "DISTSUFFIX")],
+                  rpms=["curl-8.6.0-1.el9.x86_64"]),
+            Build(nvr="glibc-2.34-60.el9", name="glibc", version="2.34",
+                  release="60.el9", build_id=1105, task_id=2105,
+                  owner="core", completed="2026-05-05 06:00:00",
+                  tag_name=tag, tags=[tag],
+                  source=src("core/glibc", tag), patch_dir_present=True,
+                  patches=[pat("core/glibc", tag, "coverage-glibc.patch",
+                               "COVERAGE")],
+                  rpms=["glibc-2.34-60.el9.x86_64"]),
+        ])
+
+
+def drift_snapshot():
+    """Тот же тег после перехода: каждая строка показывает свой случай.
+
+    Здесь собрано всё, ради чего затевалась работа, и по одному разу:
+    ghost-патчи всех трёх сторон, «ветка +N» без единого ghost, билд без
+    хеша вовсе, сборка прямо с коммита, пропавший коммит и спокойный билд,
+    у которого ветка стоит на месте.
+
+    Рядом с legacy этот файл поднимает предупреждение о двух видах — и
+    поднимал бы его сам по себе: curl прочитан с ветки, остальные с
+    коммита, а это и есть два вида в одном снапшоте.
+    """
+    tag = DRIFT_TAG
+    return Snapshot(
+        tag=tag, generated="2026-08-07T00:00:00+03:00",
+        koji_hub="https://hub/kojihub", koji_web="https://hub/koji",
+        patch_classes=list(CLASSES_WITH_LICENSE),
+        builds=[
+            # Две стороны разом: CVE влит в ветку и не собран, а патч
+            # суффикса переписан после сборки — в пакете лежит прежняя его
+            # редакция. Это тот самый случай, который до 2.2.0 выглядел
+            # как «патч у билда есть».
+            Build(nvr="nginx-1.26.0-3.el9", name="nginx", version="1.26.0",
+                  release="3.el9", build_id=1201, task_id=2201,
+                  owner="builder", completed="2026-07-02 12:00:00",
+                  tag_name=tag, tags=[tag],
+                  source=src_at("web/nginx", tag, NGINX_BUILT, ahead=3,
+                                head=NGINX_HEAD),
+                  patches_ref=NGINX_BUILT, patch_dir_present=True,
+                  patches=[
+                      pat("web/nginx", NGINX_BUILT, "CVE-2026-3010.patch",
+                          "CVE", ["CVE-2026-3010"]),
+                      pat("web/nginx", NGINX_BUILT, "nginx-distsuffix.patch",
+                          "DISTSUFFIX"),
+                  ],
+                  ghost_patches=[
+                      pat("web/nginx", tag, "CVE-2026-3011.patch", "CVE",
+                          ["CVE-2026-3011"], ghost="branch"),
+                      pat("web/nginx", tag, "nginx-distsuffix.patch",
+                          "DISTSUFFIX", ghost="changed"),
+                  ],
+                  rpms=["nginx-1.26.0-3.el9.x86_64",
+                        "nginx-1.26.0-3.el9.src"]),
+            # Третья сторона: патч из ветки убрали, а в пакете он остался.
+            Build(nvr="httpd-2.4.62-10.el9", name="httpd", version="2.4.62",
+                  release="10.el9", epoch=1, build_id=1202, task_id=2202,
+                  owner="apache", completed="2026-06-30 09:00:00",
+                  tag_name=tag, tags=[tag],
+                  source=src_at("web/httpd", tag, HTTPD_BUILT, ahead=1,
+                                head=HTTPD_HEAD),
+                  patches_ref=HTTPD_BUILT, patch_dir_present=True,
+                  patches=[
+                      pat("web/httpd", HTTPD_BUILT, "CVE-2026-3020.patch",
+                          "CVE", ["CVE-2026-3020"]),
+                      pat("web/httpd", HTTPD_BUILT, "httpd-license.patch",
+                          "LICENSE"),
+                  ],
+                  ghost_patches=[
+                      pat("web/httpd", HTTPD_BUILT, "httpd-license.patch",
+                          "LICENSE", ghost="build"),
+                  ],
+                  rpms=["httpd-2.4.62-10.el9.x86_64"]),
+            # Бейдж без ghost-секции: ветка ушла на семь коммитов, но
+            # каталога PATCH они не касались. Обратное невозможно —
+            # ghost без отставания не бывает.
+            Build(nvr="openssl-3.2.1-5.el9", name="openssl", version="3.2.1",
+                  release="5.el9", build_id=1203, task_id=2203,
+                  owner="crypto", completed="2026-06-20 08:00:00",
+                  tag_name=tag, tags=[tag],
+                  source=src_at("core/openssl", tag, OPENSSL_BUILT, ahead=7,
+                                head=OPENSSL_HEAD),
+                  patches_ref=OPENSSL_BUILT, patch_dir_present=True,
+                  patches=[pat("core/openssl", OPENSSL_BUILT,
+                               "sast-openssl.patch", "SAST")],
+                  rpms=["openssl-3.2.1-5.el9.x86_64",
+                        "openssl-libs-3.2.1-5.el9.x86_64"]),
+            # Хеша нет вовсе: koji не отдал верхнеуровневого source, и
+            # патчи сняты с ветки — как до 2.2.0. Повседневный случай, а не
+            # сбой: в problems ничего не уезжает, но patches_ref называет
+            # ветку, и в паре с соседями это два вида в одном снапшоте.
+            Build(nvr="curl-8.6.0-2.el9", name="curl", version="8.6.0",
+                  release="2.el9", build_id=1204, task_id=2204,
+                  owner="builder", completed="2026-06-15 07:00:00",
+                  tag_name=tag, tags=[tag],
+                  source=src("core/curl", tag),
+                  patches_ref=tag, patch_dir_present=True,
+                  patches=[pat("core/curl", tag, "curl-distsuffix.patch",
+                               "DISTSUFFIX")],
+                  rpms=["curl-8.6.0-2.el9.x86_64"]),
+            # Коммит пропал из репозитория — ветку форс-пушнули. Патчи
+            # сняты с ветки, и об этом сказано в problems: данные
+            # деградировали, и молчать о них нельзя.
+            Build(nvr="glibc-2.34-61.el9", name="glibc", version="2.34",
+                  release="61.el9", build_id=1205, task_id=2205,
+                  owner="core", completed="2026-06-10 06:00:00",
+                  tag_name=tag, tags=[tag],
+                  source=Source(
+                      raw="git+https://gl/core/glibc?#%s" % tag, host="gl",
+                      project="core/glibc", ref=tag, ref_kind="branch",
+                      web_url="https://gl/core/glibc/-/tree/%s" % tag,
+                      commit=GLIBC_GONE,
+                      commit_url="https://gl/core/glibc/-/tree/%s"
+                                 % GLIBC_GONE,
+                      commit_source="koji_source"),
+                  patches_ref=tag, patch_dir_present=True,
+                  patches=[pat("core/glibc", tag, "coverage-glibc.patch",
+                               "COVERAGE")],
+                  rpms=["glibc-2.34-61.el9.x86_64"],
+                  problems=["gitlab: коммит %s недоступен, патчи сняты с "
+                            "ветки" % GLIBC_GONE[:12]]),
+            # Собран прямо с коммита: ветки у такого билда нет, сравнивать
+            # не с чем. Считать его «снятым с ветки» нельзя — точнее
+            # источника не бывает.
+            Build(nvr="zlib-1.3.1-1.el9", name="zlib", version="1.3.1",
+                  release="1.el9", build_id=1206, task_id=2206,
+                  owner="builder", completed="2026-06-05 05:00:00",
+                  tag_name=tag, tags=[tag],
+                  source=Source(
+                      raw="git+https://gl/core/zlib?#%s" % ZLIB_PINNED,
+                      host="gl", project="core/zlib", ref=ZLIB_PINNED,
+                      ref_kind="commit",
+                      web_url="https://gl/core/zlib/-/tree/%s" % ZLIB_PINNED,
+                      commit=ZLIB_PINNED,
+                      commit_url="https://gl/core/zlib/-/tree/%s"
+                                 % ZLIB_PINNED,
+                      commit_source="original_url"),
+                  patches_ref=ZLIB_PINNED, patch_dir_present=True,
+                  patches=[pat("core/zlib", ZLIB_PINNED, "sast-zlib.patch",
+                               "SAST")],
+                  rpms=["zlib-1.3.1-1.el9.x86_64"]),
+            # Спокойная строка для сравнения: ветка стоит там же, где её
+            # оставила сборка. Ни бейджа, ни метки, ни ghost — так
+            # выглядит большинство, и на этом фоне остальные и читаются.
+            Build(nvr="python3-3.11.9-1.el9", name="python3",
+                  version="3.11.9", release="1.el9", build_id=1207,
+                  task_id=2207, owner="builder",
+                  completed="2026-06-01 04:00:00", tag_name=tag, tags=[tag],
+                  source=src_at("core/python3", tag, PYTHON_BUILT),
+                  patches_ref=PYTHON_BUILT, patch_dir_present=True,
+                  patches=[pat("core/python3", PYTHON_BUILT,
+                               "python3-distsuffix.patch", "DISTSUFFIX")],
+                  rpms=["python3-3.11.9-1.el9.x86_64",
+                        "python3-libs-3.11.9-1.el9.x86_64"]),
+        ])
+
+
+def caught_up_snapshot():
+    """Тот же тег ещё позже: часть отставаний догнали, часть накопилась.
+
+    Смысл файла — в паре с предыдущим. На «Изменениях» видно то, чего
+    прежде увидеть было нельзя: ghost-патч перестал быть ghost и стал
+    патчем билда, потому что билд пересобрали. И наоборот — там, где не
+    пересобирали, ветка ушла ещё дальше.
+    """
+    tag = DRIFT_TAG
+    prev = drift_snapshot().by_name()
+    return Snapshot(
+        tag=tag, generated="2026-08-09T00:00:00+03:00",
+        koji_hub="https://hub/kojihub", koji_web="https://hub/koji",
+        patch_classes=list(CLASSES_WITH_LICENSE),
+        builds=[
+            # Пересобран с вершины: CVE-2026-3011 из ghost стал патчем
+            # билда, переписанный суффикс подтянулся, ghost не осталось.
+            Build(nvr="nginx-1.26.0-4.el9", name="nginx", version="1.26.0",
+                  release="4.el9", build_id=1301, task_id=2301,
+                  owner="builder", completed="2026-08-08 12:00:00",
+                  tag_name=tag, tags=[tag],
+                  source=src_at("web/nginx", tag, NGINX_HEAD),
+                  patches_ref=NGINX_HEAD, patch_dir_present=True,
+                  patches=[
+                      pat("web/nginx", NGINX_HEAD, "CVE-2026-3010.patch",
+                          "CVE", ["CVE-2026-3010"]),
+                      pat("web/nginx", NGINX_HEAD, "CVE-2026-3011.patch",
+                          "CVE", ["CVE-2026-3011"]),
+                      pat("web/nginx", NGINX_HEAD, "nginx-distsuffix.patch",
+                          "DISTSUFFIX"),
+                  ],
+                  rpms=["nginx-1.26.0-4.el9.x86_64",
+                        "nginx-1.26.0-4.el9.src"]),
+            # Тоже пересобран: патч, которого в ветке уже не было, ушёл и
+            # из пакета — сторона build исчерпана.
+            Build(nvr="httpd-2.4.62-11.el9", name="httpd", version="2.4.62",
+                  release="11.el9", epoch=1, build_id=1302, task_id=2302,
+                  owner="apache", completed="2026-08-08 09:00:00",
+                  tag_name=tag, tags=[tag],
+                  source=src_at("web/httpd", tag, HTTPD_HEAD),
+                  patches_ref=HTTPD_HEAD, patch_dir_present=True,
+                  patches=[pat("web/httpd", HTTPD_HEAD, "CVE-2026-3020.patch",
+                               "CVE", ["CVE-2026-3020"])],
+                  rpms=["httpd-2.4.62-11.el9.x86_64"]),
+            # Не пересобирали: тот же билд, а ветка ушла ещё дальше.
+            same(prev, "openssl", tag,
+                 source=src_at("core/openssl", tag, OPENSSL_BUILT, ahead=9,
+                               head=OPENSSL_HEAD_LATER)),
+            same(prev, "curl", tag),
+            # Коммит вернулся вместе с пересборкой: проблема ушла.
+            Build(nvr="glibc-2.34-62.el9", name="glibc", version="2.34",
+                  release="62.el9", build_id=1305, task_id=2305,
+                  owner="core", completed="2026-08-07 06:00:00",
+                  tag_name=tag, tags=[tag],
+                  source=src_at("core/glibc", tag, GLIBC_REBUILT),
+                  patches_ref=GLIBC_REBUILT, patch_dir_present=True,
+                  patches=[pat("core/glibc", GLIBC_REBUILT,
+                               "coverage-glibc.patch", "COVERAGE")],
+                  rpms=["glibc-2.34-62.el9.x86_64"]),
+            same(prev, "zlib", tag),
+            # А здесь отставание только появилось: спокойная строка
+            # предыдущего снапшота обзавелась несобранным CVE.
+            Build(nvr="python3-3.11.9-1.el9", name="python3",
+                  version="3.11.9", release="1.el9", build_id=1207,
+                  task_id=2207, owner="builder",
+                  completed="2026-06-01 04:00:00", tag_name=tag, tags=[tag],
+                  source=src_at("core/python3", tag, PYTHON_BUILT, ahead=2,
+                                head=PYTHON_HEAD_LATER),
+                  patches_ref=PYTHON_BUILT, patch_dir_present=True,
+                  patches=[pat("core/python3", PYTHON_BUILT,
+                               "python3-distsuffix.patch", "DISTSUFFIX")],
+                  ghost_patches=[
+                      pat("core/python3", tag, "CVE-2026-3030.patch", "CVE",
+                          ["CVE-2026-3030"], ghost="branch"),
+                  ],
+                  rpms=["python3-3.11.9-1.el9.x86_64",
+                        "python3-libs-3.11.9-1.el9.x86_64"]),
+        ])
 
 
 FILES = [("rich-old.json", old_snapshot),
@@ -703,7 +1120,12 @@ FILES = [("rich-old.json", old_snapshot),
          ("rich-again.json", again_snapshot),
          ("rich-mirror.json", mirror_snapshot),
          ("rich-wide.json", wide_snapshot),
-         ("rich-many.json", many_snapshot)]
+         ("rich-many.json", many_snapshot),
+         # Цепочка одного тега про коммит сборки: «до», «после» и «догнали».
+         # Порядок здесь тот же, в каком их кладут на рельс.
+         ("rich-legacy.json", legacy_snapshot),
+         ("rich-drift.json", drift_snapshot),
+         ("rich-caught-up.json", caught_up_snapshot)]
 
 
 def bare(data):

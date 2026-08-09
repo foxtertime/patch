@@ -1,0 +1,282 @@
+[
+ {
+  "builds": [
+   {
+    "build_id": 1101,
+    "completed": "2026-05-20 11:00:00",
+    "epoch": null,
+    "ghost_patches": [],
+    "name": "nginx",
+    "nvr": "nginx-1.26.0-2.el9",
+    "owner": "builder",
+    "patch_dir_present": true,
+    "patches": [
+     {
+      "class": "CVE",
+      "cves": [
+       "CVE-2026-3010"
+      ],
+      "ghost": null,
+      "name": "CVE-2026-3010.patch",
+      "path": "PATCH/CVE-2026-3010.patch",
+      "web_url": "https://gl/web/nginx/-/blob/os-9.8/PATCH/CVE-2026-3010.patch"
+     },
+     {
+      "class": "CVE",
+      "cves": [
+       "CVE-2026-3011"
+      ],
+      "ghost": null,
+      "name": "CVE-2026-3011.patch",
+      "path": "PATCH/CVE-2026-3011.patch",
+      "web_url": "https://gl/web/nginx/-/blob/os-9.8/PATCH/CVE-2026-3011.patch"
+     },
+     {
+      "class": "DISTSUFFIX",
+      "cves": [],
+      "ghost": null,
+      "name": "nginx-distsuffix.patch",
+      "path": "PATCH/nginx-distsuffix.patch",
+      "web_url": "https://gl/web/nginx/-/blob/os-9.8/PATCH/nginx-distsuffix.patch"
+     }
+    ],
+    "patches_ref": null,
+    "problems": [],
+    "release": "2.el9",
+    "rpms": [
+     "nginx-1.26.0-2.el9.x86_64",
+     "nginx-1.26.0-2.el9.src"
+    ],
+    "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
+     "host": "gl",
+     "project": "web/nginx",
+     "raw": "git+https://gl/web/nginx?#os-9.8",
+     "ref": "os-9.8",
+     "ref_kind": "branch",
+     "web_url": "https://gl/web/nginx/-/tree/os-9.8"
+    },
+    "tag_name": "os-9.8",
+    "tags": [
+     "os-9.8"
+    ],
+    "task_id": 2101,
+    "version": "1.26.0"
+   },
+   {
+    "build_id": 1102,
+    "completed": "2026-05-18 09:30:00",
+    "epoch": 1,
+    "ghost_patches": [],
+    "name": "httpd",
+    "nvr": "httpd-2.4.62-9.el9",
+    "owner": "apache",
+    "patch_dir_present": true,
+    "patches": [
+     {
+      "class": "CVE",
+      "cves": [
+       "CVE-2026-3020"
+      ],
+      "ghost": null,
+      "name": "CVE-2026-3020.patch",
+      "path": "PATCH/CVE-2026-3020.patch",
+      "web_url": "https://gl/web/httpd/-/blob/os-9.8/PATCH/CVE-2026-3020.patch"
+     },
+     {
+      "class": "LICENSE",
+      "cves": [],
+      "ghost": null,
+      "name": "httpd-license.patch",
+      "path": "PATCH/httpd-license.patch",
+      "web_url": "https://gl/web/httpd/-/blob/os-9.8/PATCH/httpd-license.patch"
+     }
+    ],
+    "patches_ref": null,
+    "problems": [],
+    "release": "9.el9",
+    "rpms": [
+     "httpd-2.4.62-9.el9.x86_64"
+    ],
+    "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
+     "host": "gl",
+     "project": "web/httpd",
+     "raw": "git+https://gl/web/httpd?#os-9.8",
+     "ref": "os-9.8",
+     "ref_kind": "branch",
+     "web_url": "https://gl/web/httpd/-/tree/os-9.8"
+    },
+    "tag_name": "os-9.8",
+    "tags": [
+     "os-9.8"
+    ],
+    "task_id": 2102,
+    "version": "2.4.62"
+   },
+   {
+    "build_id": 1103,
+    "completed": "2026-05-11 08:00:00",
+    "epoch": null,
+    "ghost_patches": [],
+    "name": "openssl",
+    "nvr": "openssl-3.2.1-4.el9",
+    "owner": "crypto",
+    "patch_dir_present": true,
+    "patches": [
+     {
+      "class": "SAST",
+      "cves": [],
+      "ghost": null,
+      "name": "sast-openssl.patch",
+      "path": "PATCH/sast-openssl.patch",
+      "web_url": "https://gl/core/openssl/-/blob/os-9.8/PATCH/sast-openssl.patch"
+     }
+    ],
+    "patches_ref": null,
+    "problems": [],
+    "release": "4.el9",
+    "rpms": [
+     "openssl-3.2.1-4.el9.x86_64",
+     "openssl-libs-3.2.1-4.el9.x86_64"
+    ],
+    "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
+     "host": "gl",
+     "project": "core/openssl",
+     "raw": "git+https://gl/core/openssl?#os-9.8",
+     "ref": "os-9.8",
+     "ref_kind": "branch",
+     "web_url": "https://gl/core/openssl/-/tree/os-9.8"
+    },
+    "tag_name": "os-9.8",
+    "tags": [
+     "os-9.8"
+    ],
+    "task_id": 2103,
+    "version": "3.2.1"
+   },
+   {
+    "build_id": 1104,
+    "completed": "2026-05-09 07:00:00",
+    "epoch": null,
+    "ghost_patches": [],
+    "name": "curl",
+    "nvr": "curl-8.6.0-1.el9",
+    "owner": "builder",
+    "patch_dir_present": true,
+    "patches": [
+     {
+      "class": "DISTSUFFIX",
+      "cves": [],
+      "ghost": null,
+      "name": "curl-distsuffix.patch",
+      "path": "PATCH/curl-distsuffix.patch",
+      "web_url": "https://gl/core/curl/-/blob/os-9.8/PATCH/curl-distsuffix.patch"
+     }
+    ],
+    "patches_ref": null,
+    "problems": [],
+    "release": "1.el9",
+    "rpms": [
+     "curl-8.6.0-1.el9.x86_64"
+    ],
+    "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
+     "host": "gl",
+     "project": "core/curl",
+     "raw": "git+https://gl/core/curl?#os-9.8",
+     "ref": "os-9.8",
+     "ref_kind": "branch",
+     "web_url": "https://gl/core/curl/-/tree/os-9.8"
+    },
+    "tag_name": "os-9.8",
+    "tags": [
+     "os-9.8"
+    ],
+    "task_id": 2104,
+    "version": "8.6.0"
+   },
+   {
+    "build_id": 1105,
+    "completed": "2026-05-05 06:00:00",
+    "epoch": null,
+    "ghost_patches": [],
+    "name": "glibc",
+    "nvr": "glibc-2.34-60.el9",
+    "owner": "core",
+    "patch_dir_present": true,
+    "patches": [
+     {
+      "class": "COVERAGE",
+      "cves": [],
+      "ghost": null,
+      "name": "coverage-glibc.patch",
+      "path": "PATCH/coverage-glibc.patch",
+      "web_url": "https://gl/core/glibc/-/blob/os-9.8/PATCH/coverage-glibc.patch"
+     }
+    ],
+    "patches_ref": null,
+    "problems": [],
+    "release": "60.el9",
+    "rpms": [
+     "glibc-2.34-60.el9.x86_64"
+    ],
+    "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
+     "host": "gl",
+     "project": "core/glibc",
+     "raw": "git+https://gl/core/glibc?#os-9.8",
+     "ref": "os-9.8",
+     "ref_kind": "branch",
+     "web_url": "https://gl/core/glibc/-/tree/os-9.8"
+    },
+    "tag_name": "os-9.8",
+    "tags": [
+     "os-9.8"
+    ],
+    "task_id": 2105,
+    "version": "2.34"
+   }
+  ],
+  "dashboard": "2.2.0",
+  "generated": "2026-06-01T00:00:00+03:00",
+  "koji_hub": "https://hub/kojihub",
+  "koji_web": "https://hub/koji",
+  "patch_classes": [
+   "AUTOGEN",
+   "CVE",
+   "SAST",
+   "DAST",
+   "COVERAGE",
+   "DISTSUFFIX",
+   "LICENSE",
+   "SPEC",
+   "CHANGELOG",
+   "FILES",
+   "other"
+  ],
+  "schema": 1,
+  "tag": "os-9.8"
+ }
+]

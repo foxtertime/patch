@@ -43,8 +43,54 @@ def _original_url(info: dict) -> Optional[str]:
     return source.get("original_url") or None
 
 
+def _koji_source(info: dict) -> Optional[str]:
+    """Верхнеуровневое поле source: чем сборка пошла на самом деле.
+
+    В extra.source.original_url лежит то, что ввёл человек, — обычно ветка.
+    Здесь же koji хранит разрешённый адрес, и у сборок из git в нём стоит
+    полный хеш: git+ssh://<host>/<group>/<repo>#<hash>.
+    """
+    value = info.get("source")
+    return value if isinstance(value, str) and value.strip() else None
+
+
+def _same_project(left: Optional[str], right: Optional[str]) -> bool:
+    if not left or not right:
+        return False
+    return left.strip("/").lower() == right.strip("/").lower()
+
+
+def _commit_of(info: dict, parsed):
+    """Хеш коммита сборки и то, откуда он взят.
+
+    Из верхнеуровневого source берётся ТОЛЬКО хеш: ssh-хост в нём может не
+    совпасть с https-хостом из original_url, и пусти мы его дальше —
+    сработала бы подстановка хоста в GitlabClient, и здоровые билды
+    получили бы проблему «host не описан в конфиге».
+
+    Проекты при этом сверяются. Разошлись — хеш не берём: это другой
+    репозиторий, а не уточнение, и приклеить билду чужой коммит хуже, чем
+    не показать коммита вовсе. Хост в сверке не участвует по причине выше.
+    """
+    if parsed.ref_kind == "commit":
+        return parsed.ref, "original_url"
+    raw = _koji_source(info)
+    if not raw:
+        return None, None
+    try:
+        other = parse_source_url(raw)
+    except SourceUrlError:
+        return None, None
+    if other.ref_kind != "commit":
+        return None, None
+    if not _same_project(other.project, parsed.project):
+        return None, None
+    return other.ref, "koji_source"
+
+
 def collect_tag(tag: str, cfg, koji_client, gitlab_client, jobs: int = 8,
-                now: Optional[str] = None) -> Snapshot:
+                now: Optional[str] = None,
+                branch_check: bool = True) -> Snapshot:
     """Собирает билды тега, их патчи и RPM в один снапшот."""
     classifier = Classifier.from_config(cfg)
     started = time.monotonic()
@@ -103,7 +149,8 @@ def collect_tag(tag: str, cfg, koji_client, gitlab_client, jobs: int = 8,
                                  entry.get("tag_name"),
                                  tags.get(info.get("build_id"), []))
         try:
-            _attach_patches(build, info, cfg, gitlab_client, classifier)
+            _attach_patches(build, info, cfg, gitlab_client, classifier,
+                            branch_check)
         except Exception as exc:
             # ни одна ошибка билда (в т.ч. неожиданная, не только
             # SourceUrlError/проблема GitLab) не должна валить весь сбор.
@@ -132,7 +179,14 @@ def collect_tag(tag: str, cfg, koji_client, gitlab_client, jobs: int = 8,
                         koji_hub=cfg.koji_hub, koji_web=cfg.koji_web,
                         patch_classes=classifier.class_names(),
                         builds=builds)
-    _log_summary(snapshot, time.monotonic() - started)
+    # Билды, у которых original_url нет, а верхнеуровневый source есть:
+    # формально мы могли бы восстановить им и проект, и коммит, но тогда
+    # билд перестал бы быть no-source и получил бы from-commit — метка
+    # строки и фильтр поехали бы. Число показывает, стоит ли заводить
+    # под это отдельную работу.
+    orphan_source = sum(1 for info in infos
+                        if not _original_url(info) and _koji_source(info))
+    _log_summary(snapshot, time.monotonic() - started, orphan_source)
     return snapshot
 
 
@@ -164,7 +218,8 @@ def _placeholder_build(info: dict, rpms, tags=()) -> Build:
 
 
 def _attach_patches(build: Build, info: dict, cfg, gitlab_client,
-                    classifier: Classifier) -> None:
+                    classifier: Classifier,
+                    branch_check: bool = True) -> None:
     raw_url = _original_url(info)
     if not raw_url:
         build.problems.append("no source url")
@@ -184,12 +239,20 @@ def _attach_patches(build: Build, info: dict, cfg, gitlab_client,
         build.source = Source(raw=raw_url, ref=parsed.ref, ref_kind="srpm")
         return
 
+    commit, commit_from = _commit_of(info, parsed)
     build.source = Source(
         raw=raw_url, host=parsed.host, project=parsed.project, ref=parsed.ref,
         ref_kind=parsed.ref_kind,
-        web_url=gitlab_client.tree_url(parsed.host, parsed.project, parsed.ref))
+        web_url=gitlab_client.tree_url(parsed.host, parsed.project, parsed.ref),
+        commit=commit, commit_source=commit_from,
+        commit_url=gitlab_client.tree_url(parsed.host, parsed.project, commit))
 
-    result = gitlab_client.patch_files(parsed.host, parsed.project, parsed.ref)
+    ref, result = _read_patch_dir(build, gitlab_client, parsed, commit)
+    if ref != commit:
+        # откат на ветку: коммита в репозитории нет, и сравнивать с ним
+        # ветку бессмысленно — точка отсчёта пропала вместе с коммитом
+        commit = None
+    build.patches_ref = ref
     build.patch_dir_present = result.present
     if result.problem:
         # проблема не обязательно означает, что читать нечего: подменённый
@@ -197,12 +260,129 @@ def _attach_patches(build: Build, info: dict, cfg, gitlab_client,
         # чтений paths и так пустой.
         build.problems.append(result.problem)
     for path in result.paths:
-        name = os.path.basename(path)
-        build.patches.append(Patch(
-            path=path, name=name, cls=classifier.classify(name),
-            cves=find_cves(name),
-            web_url=gitlab_client.blob_url(parsed.host, parsed.project,
-                                           parsed.ref, path)))
+        build.patches.append(_patch(path, parsed, ref, classifier,
+                                    gitlab_client))
+
+    # Сравнивать есть с чем, только когда билд собран с ветки: у сборки
+    # прямо с коммита ветки нет, а без хеша нет и точки отсчёта.
+    if not (branch_check and commit and parsed.ref_kind == "branch"):
+        return
+    ahead = gitlab_client.compare(parsed.host, parsed.project, commit,
+                                  parsed.ref)
+    if ahead.problem:
+        build.problems.append(ahead.problem)
+        return
+    build.source.branch_head = ahead.head
+    build.source.commits_ahead = ahead.ahead
+
+    if not build.source.commits_ahead:
+        return
+    # Дерево коммита не прочиталось вовсе (сетевой отказ, 500, исчерпанные
+    # ретраи 429) — result.present is None, а built.blobs в _ghosts пуст.
+    # Посчитай мы ghost-и по такому дереву, каждый файл на вершине ветки
+    # ушёл бы в сторону "branch" — «влит, но не собран», — хотя на деле мы
+    # просто не знаем, что лежало в коммите: фабрикация, а не находка.
+    # commits_ahead уже записан и не трогается: число коммитов не зависит
+    # от чтения дерева патчей и остаётся верным само по себе — то, что
+    # ветка ушла вперёд, известно, даже если неизвестно, что именно она
+    # принесла.
+    #
+    # result.present is False — легитимно пустое дерево (ветка есть,
+    # каталога PATCH в коммите нет), и сравнение с веткой по нему верно:
+    # тогда каждый файл ветки — и правда несобранный ghost. Поэтому
+    # ограничиваемся ровно случаем «неизвестно», а не любым пустым built.
+    if result.present is None:
+        return
+    tip = gitlab_client.patch_files(parsed.host, parsed.project, parsed.ref)
+    if tip.problem:
+        build.problems.append(tip.problem)
+        return
+    build.ghost_patches = _ghosts(result, tip, parsed, commit, classifier,
+                                  gitlab_client)
+
+
+# Единственный ответ дерева, по которому видно, что коммита в репозитории
+# уже нет: его выдаёт доразбор 404 в GitlabClient. Отказ сети выглядит
+# иначе, и путать их нельзя — на отказе сети чтение ветки ничего не
+# исправит, а патчи с ветки, выданные за патчи коммита, соврут.
+#
+# Сравниваем суффиксом, а не полным равенством: при подмене хоста
+# GitlabClient._fetch приписывает свою заметку впереди («host не описан в
+# конфиге, запрошен ...; gitlab: ref not found»), и точное равенство эту
+# комбинацию бы не узнало. Строка рождается в одном месте
+# (_resolve_missing_tree), а _fetch только дописывает к ней спереди — маркер
+# всегда остаётся в конце, и ложных срабатываний суффикс не даёт.
+_REF_GONE = "gitlab: ref not found"
+
+
+def _read_patch_dir(build, gitlab_client, parsed, commit):
+    """Дерево патчей билда и ref, с которого оно снято.
+
+    Патчи билда — это то, что лежало в PATCH на коммите сборки. На ветку
+    откатываемся, только когда хеша нет вовсе или когда коммита в
+    репозитории уже не осталось: ветку могли форс-пушнуть, а коммит —
+    собрать мусором. Во втором случае данные деградировали, и молчать об
+    этом нельзя — но откат имеет смысл, только если ветка вообще есть.
+
+    У билда, собранного прямо с коммита (ref_kind == "commit"), ветки нет:
+    сам commit и есть parsed.ref, единственный ref, который мы вообще
+    знаем. Откатываться в этом случае некуда — второй вызов patch_files
+    ушёл бы за тем же самым ref и по мемоизации вернул бы тот же самый
+    отказ без единого нового запроса, а сообщение «патчи сняты с ветки»
+    было бы неправдой: ветки не существует, и патчи ниоткуда не читались.
+    """
+    if not commit:
+        return parsed.ref, gitlab_client.patch_files(parsed.host,
+                                                     parsed.project, parsed.ref)
+    result = gitlab_client.patch_files(parsed.host, parsed.project, commit)
+    if not result.problem or not result.problem.endswith(_REF_GONE):
+        return commit, result
+    if parsed.ref_kind == "commit":
+        build.problems.append(
+            "gitlab: коммит %s недоступен, патчей нет" % commit[:12])
+        return commit, result
+    build.problems.append(
+        "gitlab: коммит %s недоступен, патчи сняты с ветки" % commit[:12])
+    return parsed.ref, gitlab_client.patch_files(parsed.host, parsed.project,
+                                                 parsed.ref)
+
+
+# Порядок сторон — тот же, в каком их читают на странице: сперва то, чего
+# в билде не хватает, потом устаревшее, потом лишнее.
+_GHOST_SIDES = ("branch", "changed", "build")
+
+
+def _ghosts(built, tip, parsed, commit, classifier, gitlab_client):
+    """Различие между деревом коммита и деревом вершины ветки.
+
+    Считается по blob sha, а не по одним именам: файл с тем же именем и
+    другим содержимым — это патч, переписанный после сборки, и в пакете
+    лежит его прежняя редакция. Форма истории ветки на это не влияет
+    никак: сравниваются деревья, а не журнал.
+    """
+    paths = {
+        "branch": sorted(set(tip.blobs) - set(built.blobs)),
+        "changed": sorted(path for path in set(tip.blobs) & set(built.blobs)
+                          if tip.blobs[path] != built.blobs[path]),
+        "build": sorted(set(built.blobs) - set(tip.blobs)),
+    }
+    out = []
+    for side in _GHOST_SIDES:
+        # ссылка ведёт туда, где файл есть: у стороны build его в ветке уже
+        # нет, и ссылка на ветку вела бы в никуда
+        ref = commit if side == "build" else parsed.ref
+        for path in paths[side]:
+            out.append(_patch(path, parsed, ref, classifier, gitlab_client,
+                              ghost=side))
+    return out
+
+
+def _patch(path, parsed, ref, classifier, gitlab_client, ghost=None):
+    name = os.path.basename(path)
+    return Patch(path=path, name=name, cls=classifier.classify(name),
+                 cves=find_cves(name), ghost=ghost,
+                 web_url=gitlab_client.blob_url(parsed.host, parsed.project,
+                                                ref, path))
 
 
 # Проблемы, у которых после двоеточия стоит произвольный текст: в сводке их
@@ -210,7 +390,8 @@ def _attach_patches(build: Build, info: dict, cfg, gitlab_client,
 _GROUPED_PROBLEMS = ("gitlab:", "internal error:", "bad source url:")
 
 
-def _log_summary(snapshot: Snapshot, elapsed: float) -> None:
+def _log_summary(snapshot: Snapshot, elapsed: float,
+                 orphan_source: int = 0) -> None:
     """Итог по тегу — то, что раньше печатал CLI своим sys.stderr.write."""
     summary = problem_summary(snapshot)
     problems = sum(1 for b in snapshot.builds if b.problems)
@@ -218,6 +399,14 @@ def _log_summary(snapshot: Snapshot, elapsed: float) -> None:
     logger.info("%s: готово, %d билдов, %d проблемных%s, за %.1f с",
                 snapshot.tag, len(snapshot.builds), problems,
                 (" (%s)" % details) if details else "", elapsed)
+    known = sum(1 for b in snapshot.builds if b.source and b.source.commit)
+    ahead = sum(1 for b in snapshot.builds
+                if b.source and b.source.commits_ahead)
+    ghosts = sum(1 for b in snapshot.builds if b.ghost_patches)
+    logger.info("%s: коммит известен у %d из %d, ветка ушла вперёд у %d, "
+                "ghost-патчи у %d, без original_url но с source %d",
+                snapshot.tag, known, len(snapshot.builds), ahead, ghosts,
+                orphan_source)
 
 
 def problem_summary(snapshot: Snapshot) -> Dict[str, int]:

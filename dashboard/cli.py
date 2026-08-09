@@ -51,6 +51,12 @@ def _parser() -> argparse.ArgumentParser:
     collect.add_argument("--tag", action="append", required=True, dest="tags",
                          help="koji-тег; можно указать несколько раз")
     collect.add_argument("-o", "--output", default="snapshot.json")
+    collect.add_argument("--no-branch-check", action="store_true",
+                         help="не сравнивать коммит сборки с веткой: патчи "
+                              "по-прежнему снимаются с коммита, но число "
+                              "несобранных коммитов и ghost-патчи не "
+                              "считаются — один запрос в GitLab на билд "
+                              "вместо двух-трёх")
 
     # Не «dashboard»: программа теперь так и зовётся, и строка запуска
     # читалась бы как «dashboard dashboard». Команда называет то, что кладёт
@@ -80,7 +86,8 @@ def _collect(args, cfg):
     gitlab = GitlabClient(cfg.gitlab_hosts, token=cfg.token(),
                           patch_dir=cfg.patch_dir,
                           default_host=cfg.gitlab_default_host)
-    return [collect_tag(tag, cfg, koji_client, gitlab, jobs=args.jobs)
+    return [collect_tag(tag, cfg, koji_client, gitlab, jobs=args.jobs,
+                        branch_check=not args.no_branch_check)
             for tag in args.tags]
 
 

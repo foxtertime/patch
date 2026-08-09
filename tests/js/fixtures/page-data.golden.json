@@ -37,7 +37,8 @@
        "cves": [],
        "name": "source.tar.gz",
        "path": "PATCH/source.tar.gz",
-       "url": "https://gl/blob/PATCH/source.tar.gz"
+       "url": "https://gl/blob/PATCH/source.tar.gz",
+       "ghost": null
       }
      ],
      "new_project": "core/curl",
@@ -136,21 +137,24 @@
        ],
        "name": "CVE-2024-7347.patch",
        "path": "PATCH/CVE-2024-7347.patch",
-       "url": "https://gl/blob/PATCH/CVE-2024-7347.patch"
+       "url": "https://gl/blob/PATCH/CVE-2024-7347.patch",
+       "ghost": null
       },
       {
        "class": "CHANGELOG",
        "cves": [],
        "name": "changelog.yaml",
        "path": "PATCH/changelog.yaml",
-       "url": "https://gl/blob/PATCH/changelog.yaml"
+       "url": "https://gl/blob/PATCH/changelog.yaml",
+       "ghost": null
       },
       {
        "class": "DAST",
        "cves": [],
        "name": "dast-fuzz.patch",
        "path": "PATCH/dast-fuzz.patch",
-       "url": "https://gl/blob/PATCH/dast-fuzz.patch"
+       "url": "https://gl/blob/PATCH/dast-fuzz.patch",
+       "ghost": null
       }
      ],
      "new_project": "web/nginx",
@@ -171,21 +175,24 @@
        ],
        "name": "CVE-2024-7347.patch",
        "path": "PATCH/CVE-2024-7347.patch",
-       "url": "https://gl/blob/PATCH/CVE-2024-7347.patch"
+       "url": "https://gl/blob/PATCH/CVE-2024-7347.patch",
+       "ghost": null
       },
       {
        "class": "AUTOGEN",
        "cves": [],
        "name": "autogen-sast-patches.inc.new",
        "path": "PATCH/autogen-sast-patches.inc.new",
-       "url": "https://gl/blob/PATCH/autogen-sast-patches.inc.new"
+       "url": "https://gl/blob/PATCH/autogen-sast-patches.inc.new",
+       "ghost": null
       },
       {
        "class": "SPEC",
        "cves": [],
        "name": "nginx.spec.patch",
        "path": "PATCH/nginx.spec.patch",
-       "url": "https://gl/blob/PATCH/nginx.spec.patch"
+       "url": "https://gl/blob/PATCH/nginx.spec.patch",
+       "ghost": null
       }
      ],
      "old_project": "web/nginx",
@@ -261,7 +268,8 @@
        "cves": [],
        "name": "coverage-vim.patch",
        "path": "PATCH/coverage-vim.patch",
-       "url": "https://gl/blob/PATCH/coverage-vim.patch"
+       "url": "https://gl/blob/PATCH/coverage-vim.patch",
+       "ghost": null
       }
      ],
      "old_project": null,
@@ -300,14 +308,16 @@
        "cves": [],
        "name": "sast-zlib.patch",
        "path": "PATCH/sast-zlib.patch",
-       "url": "https://gl/blob/PATCH/sast-zlib.patch"
+       "url": "https://gl/blob/PATCH/sast-zlib.patch",
+       "ghost": null
       },
       {
        "class": "other",
        "cves": [],
        "name": "weird.diff",
        "path": "PATCH/weird.diff",
-       "url": "https://gl/blob/PATCH/weird.diff"
+       "url": "https://gl/blob/PATCH/weird.diff",
+       "ghost": null
       }
      ],
      "new_project": "core/zlib",
@@ -326,14 +336,16 @@
        "cves": [],
        "name": "sast-zlib.patch",
        "path": "PATCH/sast-zlib.patch",
-       "url": "https://gl/blob/PATCH/sast-zlib.patch"
+       "url": "https://gl/blob/PATCH/sast-zlib.patch",
+       "ghost": null
       },
       {
        "class": "other",
        "cves": [],
        "name": "weird.diff",
        "path": "PATCH/weird.diff",
-       "url": "https://gl/blob/PATCH/weird.diff"
+       "url": "https://gl/blob/PATCH/weird.diff",
+       "ghost": null
       }
      ],
      "old_project": "core/zlib",
@@ -410,7 +422,12 @@
      "source_url": "https://gl/web/httpd/-/tree/abc123",
      "tagged_in": "os-9.0",
      "task_id": 202,
-     "version": "2.4.62"
+     "version": "2.4.62",
+     "commit": null,
+     "commit_url": null,
+     "commits_ahead": null,
+     "patches_ref": null,
+     "ghosts": []
     },
     {
      "branch": "os-9.1",
@@ -444,21 +461,24 @@
        ],
        "name": "CVE-2024-7347.patch",
        "path": "PATCH/CVE-2024-7347.patch",
-       "url": "https://gl/blob/PATCH/CVE-2024-7347.patch"
+       "url": "https://gl/blob/PATCH/CVE-2024-7347.patch",
+       "ghost": null
       },
       {
        "class": "AUTOGEN",
        "cves": [],
        "name": "autogen-sast-patches.inc.new",
        "path": "PATCH/autogen-sast-patches.inc.new",
-       "url": "https://gl/blob/PATCH/autogen-sast-patches.inc.new"
+       "url": "https://gl/blob/PATCH/autogen-sast-patches.inc.new",
+       "ghost": null
       },
       {
        "class": "SPEC",
        "cves": [],
        "name": "nginx.spec.patch",
        "path": "PATCH/nginx.spec.patch",
-       "url": "https://gl/blob/PATCH/nginx.spec.patch"
+       "url": "https://gl/blob/PATCH/nginx.spec.patch",
+       "ghost": null
       }
      ],
      "problems": [],
@@ -474,7 +494,12 @@
      "source_url": "https://gl/web/nginx/-/tree/os-9.1",
      "tagged_in": "os-9.1",
      "task_id": 201,
-     "version": "1.24.0"
+     "version": "1.24.0",
+     "commit": null,
+     "commit_url": null,
+     "commits_ahead": null,
+     "patches_ref": null,
+     "ghosts": []
     },
     {
      "branch": null,
@@ -502,7 +527,8 @@
        "cves": [],
        "name": "coverage-vim.patch",
        "path": "PATCH/coverage-vim.patch",
-       "url": "https://gl/blob/PATCH/coverage-vim.patch"
+       "url": "https://gl/blob/PATCH/coverage-vim.patch",
+       "ghost": null
       }
      ],
      "problems": [
@@ -517,7 +543,12 @@
      "source_url": null,
      "tagged_in": null,
      "task_id": null,
-     "version": "9.0"
+     "version": "9.0",
+     "commit": null,
+     "commit_url": null,
+     "commits_ahead": null,
+     "patches_ref": null,
+     "ghosts": []
     },
     {
      "branch": "os-9.1",
@@ -547,14 +578,16 @@
        "cves": [],
        "name": "sast-zlib.patch",
        "path": "PATCH/sast-zlib.patch",
-       "url": "https://gl/blob/PATCH/sast-zlib.patch"
+       "url": "https://gl/blob/PATCH/sast-zlib.patch",
+       "ghost": null
       },
       {
        "class": "other",
        "cves": [],
        "name": "weird.diff",
        "path": "PATCH/weird.diff",
-       "url": "https://gl/blob/PATCH/weird.diff"
+       "url": "https://gl/blob/PATCH/weird.diff",
+       "ghost": null
       }
      ],
      "problems": [],
@@ -568,7 +601,12 @@
      "source_url": "https://gl/core/zlib/-/tree/os-9.1",
      "tagged_in": "os-9.1",
      "task_id": null,
-     "version": "1.3"
+     "version": "1.3",
+     "commit": null,
+     "commit_url": null,
+     "commits_ahead": null,
+     "patches_ref": null,
+     "ghosts": []
     }
    ],
    "counts": {
@@ -650,7 +688,8 @@
        "cves": [],
        "name": "source.tar.gz",
        "path": "PATCH/source.tar.gz",
-       "url": "https://gl/blob/PATCH/source.tar.gz"
+       "url": "https://gl/blob/PATCH/source.tar.gz",
+       "ghost": null
       }
      ],
      "problems": [],
@@ -663,7 +702,12 @@
      "source_url": "https://gl/core/curl/-/tree/os-9.2",
      "tagged_in": "os-9.2",
      "task_id": null,
-     "version": "8.0"
+     "version": "8.0",
+     "commit": null,
+     "commit_url": null,
+     "commits_ahead": null,
+     "patches_ref": null,
+     "ghosts": []
     },
     {
      "branch": "abc123",
@@ -698,7 +742,12 @@
      "source_url": "https://gl/web/httpd/-/tree/abc123",
      "tagged_in": "os-9.2",
      "task_id": 202,
-     "version": "2.4.62"
+     "version": "2.4.62",
+     "commit": null,
+     "commit_url": null,
+     "commits_ahead": null,
+     "patches_ref": null,
+     "ghosts": []
     },
     {
      "branch": "os-9.2",
@@ -732,21 +781,24 @@
        ],
        "name": "CVE-2024-7347.patch",
        "path": "PATCH/CVE-2024-7347.patch",
-       "url": "https://gl/blob/PATCH/CVE-2024-7347.patch"
+       "url": "https://gl/blob/PATCH/CVE-2024-7347.patch",
+       "ghost": null
       },
       {
        "class": "CHANGELOG",
        "cves": [],
        "name": "changelog.yaml",
        "path": "PATCH/changelog.yaml",
-       "url": "https://gl/blob/PATCH/changelog.yaml"
+       "url": "https://gl/blob/PATCH/changelog.yaml",
+       "ghost": null
       },
       {
        "class": "DAST",
        "cves": [],
        "name": "dast-fuzz.patch",
        "path": "PATCH/dast-fuzz.patch",
-       "url": "https://gl/blob/PATCH/dast-fuzz.patch"
+       "url": "https://gl/blob/PATCH/dast-fuzz.patch",
+       "ghost": null
       }
      ],
      "problems": [],
@@ -762,7 +814,12 @@
      "source_url": "https://gl/web/nginx/-/tree/os-9.2",
      "tagged_in": "os-9.2",
      "task_id": 211,
-     "version": "1.26.0"
+     "version": "1.26.0",
+     "commit": null,
+     "commit_url": null,
+     "commits_ahead": null,
+     "patches_ref": null,
+     "ghosts": []
     },
     {
      "branch": "os-9.1",
@@ -792,14 +849,16 @@
        "cves": [],
        "name": "sast-zlib.patch",
        "path": "PATCH/sast-zlib.patch",
-       "url": "https://gl/blob/PATCH/sast-zlib.patch"
+       "url": "https://gl/blob/PATCH/sast-zlib.patch",
+       "ghost": null
       },
       {
        "class": "other",
        "cves": [],
        "name": "weird.diff",
        "path": "PATCH/weird.diff",
-       "url": "https://gl/blob/PATCH/weird.diff"
+       "url": "https://gl/blob/PATCH/weird.diff",
+       "ghost": null
       }
      ],
      "problems": [],
@@ -813,7 +872,12 @@
      "source_url": "https://gl/core/zlib/-/tree/os-9.1",
      "tagged_in": "os-9.2",
      "task_id": null,
-     "version": "1.3"
+     "version": "1.3",
+     "commit": null,
+     "commit_url": null,
+     "commits_ahead": null,
+     "patches_ref": null,
+     "ghosts": []
     }
    ],
    "counts": {

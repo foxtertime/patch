@@ -200,3 +200,66 @@ test('дельта без изменений — прочерк, а не «+0 �
   assert.strictEqual(markup.delta(0, 0), '<span class="zero">—</span>');
   assert.match(markup.delta(2, 1), /\+2.*−1/);
 });
+
+test('бейдж отставания есть только когда есть отставание', function () {
+  assert.strictEqual(markup.aheadHtml({ commits_ahead: 0, branch: 'br' }), '');
+  assert.strictEqual(markup.aheadHtml({ commits_ahead: null, branch: 'br' }), '');
+  var html = markup.aheadHtml({ commits_ahead: 3, branch: 'br' });
+  assert.match(html, /ветка \+3/);
+  assert.match(html, /data-tip="[^"]*br[^"]*"/);
+});
+
+function ghost(name, side, cls) {
+  return { path: 'PATCH/' + name, name: name, 'class': cls || 'CVE',
+           cves: [], url: 'https://gl/' + name, ghost: side };
+}
+
+test('без ghost-патчей секции нет', function () {
+  assert.strictEqual(markup.ghostsHtml([], ''), '');
+});
+
+test('стороны идут в одном порядке и подписаны по-разному', function () {
+  // порядок задаёт разметка, а не порядок в снапшоте: на вход стороны
+  // поданы вперемешку
+  var html = markup.ghostsHtml([ghost('c.patch', 'build'),
+                                ghost('a.patch', 'branch'),
+                                ghost('b.patch', 'changed')], '');
+  var order = ['нет в пакете', 'в пакете старый', 'нет в ветке'];
+  var at = order.map(function (t) { return html.indexOf(t); });
+  assert.ok(at[0] !== -1 && at[0] < at[1] && at[1] < at[2]);
+});
+
+test('черта на всю секцию одна, а не по одной на сторону', function () {
+  var html = markup.ghostsHtml([ghost('a.patch', 'branch'),
+                                ghost('b.patch', 'changed'),
+                                ghost('c.patch', 'build')], '');
+  assert.strictEqual(html.split('class="ghosts"').length - 1, 1);
+});
+
+test('у каждой стороны свой счётчик и своя подсказка', function () {
+  var html = markup.ghostsHtml([ghost('a.patch', 'branch'),
+                                ghost('b.patch', 'branch')], '');
+  assert.match(html,
+    /<div class="gside" data-tip="[^"]+">нет в пакете<span class="n">2</);
+});
+
+test('полоса списка серая: цвет полосы значит класс, а его тут нет',
+     function () {
+       var html = markup.ghostsHtml([ghost('a.patch', 'branch')], '');
+       assert.match(html, /<ul class="glist">/);
+       assert.strictEqual(html.indexOf('class="plist"'), -1);
+     });
+
+test('строка с незнакомой стороной не рисуется и в счёт не идёт', function () {
+  assert.strictEqual(markup.ghostsHtml([ghost('a.patch', 'нечто')], ''), '');
+  var html = markup.ghostsHtml([ghost('a.patch', 'branch'),
+                                ghost('b.patch', 'нечто')], '');
+  assert.match(html, /нет в пакете<span class="n">1</);
+  assert.strictEqual(html.indexOf('b.patch'), -1);
+});
+
+test('класс патча виден и покрашен', function () {
+  var html = markup.ghostsHtml([ghost('a.patch', 'branch', 'SAST')], '');
+  assert.match(html, /SAST/);
+  assert.match(html, /class="pcls [^"]+"/);
+});
