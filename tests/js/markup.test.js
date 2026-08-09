@@ -240,6 +240,28 @@ test('дельта без изменений — прочерк, а не «+0 �
   assert.match(markup.delta(2, 1), /\+2.*−1/);
 });
 
+/* Третий довод строго дописывается: той же delta рисуется колонка Δ RPM,
+   где третьего исхода не бывает и не будет, и любая правка её разметки
+   поехала бы вместе с этой. */
+test('delta с двумя доводами даёт ровно то же, что и раньше', function () {
+  assert.strictEqual(markup.delta(0, 0), '<span class="zero">—</span>');
+  assert.strictEqual(markup.delta(1, 0), '<span class="plus">+1</span> ');
+  assert.strictEqual(markup.delta(0, 1), '<span class="minus">−1</span>');
+  assert.strictEqual(markup.delta(1, 1),
+    '<span class="plus">+1</span> <span class="minus">−1</span>');
+});
+
+test('delta показывает переписанные третьим знаком', function () {
+  assert.strictEqual(markup.delta(0, 0, 2), '<span class="tilde">~2</span>');
+  assert.strictEqual(markup.delta(0, 1, 2),
+    '<span class="minus">−1</span> <span class="tilde">~2</span>');
+  assert.strictEqual(markup.delta(1, 0, 2),
+    '<span class="plus">+1</span> <span class="tilde">~2</span>');
+  assert.strictEqual(markup.delta(1, 1, 2),
+    '<span class="plus">+1</span> <span class="minus">−1</span>'
+    + ' <span class="tilde">~2</span>');
+});
+
 test('бейдж отставания есть только когда есть отставание', function () {
   assert.strictEqual(markup.aheadHtml({ commits_ahead: 0, branch: 'br' }), '');
   assert.strictEqual(markup.aheadHtml({ commits_ahead: null, branch: 'br' }), '');

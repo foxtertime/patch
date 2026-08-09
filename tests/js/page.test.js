@@ -401,6 +401,41 @@ test('сортировка по другой колонке начинается
   assert.deepStrictEqual(p.st.sort.state, { key: 'patches', asc: true });
 });
 
+test('сортировка по Δ патчей считает и переписанные', function () {
+  /* Компонент, у которого переписан единственный патч, раньше стоял в
+     колонке с прочерком и по ней же уезжал вниз — то есть ровно тот
+     случай, ради которого 2.3.0 и делалась, из колонки не читался.
+
+     Патч отдан httpd, а не nginx: у обоих dpatch пока считался нулём,
+     ничью решало имя, и алфавит уже ставил nginx перед httpd что до
+     правки, что после — тест зеленел бы независимо от того, права
+     колонка или нет. Переписанный патч у httpd переворачивает алфавитную
+     подсказку: до правки побеждает она и наверх лезет nginx, после
+     правки побеждает вес патча и наверх должен лечь httpd. */
+  function withSha(sha) {
+    var p = patch('CVE-2026-3011.patch', 'CVE');
+    p.sha = sha;
+    return p;
+  }
+  var was = snap('os-9.1', JUL, { builds: [
+    build('nginx', { patches: [] }),
+    build('httpd', { patches: [withSha('aaa')] }) ] });
+  var now = snap('os-9.2', AUG, { builds: [
+    build('nginx', { patches: [] }),
+    build('httpd', { patches: [withSha('bbb')] }) ] });
+  var p = make([was, now]);
+  p.st.tab = 'diff';
+  /* Снимаем умолчание «только изменившиеся»: неизменившийся nginx нужен в
+     таблице именно затем, чтобы было с чем сравнивать порядок. */
+  p.toggleFilter('all');
+  p.sortBy('dpatch');            /* по возрастанию */
+  p.sortBy('dpatch');            /* второй клик по той же — по убыванию */
+  var order = p.sortRows(p.visibleRows()).map(function (i) {
+    return i.row.name;
+  });
+  assert.deepStrictEqual(order, ['httpd', 'nginx']);
+});
+
 test('отметка узла живёт в состоянии и снимается', function () {
   var p = make([snap('os-9.1', JUL), snap('os-9.2', AUG)]);
   assert.strictEqual(p.anchor(), null);

@@ -44,6 +44,7 @@ function diffRow(over) {
            old_inherited: false, new_inherited: false,
            old_patches: [], new_patches: [], rpm_rows: [],
            patches_added: [], patches_removed: [],
+           patches_rewritten: over.patches_rewritten || [],
            rpms_added: [], rpms_removed: [],
            old_owner: over.old_owner || 'builder',
            new_owner: over.new_owner || 'builder',
@@ -119,6 +120,20 @@ test('незнакомый статус не рисует стрелки', funct
   var out = tables.diffRows([{ row: diffRow({ status: 'constructor' }),
                                open: false }], opts());
   assert.match(out, /<td class="dir"><\/td>/);
+});
+
+test('колонка Δ патчей показывает три исхода, Δ RPM — два', function () {
+  var row = diffRow({ patches_rewritten: ['PATCH/c.patch'] });
+  row.patches_added = ['PATCH/a.patch'];
+  row.patches_removed = ['PATCH/b.patch'];
+  row.rpms_added = ['nginx-1.24.0-4.el9.x86_64'];
+  row.rpms_removed = ['nginx-1.24.0-3.el9.x86_64'];
+  var out = tables.diffRows([{ row: row, open: false }], opts());
+  var cells = out.match(/<td class="pat">.*?<\/td>/g);
+  assert.strictEqual(cells.length, 2);
+  assert.match(cells[0], /tilde">~1</);
+  /* У пакетов третьего исхода нет и не будет: сравнивать в них нечего. */
+  assert.doesNotMatch(cells[1], /tilde/);
 });
 
 /* Раскрытая строка и её детали — один предмет: полоса слева идёт через

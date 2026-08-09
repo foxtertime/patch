@@ -275,7 +275,8 @@
         + `<td class="dir">${own(labels.ARROW, row.status) || ''}</td>`
         + `<td class="ver new">${row.new_evr ? hl(row.new_evr, q) : '—'}</td>`
         + `<td class="pat">${markup.delta(row.patches_added.length,
-                                          row.patches_removed.length)}</td>`
+                                          row.patches_removed.length,
+                                          (row.patches_rewritten || []).length)}</td>`
         + `<td class="pat">${markup.delta(row.rpms_added.length,
                                           row.rpms_removed.length)}</td>`
         + `<td class="marks">${markup.marksHtml(row.marks)}</td>`

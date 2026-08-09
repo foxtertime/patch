@@ -442,7 +442,10 @@
       if (st.tab === 'diff') {
         if (key === 'old') return row.old_evr || '';
         if (key === 'new') return row.new_evr || '';
-        if (key === 'dpatch') return row.patches_added.length + row.patches_removed.length;
+        if (key === 'dpatch') {
+          return row.patches_added.length + row.patches_removed.length
+               + (row.patches_rewritten || []).length;
+        }
         if (key === 'drpm') return row.rpms_added.length + row.rpms_removed.length;
         return row.name || '';
       }

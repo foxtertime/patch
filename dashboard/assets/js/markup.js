@@ -373,10 +373,21 @@
     return out;
   }
 
-  function delta(added, removed) {
-    if (!added && !removed) return '<span class="zero">—</span>';
+  /* Третий исход дописывается, а не переписывает первые два: этой же
+     функцией рисуется колонка Δ RPM, где переписанных не бывает — у
+     пакетов нет содержимого, которое можно сравнить, — и вызов с двумя
+     доводами обязан дать ровно прежнюю строку.
+
+     Цвет тот же янтарный, что у переписанного патча в списке «стало», у
+     «сменил ветку» и у «ветка +N»: на этой странице он значит
+     «разъехалось, но ничего не потеряно», и третья легенда тут не нужна. */
+  function delta(added, removed, rewritten) {
+    if (!added && !removed && !rewritten) return '<span class="zero">—</span>';
     return (added ? `<span class="plus">+${added}</span> ` : '')
-         + (removed ? `<span class="minus">−${removed}</span>` : '');
+         + (removed ? `<span class="minus">−${removed}</span>` : '')
+         + (rewritten
+              ? `${removed ? ' ' : ''}<span class="tilde">~${rewritten}</span>`
+              : '');
   }
 
   return { markHtml, marksHtml, linkHtml, kv, signHtml, meterHtml, aheadHtml,
