@@ -12,7 +12,7 @@ from urllib.parse import quote
 
 from .httpclient import HttpClient, server_message
 
-TreeResult = namedtuple("TreeResult", "present paths problem")
+TreeResult = namedtuple("TreeResult", "present paths problem blobs")
 CompareResult = namedtuple("CompareResult", "head ahead problem")
 
 logger = logging.getLogger(__name__)
@@ -77,7 +77,7 @@ class GitlabClient:
     def patch_files(self, host, project, ref) -> TreeResult:
         """Пути файлов внутри каталога патчей ветки; результат мемоизируется."""
         if not ref:
-            return TreeResult(None, [], "gitlab: no ref in source url")
+            return TreeResult(None, [], "gitlab: no ref in source url", {})
         key = (host, project, ref)
         with self._lock:
             if key in self._cache:
@@ -91,7 +91,7 @@ class GitlabClient:
     def _fetch(self, host, project, ref) -> TreeResult:
         cfg, note = self._resolve_host(host)
         if cfg is None:
-            return TreeResult(None, [], "gitlab: unknown host %s" % host)
+            return TreeResult(None, [], "gitlab: unknown host %s" % host, {})
         result = self._fetch_tree(cfg, project, ref)
         if not note:
             return result
@@ -99,7 +99,7 @@ class GitlabClient:
         # остаётся тем, что вернул сервер, — билд просто получает проблему.
         problem = note if not result.problem else "%s; %s" % (note,
                                                               result.problem)
-        return TreeResult(result.present, result.paths, problem)
+        return TreeResult(result.present, result.paths, problem, result.blobs)
 
     def _fetch_tree(self, cfg, project, ref) -> TreeResult:
         url = "%s/projects/%s/repository/tree" % (
@@ -107,6 +107,7 @@ class GitlabClient:
         headers = {"PRIVATE-TOKEN": self._token} if self._token else {}
 
         paths = []
+        blobs = {}
         page = None
         while True:
             params = {"ref": ref, "path": self._patch_dir,
@@ -115,11 +116,11 @@ class GitlabClient:
                 params["page"] = page
             response = self._http.get(url, headers, params)
             if isinstance(response, str):
-                return TreeResult(None, [], response)
+                return TreeResult(None, [], response, {})
             if response.status == 404:
                 note = server_message(response)
                 if "project not found" in note.lower():
-                    return TreeResult(None, [], "gitlab: %s" % note)
+                    return TreeResult(None, [], "gitlab: %s" % note, {})
                 # Остальные 404 неоднозначны: «в ветке нет каталога» и «нет
                 # самой ветки» приходят одинаковым кодом, а формулировка
                 # зависит от версии GitLab — «404 Tree Not Found», «404
@@ -129,14 +130,19 @@ class GitlabClient:
             if response.status >= 400:
                 return TreeResult(None, [],
                                   "gitlab: %s %s" % (response.status,
-                                                     server_message(response)))
+                                                     server_message(response)),
+                                  {})
             for item in response.body or []:
                 if item.get("type") == "blob":
                     paths.append(item["path"])
+                    # id блоба — содержимое файла: одинаковый id у двух
+                    # деревьев значит, что файл тот же самый, а разный —
+                    # что его переписали
+                    blobs[item["path"]] = item.get("id")
             page = (response.headers or {}).get("x-next-page") or ""
             if not page:
                 break
-        return TreeResult(True, sorted(paths), None)
+        return TreeResult(True, sorted(paths), None, blobs)
 
     def _resolve_missing_tree(self, cfg, project, ref, headers) -> TreeResult:
         """404 Tree Not Found неоднозначен: либо в ветке просто нет PATCH,
@@ -150,20 +156,20 @@ class GitlabClient:
         if isinstance(response, str):
             logger.debug("%s: ветка %s — не удалось выяснить, есть ли она: %s",
                          project, ref, response)
-            return TreeResult(None, [], response)
+            return TreeResult(None, [], response, {})
         if response.status == 404:
             logger.debug("%s: ветки %s нет, поэтому и каталога %s не нашлось",
                          project, ref, self._patch_dir)
-            return TreeResult(None, [], "gitlab: ref not found")
+            return TreeResult(None, [], "gitlab: ref not found", {})
         if 200 <= response.status < 300:
             logger.debug("%s: ветка %s есть, каталога %s в ней нет — это не "
                          "ошибка, патчей у билда просто нет",
                          project, ref, self._patch_dir)
-            return TreeResult(False, [], None)
+            return TreeResult(False, [], None, {})
         logger.debug("%s: ветка %s — не удалось выяснить, есть ли она: %s %s",
                      project, ref, response.status, server_message(response))
         return TreeResult(None, [],
-                          "gitlab: %s %s" % (response.status, server_message(response)))
+                          "gitlab: %s %s" % (response.status, server_message(response)), {})
 
     # -- сравнение коммитов -----------------------------------------------
     def compare(self, host, project, from_sha, to_ref) -> CompareResult:

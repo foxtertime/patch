@@ -237,6 +237,20 @@ class PatchFilesTest(unittest.TestCase):
         self.assertIsNone(result.present)
         self.assertIn("ref", result.problem)
 
+    def test_blob_ids_come_along_with_paths(self):
+        cli, _ = client({TREE_URL: TWO_FILES})
+        result = cli.patch_files("gitlab.example.com", "g/r", "br")
+        self.assertEqual(result.blobs,
+                         {"PATCH/CVE-2024-7347.patch": "1",
+                          "PATCH/sub/sast-x.patch": "3"})
+
+    def test_failed_read_has_empty_blobs_not_none(self):
+        # у неудачного чтения blobs пуст, а не None: сравнивать деревья
+        # придётся всегда, и None заставил бы каждого звонящего проверять
+        cli, _ = client({TREE_URL: Response(500, {"message": "boom"}, {})})
+        result = cli.patch_files("gitlab.example.com", "g/r", "br")
+        self.assertEqual(result.blobs, {})
+
 
 COMPARE_URL = "https://gitlab.example.com/api/v4/projects/g%2Fr/repository/compare"
 SHA = "0f1a2b3c4d5e6f70819293a4b5c6d7e8f9001122"
