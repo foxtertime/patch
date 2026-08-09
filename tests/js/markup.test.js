@@ -208,3 +208,36 @@ test('бейдж отставания есть только когда есть 
   assert.match(html, /ветка \+3/);
   assert.match(html, /data-tip="[^"]*br[^"]*"/);
 });
+
+function ghost(name, side, cls) {
+  return { path: 'PATCH/' + name, name: name, 'class': cls || 'CVE',
+           cves: [], url: 'https://gl/' + name, ghost: side };
+}
+
+test('без ghost-патчей секции нет', function () {
+  assert.strictEqual(markup.ghostsHtml([], ''), '');
+});
+
+test('стороны идут в одном порядке и подписаны по-разному', function () {
+  var html = markup.ghostsHtml([ghost('c.patch', 'build'),
+                                ghost('a.patch', 'branch'),
+                                ghost('b.patch', 'changed')], '');
+  var order = ['готово в ветке, не собрано',
+               'переписано в ветке после сборки',
+               'убрано из ветки после сборки'];
+  var at = order.map(function (t) { return html.indexOf(t); });
+  assert.ok(at[0] !== -1 && at[0] < at[1] && at[1] < at[2]);
+});
+
+test('у каждой стороны свой счётчик и своя подсказка', function () {
+  var html = markup.ghostsHtml([ghost('a.patch', 'branch'),
+                                ghost('b.patch', 'branch')], '');
+  assert.match(html, /готово в ветке, не собрано <span class="n">2<\/span>/);
+  assert.match(html, /data-tip="[^"]+"/);
+});
+
+test('класс патча виден и покрашен', function () {
+  var html = markup.ghostsHtml([ghost('a.patch', 'branch', 'SAST')], '');
+  assert.match(html, /SAST/);
+  assert.match(html, /class="pcls [^"]+"/);
+});

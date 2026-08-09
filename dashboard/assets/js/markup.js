@@ -219,6 +219,53 @@
            .map((item) => patchItem(item.p, q, item.cls)).join(''))).join('');
   }
 
+  /* Ghost-патчи — не патчи билда, а различие между коммитом сборки и
+     вершиной ветки. Порядок сторон читается как рассказ: чего в билде не
+     хватает, что в нём устарело, что в нём лишнее. */
+  const GHOST_ORDER = ['branch', 'changed', 'build'];
+  const GHOST_HEAD = {
+    branch: 'готово в ветке, не собрано',
+    changed: 'переписано в ветке после сборки',
+    build: 'убрано из ветки после сборки'
+  };
+  const GHOST_TIP = {
+    branch: 'Файл есть в ветке, но появился после коммита, из которого '
+          + 'собран билд: в пакете его нет.',
+    changed: 'Файл с тем же именем в ветке другой: в пакете лежит его '
+           + 'прежняя редакция.',
+    build: 'Файл был на коммите сборки, а из ветки его убрали: в пакете '
+         + 'он есть.'
+  };
+
+  function ghostItem(g, q) {
+    const href = safeUrl(g.url);
+    const title = href
+      ? `<a href="${esc(href)}" target="_blank" rel="noopener">`
+        + `${hl(g.name, q)}</a>`
+      : `<span class="mono">${hl(g.name, q)}</span>`;
+    /* Класс подписью, а не отдельной группой: сторон уже три, и деление
+       каждой ещё и по классам дало бы девять заголовков на четыре файла. */
+    const cls = g['class']
+      ? `<span class="pcls ${labels.classCls(g['class'])}">`
+        + `${esc(g['class'])}</span>` : '';
+    const path = pathAdds(g, q) ? `<div class="ppath">${hl(g.path, q)}</div>`
+                                : '';
+    return `<li class="is-ghost">${cls}${title}${path}</li>`;
+  }
+
+  function ghostsHtml(ghosts, q) {
+    if (!ghosts.length) return '';
+    return GHOST_ORDER.map((side) => {
+      const list = ghosts.filter((g) => g.ghost === side);
+      if (!list.length) return '';
+      return `<div class="pgroup ghost">`
+           + `<div class="pclass" data-tip="${esc(GHOST_TIP[side])}">`
+           + `${esc(GHOST_HEAD[side])} <span class="n">${list.length}</span>`
+           + `</div><ul class="plist">`
+           + `${list.map((g) => ghostItem(g, q)).join('')}</ul></div>`;
+    }).join('');
+  }
+
   /* Архитектуру считает rpms.js — тот же модуль, что раскладывает пакеты по
      порядку. Своя копия здесь уже разошлась с ним и падала на пакете, который
      не строка: снапшот приходит из файла, который выбрал человек, а падало это
@@ -303,8 +350,8 @@
 
   return { markHtml, marksHtml, linkHtml, kv, signHtml, meterHtml, aheadHtml,
            pathAdds,
-           patchesHtml, patchesChangeHtml, rpmsHtml, rpmsChangeHtml,
-           rpmSideList,
+           patchesHtml, patchesChangeHtml, ghostsHtml, rpmsHtml,
+           rpmsChangeHtml, rpmSideList,
            taggedCell, builtHtml, inheritedNote, mainTagHtml, otherTagsHtml,
            taggedText, delta };
 }));

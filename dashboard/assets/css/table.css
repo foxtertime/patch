@@ -221,6 +221,17 @@ tr.detail-row > td { background: var(--card); padding: .85rem .7rem 1.1rem 2.2re
 .plist li.is-removed > a, .plist li.is-removed > .mono {
   text-decoration: line-through; }
 .plist .ppath { color: var(--muted); font-size: .74rem; }
+/* Ghost-патчи приглушены нарочно: их нет в пакете, и читаться они должны
+   тише настоящих — иначе блок патчей превращается в два равноправных
+   списка, и какой из них про билд, станет неочевидно. */
+.pgroup.ghost { margin-top: .75rem; padding-top: .5rem;
+                border-top: 1px dashed var(--line); }
+.pgroup.ghost .pclass { color: var(--muted); font-weight: 600;
+                        text-transform: none; letter-spacing: 0;
+                        cursor: help; }
+.pgroup.ghost .plist li.is-ghost { opacity: .72; }
+.pgroup.ghost .pcls { margin-right: .35rem; font-size: .66rem;
+                      font-weight: 700; letter-spacing: .04em; }
 /* Знак дублирует цвет — на случай, если цвет не различим. */
 .sign { font-weight: 700; margin-right: .15rem; }
 /* Пакеты — такой же список, как патчи, по одному в строке. */

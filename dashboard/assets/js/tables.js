@@ -113,7 +113,8 @@
 
       + `<div class="block">${blockHead('патчи', row.patches.length,
                                         markup.aheadHtml(row))}`
-      + `${markup.patchesHtml(row.patches, q)}</div>`;
+      + `${markup.patchesHtml(row.patches, q)}`
+      + `${markup.ghostsHtml(row.ghosts || [], q)}</div>`;
 
     if (row.problems.length) {
       const items = row.problems.map((p) => `<li>${hl(p, q)}</li>`).join('');

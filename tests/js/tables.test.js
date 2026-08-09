@@ -293,6 +293,19 @@ test('бейдж отставания попадает в шапку блока 
   assert.match(out, /<div class="bl">патчи[\s\S]*ветка \+4/);
 });
 
+test('ghost-секция стоит в блоке патчей', function () {
+  var row = stateRow({ ghosts: [{ path: 'PATCH/x.patch', name: 'x.patch',
+                                  'class': 'CVE', cves: [],
+                                  url: 'https://gl/x', ghost: 'branch' }] });
+  var out = tables.stateRows([{ row: row, open: true }], opts());
+  assert.match(out, /готово в ветке, не собрано/);
+});
+
+test('без ghost блок патчей прежний', function () {
+  var out = tables.stateRows([{ row: stateRow(), open: true }], opts());
+  assert.strictEqual(out.indexOf('готово в ветке'), -1);
+});
+
 test('сводка стороны диффа несёт всю карточку билда', function () {
   /* «Было» и «стало» — это две карточки одного билда, и обрезать их до
      трёх строк значит заставлять уходить из раскрытия за остальным. */
