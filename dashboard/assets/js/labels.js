@@ -26,7 +26,8 @@
     "added": "появился", "removed": "исчез", "unchanged": "версия та же",
     "upgraded": "версия выросла", "downgraded": "версия упала",
     "repackaged": "состав RPM изменился", "patches+": "патчи пришли",
-    "patches-": "патчи ушли", "branch-changed": "сменил ветку",
+    "patches-": "патчи ушли", "patches~": "патчи переписаны",
+    "branch-changed": "сменил ветку",
     "changed": "что-то изменилось"
   };
   /* Подписи классов патчей живут отдельно от постоянных: классы приходят с
@@ -40,6 +41,7 @@
                         "changelog": 1, "files": 1, "other": 1 };
   const CALM_MARKS = { "from-commit": "warn", "from-srpm": "warn",
                        "branch-ahead": "warn",
+                       "patches~": "warn",
                        "no-patch": "calm",
                        "no-source": "bad", "gitlab-error": "bad",
                        "internal-error": "bad", "inherited": "calm" };
@@ -71,7 +73,7 @@
       { id: "status", label: "статус",
         keys: ["added", "removed", "upgraded", "downgraded", "unchanged"] },
       { id: "change", label: "что изменилось",
-        keys: ["changed", "patches+", "patches-", "repackaged",
+        keys: ["changed", "patches+", "patches-", "patches~", "repackaged",
                "branch-changed", "tag-changed"] }
     ]
   };

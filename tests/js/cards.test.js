@@ -23,6 +23,7 @@ function pair(over) {
            counts: Object.assign({
              changed: 1, added: 0, removed: 0, upgraded: 1, downgraded: 0,
              unchanged: 0, patches_added: 0, patches_removed: 0,
+             patches_rewritten: 0,
              repackaged: 0, branch_changed: 0, tag_changed: 0
            }, over.counts || {}) };
 }
@@ -73,9 +74,15 @@ test('класс с именем constructor не роняет карточки'
 test('карточки диффа перечисляют все одиннадцать срезов', function () {
   var out = cards.diffCards(pair());
   var found = out.match(/data-filter="/g) || [];
-  assert.strictEqual(found.length, 11);
+  assert.strictEqual(found.length, 12);
   assert.match(out, /data-filter="patches\+"/);
   assert.match(out, /data-filter="tag-changed"/);
+});
+
+test('ряд итогов считает переписанные патчи', function () {
+  var out = cards.diffCards(pair({ counts: { patches_rewritten: 3 } }));
+  assert.match(out, /data-filter="patches~"/);
+  assert.match(out, /патчи переписаны/);
 });
 
 test('карточка диффа подписана «из скольких»', function () {
