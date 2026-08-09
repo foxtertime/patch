@@ -50,8 +50,15 @@ test('высота липкой шапки выставляется при со�
   dom.document.documentElement.style.setProperty = function (name, value) {
     calls.push([name, value]);
   };
-  viewportmod.create({ controls: dom.id('controls'), toTop: dom.id('totop'),
+  /* Заглушка отдаёт всем узлам один и тот же прямоугольник; ставим свою
+     высоту прямо здесь, чтобы ожидаемое значение ниже было тем, что задали
+     сами, а не случайным числом из чужой заглушки. */
+  var controls = dom.id('controls');
+  controls.getBoundingClientRect = function () {
+    return { top: 0, left: 0, right: 100, bottom: 42, width: 100, height: 42 };
+  };
+  viewportmod.create({ controls: controls, toTop: dom.id('totop'),
                        onResize: function () {} });
   assert.strictEqual(calls.length, 1);
-  assert.strictEqual(calls[0][0], '--controls-h');
+  assert.deepStrictEqual(calls[0], ['--controls-h', '42px']);
 });
