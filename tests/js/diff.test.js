@@ -478,3 +478,68 @@ test('нестроковое имя пакета не роняет сравне�
     diff.alignRpms(older.builds[0], newer.builds[0]);
   });
 });
+
+function withPatch(over, path, sha) {
+  return build(Object.assign({ patches: [{ path: path, name: 'x.patch',
+                                           'class': 'CVE', sha: sha }] },
+                             over || {}));
+}
+
+test('патч переписан: путь тот же, sha другой', function () {
+  var pair = diff.diffSnapshots(
+    snap('a', [withPatch({}, 'PATCH/x.patch', 'aaa')]),
+    snap('b', [withPatch({ nvr: 'nginx-2.0-1.el9', version: '2.0' },
+                         'PATCH/x.patch', 'bbb')]));
+  assert.deepStrictEqual(only(pair).patches_rewritten, ['PATCH/x.patch']);
+  assert.deepStrictEqual(only(pair).patches_added, []);
+  assert.deepStrictEqual(only(pair).patches_removed, []);
+});
+
+test('тот же sha — патч уцелел, а не переписан', function () {
+  var pair = diff.diffSnapshots(
+    snap('a', [withPatch({}, 'PATCH/x.patch', 'aaa')]),
+    snap('b', [withPatch({ nvr: 'nginx-2.0-1.el9', version: '2.0' },
+                         'PATCH/x.patch', 'aaa')]));
+  assert.deepStrictEqual(only(pair).patches_rewritten, []);
+});
+
+test('sha известен только с одной стороны — молчим', function () {
+  var pair = diff.diffSnapshots(
+    snap('a', [withPatch({}, 'PATCH/x.patch', undefined)]),
+    snap('b', [withPatch({ nvr: 'nginx-2.0-1.el9', version: '2.0' },
+                         'PATCH/x.patch', 'bbb')]));
+  assert.deepStrictEqual(only(pair).patches_rewritten, []);
+});
+
+test('переписанный патч делает компонент изменившимся', function () {
+  // сам по себе, без смены версии: status остался unchanged, а метка
+  // «изменился» обязана появиться — иначе подпись карточки «изменилось
+  // хоть что-нибудь» становится неправдой
+  var pair = diff.diffSnapshots(
+    snap('a', [withPatch({}, 'PATCH/x.patch', 'aaa')]),
+    snap('b', [withPatch({}, 'PATCH/x.patch', 'bbb')]));
+  assert.strictEqual(only(pair).status, 'unchanged');
+  assert.strictEqual(only(pair).changed, true);
+});
+
+test('счётчик считает компоненты, а не файлы', function () {
+  var two = build({ nvr: 'curl-1.0-1.el9', name: 'curl',
+                    patches: [{ path: 'PATCH/a.patch', name: 'a.patch',
+                                'class': 'CVE', sha: 'a1' },
+                              { path: 'PATCH/b.patch', name: 'b.patch',
+                                'class': 'CVE', sha: 'b1' }] });
+  var twoNew = build({ nvr: 'curl-1.0-1.el9', name: 'curl',
+                       patches: [{ path: 'PATCH/a.patch', name: 'a.patch',
+                                   'class': 'CVE', sha: 'a2' },
+                                 { path: 'PATCH/b.patch', name: 'b.patch',
+                                   'class': 'CVE', sha: 'b2' }] });
+  var pair = diff.diffSnapshots(snap('a', [two]), snap('b', [twoNew]));
+  assert.strictEqual(pair.counts.patches_rewritten, 1);
+});
+
+test('появившийся и исчезнувший компонент переписанных не имеют', function () {
+  var added = diff.diffSnapshots(snap('a', []), snap('b', [build({})]));
+  var gone = diff.diffSnapshots(snap('a', [build({})]), snap('b', []));
+  assert.deepStrictEqual(only(added).patches_rewritten, []);
+  assert.deepStrictEqual(only(gone).patches_rewritten, []);
+});
