@@ -19,6 +19,7 @@
       "ghost": null,
       "name": "CVE-2025-1112.patch",
       "path": "PATCH/CVE-2025-1112.patch",
+      "sha": null,
       "web_url": "https://gl/blob/PATCH/CVE-2025-1112.patch"
      },
      {
@@ -27,6 +28,7 @@
       "ghost": null,
       "name": "changelog.yaml",
       "path": "PATCH/changelog.yaml",
+      "sha": null,
       "web_url": "https://gl/blob/PATCH/changelog.yaml"
      },
      {
@@ -35,6 +37,7 @@
       "ghost": null,
       "name": "nginx.spec.patch",
       "path": "PATCH/nginx.spec.patch",
+      "sha": null,
       "web_url": "https://gl/blob/PATCH/nginx.spec.patch"
      },
      {
@@ -43,6 +46,7 @@
       "ghost": null,
       "name": "nginx-distsuffix.patch",
       "path": "PATCH/nginx-distsuffix.patch",
+      "sha": null,
       "web_url": "https://gl/blob/PATCH/nginx-distsuffix.patch"
      }
     ],
@@ -165,6 +169,7 @@
       "ghost": null,
       "name": "coverage-vim.patch",
       "path": "PATCH/coverage-vim.patch",
+      "sha": null,
       "web_url": "https://gl/blob/PATCH/coverage-vim.patch"
      }
     ],
@@ -196,6 +201,7 @@
       "ghost": null,
       "name": "autogen-cve-patches.inc.new",
       "path": "PATCH/autogen-cve-patches.inc.new",
+      "sha": null,
       "web_url": "https://gl/blob/PATCH/autogen-cve-patches.inc.new"
      },
      {
@@ -206,6 +212,7 @@
       "ghost": null,
       "name": "CVE-2025-2003.patch",
       "path": "PATCH/CVE-2025-2003.patch",
+      "sha": null,
       "web_url": "https://gl/blob/PATCH/CVE-2025-2003.patch"
      },
      {
@@ -214,6 +221,7 @@
       "ghost": null,
       "name": "sast-kernel-net.patch",
       "path": "PATCH/sast-kernel-net.patch",
+      "sha": null,
       "web_url": "https://gl/blob/PATCH/sast-kernel-net.patch"
      },
      {
@@ -222,6 +230,7 @@
       "ghost": null,
       "name": "sast-kernel-fs.patch",
       "path": "PATCH/sast-kernel-fs.patch",
+      "sha": null,
       "web_url": "https://gl/blob/PATCH/sast-kernel-fs.patch"
      },
      {
@@ -230,6 +239,7 @@
       "ghost": null,
       "name": "dast-kernel-fuzz.patch",
       "path": "PATCH/dast-kernel-fuzz.patch",
+      "sha": null,
       "web_url": "https://gl/blob/PATCH/dast-kernel-fuzz.patch"
      },
      {
@@ -238,6 +248,7 @@
       "ghost": null,
       "name": "coverage-kernel.patch",
       "path": "PATCH/coverage-kernel.patch",
+      "sha": null,
       "web_url": "https://gl/blob/PATCH/coverage-kernel.patch"
      },
      {
@@ -246,6 +257,7 @@
       "ghost": null,
       "name": "kernel.spec.distsuffix.patch",
       "path": "PATCH/kernel.spec.distsuffix.patch",
+      "sha": null,
       "web_url": "https://gl/blob/PATCH/kernel.spec.distsuffix.patch"
      },
      {
@@ -254,6 +266,7 @@
       "ghost": null,
       "name": "kernel.spec.patch",
       "path": "PATCH/kernel.spec.patch",
+      "sha": null,
       "web_url": "https://gl/blob/PATCH/kernel.spec.patch"
      },
      {
@@ -262,6 +275,7 @@
       "ghost": null,
       "name": "linux-5.14.0.tar.gz",
       "path": "PATCH/linux-5.14.0.tar.gz",
+      "sha": null,
       "web_url": "https://gl/blob/PATCH/linux-5.14.0.tar.gz"
      }
     ],
@@ -315,6 +329,7 @@
       "ghost": null,
       "name": "source.tar.gz",
       "path": "PATCH/source.tar.gz",
+      "sha": null,
       "web_url": "https://gl/blob/PATCH/source.tar.gz"
      }
     ],
@@ -362,6 +377,7 @@
       "ghost": null,
       "name": "CVE-2025-3001.patch",
       "path": "PATCH/CVE-2025-3001.patch",
+      "sha": null,
       "web_url": "https://gl/blob/PATCH/CVE-2025-3001.patch"
      },
      {
@@ -370,6 +386,7 @@
       "ghost": null,
       "name": "openssl-distsuffix.patch",
       "path": "PATCH/openssl-distsuffix.patch",
+      "sha": null,
       "web_url": "https://gl/blob/PATCH/openssl-distsuffix.patch"
      }
     ],
@@ -403,7 +420,7 @@
     "version": "3.2.1"
    }
   ],
-  "dashboard": "2.1.0",
+  "dashboard": "2.2.0",
   "generated": "2026-10-15T12:00:00+03:00",
   "koji_hub": "https://mirror/kojihub",
   "koji_web": "https://mirror/koji",
