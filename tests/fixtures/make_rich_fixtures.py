@@ -33,6 +33,13 @@ CLASSES_WITH_LICENSE = ["AUTOGEN", "CVE", "SAST", "DAST", "COVERAGE",
                         "DISTSUFFIX", "LICENSE", "SPEC", "CHANGELOG",
                         "FILES", "other"]
 
+# Ссылки демонстрационного билда httpd (собран с коммита, ghost-патчи всех
+# трёх сторон): короткие постоянные рядом с остальными в шапке, чтобы
+# длинные адреса не расползались по строкам самих Build().
+BLOB = ("https://gitlab.example.com/g/httpd/-/blob/"
+        "0f1a2b3c4d5e6f70819293a4b5c6d7e8f9001122/PATCH/%s")
+BLOB_BRANCH = "https://gitlab.example.com/g/httpd/-/blob/os-9.4/PATCH/%s"
+
 
 def src(project, ref, kind="branch"):
     return Source(raw="git+https://gl/%s?#%s" % (project, ref), host="gl",
@@ -675,22 +682,73 @@ def many_snapshot():
 
     Прежние компоненты цепочки на месте: без них диапазон os-9.6 → os-9.7
     состоял бы из одних появившихся, и смотреть в нём было бы нечего.
+
+    Здесь же httpd впервые за всю цепочку затегован прямо, а не унаследован:
+    пересобран с ветки os-9.4 (тег в этом мире не изменил самой ветки — она
+    просто отстала от него), коммит сборки известен из `source`, и с тех пор
+    ветка ушла на четыре коммита вперёд. На таком билде видны разом: бейдж
+    «ветка +N», метка `branch-ahead` и ghost-патчи всех трёх сторон — то, чего
+    ни один прежний компонент цепочки не показывал.
     """
     prev = wide_snapshot().by_name()
+    tag = "os-9.7"
     builds = [
-        same(prev, "nginx", "os-9.7"),
-        same(prev, "httpd", "os-9.7", tag_name="os-9.4",
-             tags=["os-9.4", "os-9.7"]),
-        same(prev, "zlib", "os-9.7"),
-        same(prev, "vim", "os-9.7", tag_name=None, tags=[]),
-        same(prev, "kernel", "os-9.7"),
-        same(prev, "curl", "os-9.7"),
-        same(prev, "openssl", "os-9.7"),
-        same(prev, "chromium", "os-9.7", tag_name="os-9.5",
-             tags=["os-9.5", "os-9.7"]),
+        same(prev, "nginx", tag),
+        # ghost-патчи всех трёх сторон и «ветка +N»: собран с коммита ветки
+        # os-9.4, которая с тех пор ушла на четыре коммита вперёд. Ссылки не
+        # случайны — у патчей билда и у стороны build они ведут на коммит, у
+        # branch и changed — на ветку, так же как их строит collect
+        Build(nvr="httpd-2.4.62-13.el9", name="httpd", version="2.4.62",
+              release="13.el9", build_id=901, task_id=9011, owner="builder",
+              completed="2026-07-01 10:00:00", tag_name=tag,
+              source=Source(
+                  raw="git+https://gitlab.example.com/g/httpd#origin/os-9.4",
+                  host="gitlab.example.com", project="g/httpd",
+                  ref="os-9.4", ref_kind="branch",
+                  web_url="https://gitlab.example.com/g/httpd/-/tree/os-9.4",
+                  commit="0f1a2b3c4d5e6f70819293a4b5c6d7e8f9001122",
+                  commit_url="https://gitlab.example.com/g/httpd/-/tree/"
+                             "0f1a2b3c4d5e6f70819293a4b5c6d7e8f9001122",
+                  commit_source="koji_source",
+                  branch_head="99aabbccddeeff00112233445566778899aabbcc",
+                  commits_ahead=4),
+              patches_ref="0f1a2b3c4d5e6f70819293a4b5c6d7e8f9001122",
+              patch_dir_present=True,
+              rpms=["httpd-2.4.62-13.el9.x86_64"],
+              patches=[
+                  Patch(path="PATCH/CVE-2026-1111.patch",
+                        name="CVE-2026-1111.patch", cls="CVE",
+                        cves=["CVE-2026-1111"],
+                        web_url=BLOB % "CVE-2026-1111.patch"),
+                  Patch(path="PATCH/httpd-distsuffix.patch",
+                        name="httpd-distsuffix.patch", cls="DISTSUFFIX",
+                        web_url=BLOB % "httpd-distsuffix.patch"),
+                  Patch(path="PATCH/old-fix.patch", name="old-fix.patch",
+                        cls="other", web_url=BLOB % "old-fix.patch"),
+              ],
+              ghost_patches=[
+                  Patch(path="PATCH/CVE-2026-9999.patch",
+                        name="CVE-2026-9999.patch", cls="CVE",
+                        cves=["CVE-2026-9999"], ghost="branch",
+                        web_url=BLOB_BRANCH % "CVE-2026-9999.patch"),
+                  Patch(path="PATCH/httpd-distsuffix.patch",
+                        name="httpd-distsuffix.patch", cls="DISTSUFFIX",
+                        ghost="changed",
+                        web_url=BLOB_BRANCH % "httpd-distsuffix.patch"),
+                  Patch(path="PATCH/old-fix.patch", name="old-fix.patch",
+                        cls="other", ghost="build",
+                        web_url=BLOB % "old-fix.patch"),
+              ]),
+        same(prev, "zlib", tag),
+        same(prev, "vim", tag, tag_name=None, tags=[]),
+        same(prev, "kernel", tag),
+        same(prev, "curl", tag),
+        same(prev, "openssl", tag),
+        same(prev, "chromium", tag, tag_name="os-9.5",
+             tags=["os-9.5", tag]),
     ]
     return Snapshot(
-        tag="os-9.7", generated="2026-12-01T00:00:00+03:00",
+        tag=tag, generated="2026-12-01T00:00:00+03:00",
         koji_hub="https://hub/kojihub", koji_web="https://hub/koji",
         patch_classes=list(CLASSES_WITH_LICENSE),
         builds=builds + many_builds())

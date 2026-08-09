@@ -76,40 +76,91 @@
     "version": "1.27.0"
    },
    {
-    "build_id": 143,
-    "completed": "2026-09-30 12:00:00",
-    "epoch": 1,
-    "ghost_patches": [],
+    "build_id": 901,
+    "completed": "2026-07-01 10:00:00",
+    "epoch": null,
+    "ghost_patches": [
+     {
+      "class": "CVE",
+      "cves": [
+       "CVE-2026-9999"
+      ],
+      "ghost": "branch",
+      "name": "CVE-2026-9999.patch",
+      "path": "PATCH/CVE-2026-9999.patch",
+      "web_url": "https://gitlab.example.com/g/httpd/-/blob/os-9.4/PATCH/CVE-2026-9999.patch"
+     },
+     {
+      "class": "DISTSUFFIX",
+      "cves": [],
+      "ghost": "changed",
+      "name": "httpd-distsuffix.patch",
+      "path": "PATCH/httpd-distsuffix.patch",
+      "web_url": "https://gitlab.example.com/g/httpd/-/blob/os-9.4/PATCH/httpd-distsuffix.patch"
+     },
+     {
+      "class": "other",
+      "cves": [],
+      "ghost": "build",
+      "name": "old-fix.patch",
+      "path": "PATCH/old-fix.patch",
+      "web_url": "https://gitlab.example.com/g/httpd/-/blob/0f1a2b3c4d5e6f70819293a4b5c6d7e8f9001122/PATCH/old-fix.patch"
+     }
+    ],
     "name": "httpd",
-    "nvr": "httpd-2.4.62-2.el9",
-    "owner": "httpd-team",
-    "patch_dir_present": false,
-    "patches": [],
-    "patches_ref": null,
+    "nvr": "httpd-2.4.62-13.el9",
+    "owner": "builder",
+    "patch_dir_present": true,
+    "patches": [
+     {
+      "class": "CVE",
+      "cves": [
+       "CVE-2026-1111"
+      ],
+      "ghost": null,
+      "name": "CVE-2026-1111.patch",
+      "path": "PATCH/CVE-2026-1111.patch",
+      "web_url": "https://gitlab.example.com/g/httpd/-/blob/0f1a2b3c4d5e6f70819293a4b5c6d7e8f9001122/PATCH/CVE-2026-1111.patch"
+     },
+     {
+      "class": "DISTSUFFIX",
+      "cves": [],
+      "ghost": null,
+      "name": "httpd-distsuffix.patch",
+      "path": "PATCH/httpd-distsuffix.patch",
+      "web_url": "https://gitlab.example.com/g/httpd/-/blob/0f1a2b3c4d5e6f70819293a4b5c6d7e8f9001122/PATCH/httpd-distsuffix.patch"
+     },
+     {
+      "class": "other",
+      "cves": [],
+      "ghost": null,
+      "name": "old-fix.patch",
+      "path": "PATCH/old-fix.patch",
+      "web_url": "https://gitlab.example.com/g/httpd/-/blob/0f1a2b3c4d5e6f70819293a4b5c6d7e8f9001122/PATCH/old-fix.patch"
+     }
+    ],
+    "patches_ref": "0f1a2b3c4d5e6f70819293a4b5c6d7e8f9001122",
     "problems": [],
-    "release": "2.el9",
+    "release": "13.el9",
     "rpms": [
-     "httpd-2.4.62-2.el9.x86_64"
+     "httpd-2.4.62-13.el9.x86_64"
     ],
     "source": {
-     "branch_head": null,
-     "commit": null,
-     "commit_source": null,
-     "commit_url": null,
-     "commits_ahead": null,
-     "host": "gl",
-     "project": "apps/httpd",
-     "raw": "git+https://gl/apps/httpd?#abc123",
-     "ref": "abc123",
-     "ref_kind": "commit",
-     "web_url": "https://gl/apps/httpd/-/tree/abc123"
+     "branch_head": "99aabbccddeeff00112233445566778899aabbcc",
+     "commit": "0f1a2b3c4d5e6f70819293a4b5c6d7e8f9001122",
+     "commit_source": "koji_source",
+     "commit_url": "https://gitlab.example.com/g/httpd/-/tree/0f1a2b3c4d5e6f70819293a4b5c6d7e8f9001122",
+     "commits_ahead": 4,
+     "host": "gitlab.example.com",
+     "project": "g/httpd",
+     "raw": "git+https://gitlab.example.com/g/httpd#origin/os-9.4",
+     "ref": "os-9.4",
+     "ref_kind": "branch",
+     "web_url": "https://gitlab.example.com/g/httpd/-/tree/os-9.4"
     },
-    "tag_name": "os-9.4",
-    "tags": [
-     "os-9.4",
-     "os-9.7"
-    ],
-    "task_id": 243,
+    "tag_name": "os-9.7",
+    "tags": [],
+    "task_id": 9011,
     "version": "2.4.62"
    },
    {
