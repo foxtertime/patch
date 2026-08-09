@@ -14,20 +14,22 @@
                              require('./page.js'), require('./hash.js'),
                              require('./rail.js'), require('./files.js'),
                              require('./tips.js'), require('./toasts.js'),
-                             require('./filters.js'), require('./search.js'),
-                             require('./copy.js'), require('./viewport.js'));
+                             require('./address.js'), require('./filters.js'),
+                             require('./search.js'), require('./copy.js'),
+                             require('./viewport.js'));
   } else {
     root.KP = root.KP || {};
     root.KP.ui = factory(root.KP.viewmodel, root.KP.store, root.KP.diff,
                          root.KP.text, root.KP.labels, root.KP.markup,
                          root.KP.tables, root.KP.cards, root.KP.page,
                          root.KP.hash, root.KP.rail, root.KP.files,
-                         root.KP.tips, root.KP.toasts, root.KP.filters,
-                         root.KP.search, root.KP.copy, root.KP.viewport);
+                         root.KP.tips, root.KP.toasts, root.KP.address,
+                         root.KP.filters, root.KP.search, root.KP.copy,
+                         root.KP.viewport);
   }
 }(typeof globalThis !== 'undefined' ? globalThis : this,
   function (viewmodel, store, diffmod, text, labels, markup, tables, cards,
-            pagemod, hash, railmod, filesmod, tipsmod, toastsmod,
+            pagemod, hash, railmod, filesmod, tipsmod, toastsmod, addressmod,
             filtersmod, searchmod, copymod, viewportmod) {
   'use strict';
 
@@ -63,11 +65,6 @@
   const fileInput = document.getElementById('file-input');
   const dropZone = document.getElementById('drop');
   const pickBtn = document.getElementById('pick');
-
-  let hashLock = false;
-  /* Писала ли страница адрес сама. С этого мгновения location.hash — её
-     собственное эхо, а не то, с чем её открыли. */
-  let hashIsOurs = false;
 
   /* ---------- вспомогательное ---------- */
 
@@ -238,7 +235,7 @@
       body.innerHTML = st.tab === 'diff' ? tables.diffRows(items, rowOpts())
                                          : tables.stateRows(items, rowOpts());
     }
-    writeHash();
+    address.write();
   }
 
   /* Карточки перерисовываются только при смене вкладки, тега или пары:
@@ -290,33 +287,6 @@
     search.placeholder = name === 'diff'
       ? 'Компонент, версия, тег, ветка, патч, CVE, RPM…'
       : 'Компонент, тег, ветка, патч, CVE, RPM…';
-  }
-
-  /* ---------- состояние в адресной строке ---------- */
-
-  function writeHash() {
-    const next = hash.format(page.hashParts());
-    hashIsOurs = true;
-    if (location.hash === next) return;
-    hashLock = true;
-    try {
-      if (history && history.replaceState) history.replaceState(null, '', next);
-      else location.hash = next;
-    } catch (e) {
-      location.hash = next;
-    }
-    setTimeout(() => { hashLock = false; }, 0);
-  }
-
-  function readHash() {
-    const raw = location.hash.replace(/^#/, '');
-    if (!raw) return false;
-    page.restore(hash.parse(raw));
-    search.value = st.q;
-    /* Запрос мог приехать из ссылки — крестик обязан появиться вместе
-       с ним, а не ждать первого касания клавиатуры. */
-    clearBtn.hidden = !search.value;
-    return true;
   }
 
   /* ---------- события ---------- */
@@ -449,11 +419,6 @@
     render();
   });
 
-  window.addEventListener('hashchange', () => {
-    if (hashLock) return;
-    if (readHash()) { page.dropDeadFilters(); showTab(st.tab); rebuild(); }
-  });
-
   /* ---------- владельцы участков страницы ---------- */
 
   /* Корень заполняется по ходу: рельс берёт метод в момент вызова, а не в
@@ -464,6 +429,11 @@
   const tips = tipsmod.create({ node: document.getElementById('tip') });
   const hideTip = tips.hide;
   const toasts = toastsmod.create({ node: document.getElementById('toasts') });
+  const address = addressmod.create({
+    page: page, hash: hash, dom: { search: search, clear: clearBtn },
+    /* Ссылка, присланная позже, — это смена всего сразу: вкладки, выбора,
+       фильтров. Что после неё перерисовать, знает корень. */
+    onExternal: () => { page.dropDeadFilters(); showTab(st.tab); rebuild(); } });
   let rail = railmod.create({ box: chainBox, page: page, store: store,
                               text: text, app: app, hideTip: hideTip });
   let files = filesmod.create({ store: store, toasts: toasts,
@@ -548,14 +518,15 @@
     /* Адрес читаем, только пока он чужой — тот, с которым страницу открыли.
        Дальше в нём лежит наша же прошлая запись, и она вернула бы прежний
        выбор в обход picked, снова похоронив умолчание. Ссылку, присланную
-       позже, приносит hashchange. */
-    if (!hashIsOurs) readHash();
+       позже, приносит hashchange внутри address. */
+    if (!address.isOurs()) address.read();
     /* Фильтр переживает смену состава снапшотов, а его предмет — нет: класс
        патчей уходит вместе со своим снапшотом, метка строки — вместе с
-       последней такой строкой. Зовём отдельно от readHash(), который выше
-       зовут уже не всегда: иначе страница показывала бы пустую таблицу под
-       фильтр, которого не поставить и не снять — карточки с ним не осталось
-       ни одной, а в чипе вместо подписи стоял бы сам ключ. */
+       последней такой строкой. Зовём отдельно от address.read(), который
+       выше зовут уже не всегда: иначе страница показывала бы пустую
+       таблицу под фильтр, которого не поставить и не снять — карточки с
+       ним не осталось ни одной, а в чипе вместо подписи стоял бы сам
+       ключ. */
     page.dropDeadFilters();
     showTab(st.tab);
     rebuild();
