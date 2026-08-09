@@ -60,3 +60,16 @@ test('совпадение только в ghost-патче находит ст�
     assert.strictEqual(out.show, true);
     assert.strictEqual(out.deep, true);
   });
+
+test('CVE ищется одинаково в патчах билда и в ghost-патчах', function () {
+  var found = { name: 'x.patch', path: 'PATCH/x.patch', 'class': 'CVE',
+                cves: ['CVE-2026-3011'] };
+  var byPatch = search.scanState(
+    { patches: [found], ghosts: [], rpms: [], problems: [] },
+    'cve-2026-3011');
+  var byGhost = search.scanState(
+    { patches: [], ghosts: [found], rpms: [], problems: [] },
+    'cve-2026-3011');
+  assert.deepStrictEqual(byPatch, byGhost);
+  assert.deepStrictEqual(byPatch, { show: true, deep: true });
+});
