@@ -89,7 +89,8 @@ def _commit_of(info: dict, parsed):
 
 
 def collect_tag(tag: str, cfg, koji_client, gitlab_client, jobs: int = 8,
-                now: Optional[str] = None) -> Snapshot:
+                now: Optional[str] = None,
+                branch_check: bool = True) -> Snapshot:
     """Собирает билды тега, их патчи и RPM в один снапшот."""
     classifier = Classifier.from_config(cfg)
     started = time.monotonic()
@@ -148,7 +149,8 @@ def collect_tag(tag: str, cfg, koji_client, gitlab_client, jobs: int = 8,
                                  entry.get("tag_name"),
                                  tags.get(info.get("build_id"), []))
         try:
-            _attach_patches(build, info, cfg, gitlab_client, classifier)
+            _attach_patches(build, info, cfg, gitlab_client, classifier,
+                            branch_check)
         except Exception as exc:
             # ни одна ошибка билда (в т.ч. неожиданная, не только
             # SourceUrlError/проблема GitLab) не должна валить весь сбор.
@@ -177,7 +179,14 @@ def collect_tag(tag: str, cfg, koji_client, gitlab_client, jobs: int = 8,
                         koji_hub=cfg.koji_hub, koji_web=cfg.koji_web,
                         patch_classes=classifier.class_names(),
                         builds=builds)
-    _log_summary(snapshot, time.monotonic() - started)
+    # Билды, у которых original_url нет, а верхнеуровневый source есть:
+    # формально мы могли бы восстановить им и проект, и коммит, но тогда
+    # билд перестал бы быть no-source и получил бы from-commit — метка
+    # строки и фильтр поехали бы. Число показывает, стоит ли заводить
+    # под это отдельную работу.
+    orphan_source = sum(1 for info in infos
+                        if not _original_url(info) and _koji_source(info))
+    _log_summary(snapshot, time.monotonic() - started, orphan_source)
     return snapshot
 
 
@@ -209,7 +218,8 @@ def _placeholder_build(info: dict, rpms, tags=()) -> Build:
 
 
 def _attach_patches(build: Build, info: dict, cfg, gitlab_client,
-                    classifier: Classifier) -> None:
+                    classifier: Classifier,
+                    branch_check: bool = True) -> None:
     raw_url = _original_url(info)
     if not raw_url:
         build.problems.append("no source url")
@@ -252,6 +262,18 @@ def _attach_patches(build: Build, info: dict, cfg, gitlab_client,
     for path in result.paths:
         build.patches.append(_patch(path, parsed, ref, classifier,
                                     gitlab_client))
+
+    # Сравнивать есть с чем, только когда билд собран с ветки: у сборки
+    # прямо с коммита ветки нет, а без хеша нет и точки отсчёта.
+    if not (branch_check and commit and parsed.ref_kind == "branch"):
+        return
+    ahead = gitlab_client.compare(parsed.host, parsed.project, commit,
+                                  parsed.ref)
+    if ahead.problem:
+        build.problems.append(ahead.problem)
+        return
+    build.source.branch_head = ahead.head
+    build.source.commits_ahead = ahead.ahead
 
 
 # Единственный ответ дерева, по которому видно, что коммита в репозитории
@@ -301,7 +323,8 @@ def _patch(path, parsed, ref, classifier, gitlab_client, ghost=None):
 _GROUPED_PROBLEMS = ("gitlab:", "internal error:", "bad source url:")
 
 
-def _log_summary(snapshot: Snapshot, elapsed: float) -> None:
+def _log_summary(snapshot: Snapshot, elapsed: float,
+                 orphan_source: int = 0) -> None:
     """Итог по тегу — то, что раньше печатал CLI своим sys.stderr.write."""
     summary = problem_summary(snapshot)
     problems = sum(1 for b in snapshot.builds if b.problems)
@@ -309,6 +332,14 @@ def _log_summary(snapshot: Snapshot, elapsed: float) -> None:
     logger.info("%s: готово, %d билдов, %d проблемных%s, за %.1f с",
                 snapshot.tag, len(snapshot.builds), problems,
                 (" (%s)" % details) if details else "", elapsed)
+    known = sum(1 for b in snapshot.builds if b.source and b.source.commit)
+    ahead = sum(1 for b in snapshot.builds
+                if b.source and b.source.commits_ahead)
+    ghosts = sum(1 for b in snapshot.builds if b.ghost_patches)
+    logger.info("%s: коммит известен у %d из %d, ветка ушла вперёд у %d, "
+                "ghost-патчи у %d, без original_url но с source %d",
+                snapshot.tag, known, len(snapshot.builds), ahead, ghosts,
+                orphan_source)
 
 
 def problem_summary(snapshot: Snapshot) -> Dict[str, int]:

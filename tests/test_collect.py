@@ -675,5 +675,62 @@ class PatchesComeFromCommitTest(unittest.TestCase):
         self.assertEqual(build.problems, [])
 
 
+HEAD = "99aabbccddeeff00112233445566778899aabbcc"
+NGINX_COMPARE = ("https://gitlab.example.com/api/v4/projects/g%2Fnginx"
+                 "/repository/compare")
+
+
+def compare_answer(ahead, head=HEAD):
+    return Response(200, {"commit": {"id": head},
+                          "commits": [{"id": "x"}] * ahead}, {})
+
+
+class BranchAheadTest(unittest.TestCase):
+    def _nginx(self, routes, **kwargs):
+        koji, gitlab, transport = clients_with_source(
+            routes, "git+ssh://git@gitlab.example.com/g/nginx#" + SHA)
+        snapshot = collect_tag("os-9.2", config(), koji, gitlab, jobs=1,
+                               **kwargs)
+        return snapshot.by_name()["nginx"], transport
+
+    def test_head_and_count_land_in_the_snapshot(self):
+        build, _ = self._nginx({
+            NGINX_TREE: tree(["PATCH/CVE-2026-1.patch"]),
+            NGINX_COMPARE: compare_answer(3),
+        })
+        self.assertEqual(build.source.branch_head, HEAD)
+        self.assertEqual(build.source.commits_ahead, 3)
+        self.assertEqual(build.problems, [])
+
+    def test_branch_not_moved_is_zero(self):
+        build, _ = self._nginx({
+            NGINX_TREE: tree(["PATCH/CVE-2026-1.patch"]),
+            NGINX_COMPARE: compare_answer(0, head=SHA),
+        })
+        self.assertEqual(build.source.commits_ahead, 0)
+
+    def test_no_hash_means_no_comparison(self):
+        koji, gitlab, transport = clients_with_source(
+            {NGINX_TREE: tree([])}, None)
+        collect_tag("os-9.2", config(), koji, gitlab, jobs=1)
+        self.assertFalse([r for r in transport.requests
+                          if r[0] == NGINX_COMPARE])
+
+    def test_flag_turns_the_comparison_off(self):
+        build, transport = self._nginx({NGINX_TREE: tree([])},
+                                       branch_check=False)
+        self.assertIsNone(build.source.commits_ahead)
+        self.assertFalse([r for r in transport.requests
+                          if r[0] == NGINX_COMPARE])
+
+    def test_failed_comparison_is_a_problem_and_not_a_count(self):
+        build, _ = self._nginx({
+            NGINX_TREE: tree([]),
+            NGINX_COMPARE: Response(500, {"message": "boom"}, {}),
+        })
+        self.assertIsNone(build.source.commits_ahead)
+        self.assertTrue(any("gitlab:" in p for p in build.problems))
+
+
 if __name__ == "__main__":
     unittest.main()
