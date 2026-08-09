@@ -609,6 +609,39 @@ class PatchesComeFromCommitTest(unittest.TestCase):
         self.assertEqual(len(build.patches), 1)
         self.assertTrue(any("недоступен" in p for p in build.problems))
 
+    def test_vanished_commit_of_a_from_commit_build_says_no_branch(self):
+        # ref_kind == "commit": билд собран прямо с коммита, original_url
+        # указывает на хеш напрямую, а не на ветку с фрагментом. Ветки, на
+        # которую можно откатиться, нет вовсе — сообщение не должно этого
+        # утверждать, и второго запроса дерева тоже быть не должно: он ушёл
+        # бы за тем же самым ref.
+        builds = {bid: dict(info) for bid, info in BUILDS.items()}
+        builds[1] = dict(builds[1])
+        builds[1]["extra"] = {"source": {"original_url":
+            "git+https://gitlab.example.com/g/nginx#" + SHA}}
+        session = FakeKojiSession(tagged=TAGGED, builds=builds, rpms=RPMS,
+                                  tags=TAGS)
+        transport = FakeTransport({
+            (NGINX_TREE, (("path", "PATCH"), ("per_page", "100"),
+                          ("recursive", "true"), ("ref", SHA))):
+                Response(404, {"message": "404 Tree Not Found"}, {}),
+            COMMITS % ("g%2Fnginx", SHA): Response(404, {"message": "404"}, {}),
+        })
+        gitlab = GitlabClient(HOSTS, token=None, transport=transport,
+                              sleeper=lambda _s: None)
+        build = collect_tag("os-9.2", config(), KojiClient(session), gitlab,
+                            jobs=1, now="n").by_name()["nginx"]
+        self.assertEqual(build.source.ref_kind, "commit")
+        self.assertEqual(build.patches_ref, SHA)
+        self.assertEqual(build.patches, [])
+        self.assertTrue(any("недоступен" in p for p in build.problems),
+                        build.problems)
+        self.assertFalse(any("сняты с ветки" in p for p in build.problems),
+                         build.problems)
+        refs = [params.get("ref") for url, params, _ in transport.requests
+                if url == NGINX_TREE]
+        self.assertEqual(refs, [SHA])
+
     def test_ref_gone_is_recognised_behind_a_substituted_host_note(self):
         # хост из original_url не описан в конфиге: GitlabClient._fetch
         # приписывает свою заметку впереди строки problem, и «ref not
