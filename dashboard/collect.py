@@ -31,7 +31,11 @@ def _completed(raw) -> Optional[str]:
     if raw in (None, ""):
         return None
     if isinstance(raw, (int, float)):
-        return datetime.utcfromtimestamp(raw).strftime("%Y-%m-%d %H:%M:%S")
+        # не utcfromtimestamp: тот объявлен устаревшим в 3.12. Пояс в
+        # строку не попадает — его нет в формате, — поэтому результат
+        # тот же самый.
+        return datetime.fromtimestamp(raw, timezone.utc).strftime(
+            "%Y-%m-%d %H:%M:%S")
     # хаб может не прислать время вовсе — тогда останется одна дата, и это
     # нормально: срез по длине ничего не ломает
     return str(raw).replace("T", " ", 1)[:19].strip()

@@ -18,7 +18,7 @@
   function create(deps) {
     const viewmodel = deps.viewmodel, diffmod = deps.diffmod;
     const store = deps.store, labels = deps.labels, text = deps.text;
-    const own = text.own, keys = text.keys, setFrom = text.setFrom;
+    const own = text.own, keys = text.keys;
     const has = text.has, slug = text.slug;
 
     /* Данные страницы считаются не здесь: сюда приходит уже посчитанное
