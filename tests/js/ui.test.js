@@ -1948,3 +1948,43 @@ test('прокрутка настоящей страницы показывае�
   dom.fireWindow('scroll');
   assert.strictEqual(dom.id('totop').hidden, false);
 });
+
+/* Непонятый шаблон не фильтрует и объясняет себя. Пустая таблица на каждой
+   недописанной скобке была бы неотличима от «ничего не нашлось». Режим
+   включаем адресом: кнопки на этот момент ещё нет. */
+test('непонятая регулярка показывает все строки и называет причину',
+  function () {
+    var dom = load({ hash: '#tab=state&q=&re=1&f=&sort=name' });
+    store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
+    dom.id('q').value = '^python(';
+    dom.fire(dom.id('q'), 'input', {});
+    return wait(200).then(function () {
+      assert.strictEqual(dom.id('q-bad').hidden, false);
+      assert.match(dom.id('q-bad').textContent, /не разбирается/);
+      assert.doesNotMatch(dom.id('state-rows').innerHTML, /class="empty"/,
+                          'строки обязаны остаться на месте');
+    });
+  });
+
+test('починенная регулярка убирает сообщение', function () {
+  var dom = load({ hash: '#tab=state&q=&re=1&f=&sort=name' });
+  store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
+  dom.id('q').value = '^nginx';
+  dom.fire(dom.id('q'), 'input', {});
+  return wait(200).then(function () {
+    assert.strictEqual(dom.id('q-bad').hidden, true);
+  });
+});
+
+test('обычный поиск сообщения не показывает никогда', function () {
+  /* Подстрока не разбирается и испортиться не может: у неё problem всегда
+     null, и строка сообщения обязана молчать даже на том, что в режиме
+     регулярки её бы уронило. */
+  var dom = load();
+  store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
+  dom.id('q').value = '^python(';
+  dom.fire(dom.id('q'), 'input', {});
+  return wait(200).then(function () {
+    assert.strictEqual(dom.id('q-bad').hidden, true);
+  });
+});

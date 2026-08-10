@@ -94,6 +94,13 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .count { color: var(--muted); font-size: .85rem; margin-left: auto;
   font-variant-numeric: tabular-nums; white-space: nowrap; }
 
+/* Причина непонятого шаблона. Красным не красим: это не поломка страницы,
+   а сообщение о том, что человек ещё дописывает шаблон, — приглушённого
+   довольно. Длину ограничиваем: сообщения браузеров бывают в строку и
+   растянули бы всю панель; целиком его показывает подсказка. */
+.qbad { color: var(--major); font-size: .8rem; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; max-width: 28rem; }
+
 
 /* Кнопка «наверх». Тег в тысячу билдов — это метры прокрутки, а фильтры и
    вкладки остались вверху. Появляется ниже первого экрана: на нетронутой

@@ -50,6 +50,10 @@
       <button id="expand" class="toggle" data-tip="Развернуть или свернуть все строки, которые сейчас видны. Фильтры и поиск учитываются.">Expand all</button>
       <button id="copy-nvr" class="toggle" data-tip="Скопировать NVR отфильтрованных строк">Copy NVR</button>
       <span class="count" id="count"></span>
+      <!-- Причина, по которой шаблон не стал регулярным выражением. Стоит
+           рядом со счётчиком, потому что объясняет ровно его: почему строк
+           показано столько же, сколько всего. -->
+      <span class="qbad" id="q-bad" hidden></span>
     </div>
     <div class="tablewrap"><table id="state-table">
       <thead><tr>

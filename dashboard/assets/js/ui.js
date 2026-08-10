@@ -54,6 +54,7 @@
   const search = document.getElementById('q');
   const clearBtn = document.getElementById('q-clear');
   const counter = document.getElementById('count');
+  const qbad = document.getElementById('q-bad');
   const expandBtn = document.getElementById('expand');
   const copyBtn = document.getElementById('copy-nvr');
   const tabBtns = Array.from(document.querySelectorAll('.tab'));
@@ -215,6 +216,15 @@
       : plural(total, 'билд', 'билда', 'билдов');
 
     counter.textContent = items.length + ' / ' + total + ' ' + word;
+    /* Шаблон не разобрался: строки не фильтруются, и надо сказать почему.
+       Текст берём у браузера дословно — он называет место ошибки, а общий
+       текст от нас не назвал бы. Подсказкой даём его целиком: в строке он
+       обрезан. */
+    const problem = page.matcher().problem;
+    qbad.hidden = !problem;
+    qbad.textContent = problem
+      ? 'регулярка не разбирается: ' + problem + ' — показаны все строки' : '';
+    if (problem) qbad.setAttribute('data-tip', problem);
     expandBtn.textContent = allOpen(items) ? 'Collapse all' : 'Expand all';
     expandBtn.disabled = !items.length;
     copyBtn.disabled = !items.length;
