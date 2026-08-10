@@ -91,6 +91,12 @@ button:hover { border-color: var(--fg); }
 button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .toggle { flex: 0 0 auto; white-space: nowrap; }
 .toggle[disabled] { opacity: .5; cursor: default; }
+/* Нажатый переключатель. Правило общее, а не именное: нажатых
+   переключателей в панели уже два — фильтры и режим поиска, — и красить их
+   двумя одинаковыми правилами по id значит завести дубль, который разойдётся
+   молча. Селектор слабее прежнего (класс вместо id), и это ничего не ломает:
+   спорить с ним нечему — button:hover слабее обоих. */
+.toggle.on { border-color: var(--accent); color: var(--accent); }
 .count { color: var(--muted); font-size: .85rem; margin-left: auto;
   font-variant-numeric: tabular-nums; white-space: nowrap; }
 

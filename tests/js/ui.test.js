@@ -1988,3 +1988,71 @@ test('обычный поиск сообщения не показывает н�
     assert.strictEqual(dom.id('q-bad').hidden, true);
   });
 });
+
+/* Кнопка режима: меняет смысл соседнего поля, а не делает что-то сама. */
+test('кнопка режима переключает поиск на регулярку', function () {
+  var dom = load();
+  store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00'),
+             snap('os-9.2', '2026-08-01T00:00:00+03:00')], 'a.json');
+  assert.strictEqual(dom.id('q-re').getAttribute('aria-pressed'), 'false');
+  dom.fire(dom.id('q-re'), 'click', {});
+  assert.strictEqual(dom.id('q-re').getAttribute('aria-pressed'), 'true');
+  assert.match(dom.location.hash, /(^|&)re=1(&|$)/);
+});
+
+test('нажатая кнопка меняет отбор строк без задержки', function () {
+  /* Набор в поле откладывается на 120 мс ради тысяч строк; клик один, и
+     откладывать его незачем — таблица обязана перерисоваться сразу. */
+  var dom = load();
+  store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00',
+                  { builds: [build('nginx'), build('unginx')] })], 'a.json');
+  dom.id('q').value = '^nginx';
+  dom.fire(dom.id('q'), 'input', {});
+  return wait(200).then(function () {
+    var before = dom.id('count').textContent;
+    dom.fire(dom.id('q-re'), 'click', {});
+    assert.notStrictEqual(dom.id('count').textContent, before,
+                          'таблица не перерисовалась сразу после клика');
+  });
+});
+
+test('режим переживает смену вкладки', function () {
+  /* Поле поиска на странице одно на обе вкладки, и его признак живёт так
+     же: переключение таблицы к способу поиска отношения не имеет. */
+  var dom = load();
+  store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00'),
+             snap('os-9.2', '2026-08-01T00:00:00+03:00')], 'a.json');
+  dom.fire(dom.id('q-re'), 'click', {});
+  pressTab(dom, 'diff');
+  assert.strictEqual(dom.id('q-re').getAttribute('aria-pressed'), 'true');
+});
+
+test('крестик чистит запрос, но режим не выключает', function () {
+  /* Крестиком чистят, чтобы набрать другой шаблон, а не чтобы вернуться к
+     поиску подстроки. Режим — это режим. */
+  var dom = load();
+  store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
+  dom.fire(dom.id('q-re'), 'click', {});
+  dom.id('q').value = '^ngi';
+  dom.fire(dom.id('q'), 'input', {});
+  return wait(200).then(function () {
+    dom.fire(dom.id('q-clear'), 'click', {});
+    assert.strictEqual(dom.id('q').value, '');
+    assert.strictEqual(dom.id('q-re').getAttribute('aria-pressed'), 'true');
+  });
+});
+
+test('отжатая кнопка убирает сообщение о непонятом шаблоне', function () {
+  /* Шаблон остался в поле, но искать его теперь буквально — жаловаться
+     больше не на что. */
+  var dom = load();
+  store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
+  dom.fire(dom.id('q-re'), 'click', {});
+  dom.id('q').value = '^python(';
+  dom.fire(dom.id('q'), 'input', {});
+  return wait(200).then(function () {
+    assert.strictEqual(dom.id('q-bad').hidden, false);
+    dom.fire(dom.id('q-re'), 'click', {});
+    assert.strictEqual(dom.id('q-bad').hidden, true);
+  });
+});

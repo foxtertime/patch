@@ -53,6 +53,7 @@
   let controls = document.getElementById('controls');
   const search = document.getElementById('q');
   const clearBtn = document.getElementById('q-clear');
+  const reBtn = document.getElementById('q-re');
   const counter = document.getElementById('count');
   const qbad = document.getElementById('q-bad');
   const expandBtn = document.getElementById('expand');
@@ -230,6 +231,7 @@
     copyBtn.disabled = !items.length;
 
     syncCards();
+    syncRe();
     filters.sync();
     syncArrows();
     /* Рельс показывает текущий выбор, а он меняется и без смены состава:
@@ -418,6 +420,18 @@
     /* Курсор обратно в поле: крестиком чаще всего чистят, чтобы набрать
        другое, а не чтобы уйти со страницы. */
     search.focus();
+    render();
+  });
+
+  /* Вид кнопки считается от состояния, а не переключается на месте: режим
+     приезжает и из адреса, и кнопка обязана показывать его тоже. */
+  function syncRe() {
+    reBtn.setAttribute('aria-pressed', String(st.regex));
+    reBtn.className = st.regex ? 'toggle mono on' : 'toggle mono';
+  }
+
+  reBtn.addEventListener('click', () => {
+    st.regex = !st.regex;
     render();
   });
 
