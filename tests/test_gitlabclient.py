@@ -251,6 +251,13 @@ class PatchFilesTest(unittest.TestCase):
         result = cli.patch_files("gitlab.example.com", "g/r", "br")
         self.assertEqual(result.blobs, {})
 
+    def test_tree_problem_builds_the_same_tuple_as_by_hand(self):
+        # восемь мест собирали этот кортеж вручную; помощник обязан давать
+        # ровно то же самое, иначе один из восьми случаев тихо поменяется
+        from dashboard.gitlabclient import TreeResult, _tree_problem
+        self.assertEqual(_tree_problem("gitlab: беда"),
+                         TreeResult(None, [], "gitlab: беда", {}))
+
 
 COMPARE_URL = "https://gitlab.example.com/api/v4/projects/g%2Fr/repository/compare"
 SHA = "0f1a2b3c4d5e6f70819293a4b5c6d7e8f9001122"

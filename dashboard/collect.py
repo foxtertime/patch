@@ -9,7 +9,7 @@ from typing import Dict, Optional
 
 from .classify import Classifier, find_cves
 from .model import Build, Patch, Snapshot, Source
-from .sourceurl import SourceUrlError, parse_source_url
+from .sourceurl import ParsedSource, SourceUrlError, parse_source_url
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,11 @@ def _completed(raw) -> Optional[str]:
     if raw in (None, ""):
         return None
     if isinstance(raw, (int, float)):
-        return datetime.utcfromtimestamp(raw).strftime("%Y-%m-%d %H:%M:%S")
+        # не utcfromtimestamp: тот объявлен устаревшим в 3.12. Пояс в
+        # строку не попадает — его нет в формате, — поэтому результат
+        # тот же самый.
+        return datetime.fromtimestamp(raw, timezone.utc).strftime(
+            "%Y-%m-%d %H:%M:%S")
     # хаб может не прислать время вовсе — тогда останется одна дата, и это
     # нормально: срез по длине ничего не ломает
     return str(raw).replace("T", " ", 1)[:19].strip()
@@ -149,7 +153,7 @@ def collect_tag(tag: str, cfg, koji_client, gitlab_client, jobs: int = 8,
                                  entry.get("tag_name"),
                                  tags.get(info.get("build_id"), []))
         try:
-            _attach_patches(build, info, cfg, gitlab_client, classifier,
+            _attach_patches(build, info, gitlab_client, classifier,
                             branch_check)
         except Exception as exc:
             # ни одна ошибка билда (в т.ч. неожиданная, не только
@@ -217,19 +221,48 @@ def _placeholder_build(info: dict, rpms, tags=()) -> Build:
     return build
 
 
-def _attach_patches(build: Build, info: dict, cfg, gitlab_client,
+def _attach_patches(build: Build, info: dict, gitlab_client,
                     classifier: Classifier,
                     branch_check: bool = True) -> None:
+    """Патчи билда и всё, что о них известно.
+
+    Четыре фазы подряд, и каждая может оказаться последней: разобрать
+    источник, записать его в билд, прочитать каталог патчей, сравнить
+    коммит сборки с вершиной ветки.
+    """
+    parsed = _parse_source(build, info)
+    if parsed is None:
+        return
+    commit = _describe_source(build, info, parsed, gitlab_client)
+    ref, tree = _collect_patches(build, gitlab_client, parsed, commit,
+                                 classifier)
+    if ref != commit:
+        # откат на ветку: коммита в репозитории нет, и сравнивать с ним
+        # ветку бессмысленно — точка отсчёта пропала вместе с коммитом
+        commit = None
+    # Сравнивать есть с чем, только когда билд собран с ветки: у сборки
+    # прямо с коммита ветки нет, а без хеша нет и точки отсчёта.
+    if branch_check and commit and parsed.ref_kind == "branch":
+        _branch_drift(build, gitlab_client, parsed, commit, tree, classifier)
+
+
+def _parse_source(build: Build, info: dict) -> Optional[ParsedSource]:
+    """Источник билда, разобранный настолько, чтобы было что читать.
+
+    None значит «дальше идти незачем»: URL нет вовсе, URL не разобрался
+    или билд собран из готового SRPM. Причина в каждом из трёх случаев
+    уже записана в билд, и звать следующие фазы не с чем.
+    """
     raw_url = _original_url(info)
     if not raw_url:
         build.problems.append("no source url")
-        return
+        return None
     try:
         parsed = parse_source_url(raw_url)
     except SourceUrlError as exc:
         build.source = Source(raw=raw_url)
         build.problems.append("bad source url: %s" % exc)
-        return
+        return None
 
     # Сборка из готового SRPM: ветки нет, каталог PATCH читать негде и не у
     # кого. Это не проблема билда, а другой способ его собрать, поэтому в
@@ -237,21 +270,36 @@ def _attach_patches(build: Build, info: dict, cfg, gitlab_client,
     # patch_dir_present остаётся None: «неизвестно», а не «нет патчей».
     if parsed.ref_kind == "srpm":
         build.source = Source(raw=raw_url, ref=parsed.ref, ref_kind="srpm")
-        return
+        return None
+    return parsed
 
+
+def _describe_source(build: Build, info: dict, parsed,
+                     gitlab_client) -> Optional[str]:
+    """Записывает build.source целиком и отдаёт хеш коммита сборки.
+
+    Сырой URL читаем из info заново — то же самое поле, что разбирал
+    _parse_source; таскать его между фазами ради одного обращения к
+    словарю значило бы усложнить их договор.
+    """
     commit, commit_from = _commit_of(info, parsed)
     build.source = Source(
-        raw=raw_url, host=parsed.host, project=parsed.project, ref=parsed.ref,
-        ref_kind=parsed.ref_kind,
+        raw=_original_url(info), host=parsed.host, project=parsed.project,
+        ref=parsed.ref, ref_kind=parsed.ref_kind,
         web_url=gitlab_client.tree_url(parsed.host, parsed.project, parsed.ref),
         commit=commit, commit_source=commit_from,
         commit_url=gitlab_client.tree_url(parsed.host, parsed.project, commit))
+    return commit
 
+
+def _collect_patches(build: Build, gitlab_client, parsed, commit,
+                     classifier: Classifier):
+    """Каталог патчей билда: список патчей, ref и результат чтения.
+
+    Результат отдаём наружу целиком: по нему считается расхождение с
+    веткой, и читать дерево второй раз ради этого незачем.
+    """
     ref, result = _read_patch_dir(build, gitlab_client, parsed, commit)
-    if ref != commit:
-        # откат на ветку: коммита в репозитории нет, и сравнивать с ним
-        # ветку бессмысленно — точка отсчёта пропала вместе с коммитом
-        commit = None
     build.patches_ref = ref
     build.patch_dir_present = result.present
     if result.problem:
@@ -263,11 +311,12 @@ def _attach_patches(build: Build, info: dict, cfg, gitlab_client,
         build.patches.append(_patch(path, parsed, ref, classifier,
                                     gitlab_client,
                                     sha=result.blobs.get(path)))
+    return ref, result
 
-    # Сравнивать есть с чем, только когда билд собран с ветки: у сборки
-    # прямо с коммита ветки нет, а без хеша нет и точки отсчёта.
-    if not (branch_check and commit and parsed.ref_kind == "branch"):
-        return
+
+def _branch_drift(build: Build, gitlab_client, parsed, commit, tree,
+                  classifier: Classifier) -> None:
+    """Насколько ветка ушла вперёд от коммита сборки и что она принесла."""
     ahead = gitlab_client.compare(parsed.host, parsed.project, commit,
                                   parsed.ref)
     if ahead.problem:
@@ -279,7 +328,7 @@ def _attach_patches(build: Build, info: dict, cfg, gitlab_client,
     if not build.source.commits_ahead:
         return
     # Дерево коммита не прочиталось вовсе (сетевой отказ, 500, исчерпанные
-    # ретраи 429) — result.present is None, а built.blobs в _ghosts пуст.
+    # ретраи 429) — tree.present is None, а built.blobs в _ghosts пуст.
     # Посчитай мы ghost-и по такому дереву, каждый файл на вершине ветки
     # ушёл бы в сторону "branch" — «влит, но не собран», — хотя на деле мы
     # просто не знаем, что лежало в коммите: фабрикация, а не находка.
@@ -288,17 +337,17 @@ def _attach_patches(build: Build, info: dict, cfg, gitlab_client,
     # ветка ушла вперёд, известно, даже если неизвестно, что именно она
     # принесла.
     #
-    # result.present is False — легитимно пустое дерево (ветка есть,
+    # tree.present is False — легитимно пустое дерево (ветка есть,
     # каталога PATCH в коммите нет), и сравнение с веткой по нему верно:
     # тогда каждый файл ветки — и правда несобранный ghost. Поэтому
     # ограничиваемся ровно случаем «неизвестно», а не любым пустым built.
-    if result.present is None:
+    if tree.present is None:
         return
     tip = gitlab_client.patch_files(parsed.host, parsed.project, parsed.ref)
     if tip.problem:
         build.problems.append(tip.problem)
         return
-    build.ghost_patches = _ghosts(result, tip, parsed, commit, classifier,
+    build.ghost_patches = _ghosts(tree, tip, parsed, commit, classifier,
                                   gitlab_client)
 
 

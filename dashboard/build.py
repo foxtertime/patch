@@ -18,9 +18,10 @@ TEMPLATE_PATH = os.path.join(ASSETS, "dashboard.html")
 # Порядок по зависимостям, а не по алфавиту: каждый следующий скрипт
 # рассчитывает, что предыдущие уже положили себя в KP.
 SCRIPTS = ("vercmp.js", "rpms.js", "diff.js", "viewmodel.js", "store.js",
-           "text.js", "labels.js", "hash.js", "page.js", "markup.js",
-           "tables.js", "cards.js", "filters.js", "rail.js", "files.js",
-           "tips.js", "toasts.js", "ui.js")
+           "text.js", "labels.js", "hash.js", "search.js", "page.js",
+           "markup.js", "tables.js", "cards.js", "filters.js", "rail.js",
+           "files.js", "tips.js", "toasts.js", "address.js", "copy.js",
+           "viewport.js", "notices.js", "ui.js")
 # Порядок решает каскад: при равной специфичности выигрывает то, что ниже.
 # base идёт первым — там переменные и палитра, tip последним — он всплывает
 # поверх всего. Перестановка файлов здесь молча меняет вид страницы.

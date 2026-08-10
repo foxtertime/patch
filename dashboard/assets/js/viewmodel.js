@@ -271,26 +271,49 @@
     return marks;
   }
 
-  function diffRow(component, kojiWeb, oldTag, newTag) {
-    const old = component.old || null, fresh = component['new'] || null;
-    const shown = fresh || old;
+  /* Одна сторона перехода: десять значений, каждое со своей охраной от
+     отсутствующего билда и отсутствующего источника. Считаются они у «было»
+     и у «стало» по одному правилу, и правило это должно быть записано один
+     раз — разойдись две копии, одна сторона показывала бы не то, что
+     другая, и заметить это было бы нечем. */
+  function sideOf(build, tag, kojiWeb) {
+    const source = (build && build.source) || null;
     return {
-      old_tagged_in: old ? orNull(old.tag_name) : null,
-      new_tagged_in: fresh ? orNull(fresh.tag_name) : null,
-      old_inherited: old ? inheritedIn(old, oldTag) : null,
-      new_inherited: fresh ? inheritedIn(fresh, newTag) : null,
-      name: component.name, status: component.status,
-      changed: Boolean(component.changed),
-      old_evr: old ? evrOf(old) : null,
-      new_evr: fresh ? evrOf(fresh) : null,
-      old_branch: (old && old.source) ? orNull(old.source.ref) : null,
-      new_branch: (fresh && fresh.source) ? orNull(fresh.source.ref) : null,
+      tagged_in: build ? orNull(build.tag_name) : null,
+      inherited: build ? inheritedIn(build, tag) : null,
+      evr: build ? evrOf(build) : null,
+      branch: source ? orNull(source.ref) : null,
       // Чем ветка приходится билду, у каждой стороны своё: пересобранный из
       // SRPM компонент рядом с прежним, собранным из ветки, — законная
       // пара, и подписать оба «веткой» значило бы соврать про одну из них.
-      old_ref_kind: (old && old.source) ? orNull(old.source.ref_kind) : null,
-      new_ref_kind: (fresh && fresh.source)
-        ? orNull(fresh.source.ref_kind) : null,
+      ref_kind: source ? orNull(source.ref_kind) : null,
+      // Своё у каждой стороны: раскрытая строка показывает не сравнение, а
+      // две карточки одного билда, и «кто собрал» с «когда» у них разные.
+      owner: build ? orNull(build.owner) : null,
+      completed: build ? toMsk(build.completed) : null,
+      project: source ? orNull(source.project) : null,
+      koji_url: build ? kojiUrl(kojiWeb, build.nvr) : null,
+      source_url: source ? orNull(source.web_url) : null
+    };
+  }
+
+  function diffRow(component, kojiWeb, oldTag, newTag) {
+    const old = component.old || null, fresh = component['new'] || null;
+    const shown = fresh || old;
+    const was = sideOf(old, oldTag, kojiWeb);
+    const now = sideOf(fresh, newTag, kojiWeb);
+    /* Список полей остаётся явным, а не собирается приписыванием приставки
+       в цикле. Дублировалось здесь правило вывода значения, и оно теперь
+       одно — в sideOf; форма же строки это договор с дашбордом, и её надо
+       уметь найти поиском по old_project. */
+    return {
+      old_tagged_in: was.tagged_in, new_tagged_in: now.tagged_in,
+      old_inherited: was.inherited, new_inherited: now.inherited,
+      name: component.name, status: component.status,
+      changed: Boolean(component.changed),
+      old_evr: was.evr, new_evr: now.evr,
+      old_branch: was.branch, new_branch: now.branch,
+      old_ref_kind: was.ref_kind, new_ref_kind: now.ref_kind,
       patches_added: component.patches_added.slice(),
       patches_removed: component.patches_removed.slice(),
       patches_rewritten: component.patches_rewritten.slice(),
@@ -302,19 +325,11 @@
       // так один и тот же подпакет стоит в обеих колонках на одной высоте,
       // и NVRA не дублируются в данных страницы
       rpm_rows: diff.alignRpms(old, fresh),
-      // Своё у каждой стороны: раскрытая строка показывает не сравнение, а
-      // две карточки одного билда, и «кто собрал» с «когда» у них разные.
-      old_owner: old ? orNull(old.owner) : null,
-      new_owner: fresh ? orNull(fresh.owner) : null,
-      old_completed: old ? toMsk(old.completed) : null,
-      new_completed: fresh ? toMsk(fresh.completed) : null,
-      old_project: (old && old.source) ? orNull(old.source.project) : null,
-      new_project: (fresh && fresh.source) ? orNull(fresh.source.project) : null,
-      old_koji_url: old ? kojiUrl(kojiWeb, old.nvr) : null,
-      new_koji_url: fresh ? kojiUrl(kojiWeb, fresh.nvr) : null,
-      old_source_url: (old && old.source) ? orNull(old.source.web_url) : null,
-      new_source_url: (fresh && fresh.source)
-        ? orNull(fresh.source.web_url) : null,
+      old_owner: was.owner, new_owner: now.owner,
+      old_completed: was.completed, new_completed: now.completed,
+      old_project: was.project, new_project: now.project,
+      old_koji_url: was.koji_url, new_koji_url: now.koji_url,
+      old_source_url: was.source_url, new_source_url: now.source_url,
       // Ссылки строки — одной стороны, той, что показана в таблице: колонка
       // «ссылки» ведёт к тому билду, о котором строка и рассказывает.
       koji_url: shown ? kojiUrl(kojiWeb, shown.nvr) : null,

@@ -1001,15 +1001,6 @@ test('негодный снапшот не уносит соседей по за
   assert.ok(noteText(dom).indexOf('bad.json') !== -1, noteText(dom));
 });
 
-test('разные хабы — предупреждение на странице', function () {
-  var dom = load();
-  var other = snap('os-9.2', '2026-08-01T00:00:00+03:00');
-  other.koji_hub = 'https://elsewhere/kojihub';
-  store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
-  store.add([other], 'b.json');
-  assert.ok(noteText(dom).indexOf('хаба') !== -1, noteText(dom));
-});
-
 test('перестановка тех же снапшотов предупреждение не повторяет', function () {
   /* warnings() считается заново от состава, и на каждое перетаскивание
      набор строк там прежний. Показывать его снова значило бы твердить
@@ -1024,20 +1015,6 @@ test('перестановка тех же снапшотов предупреж
   dragNode(dom, 1, 0, 'before');
   assert.strictEqual(dom.id('toasts').querySelectorAll('.toast').length, before,
                      'предупреждение всплыло второй раз: ' + noteText(dom));
-});
-
-test('откатившаяся перестановка объясняется окошком', function () {
-  /* У перестановки нет своего места для ошибок: причина уезжает в
-     предупреждения хранилища. Состав после отката прежний, и не показать
-     её значило бы промолчать о том, что действие не состоялось. */
-  var dom = load();
-  store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
-  store.add([snap('os-9.2', '2026-08-01T00:00:00+03:00')], 'b.json');
-  store.onChange(function () {
-    if (store.list()[0].tag === 'os-9.2') throw new Error('пара не рисуется');
-  });
-  store.move(1, -1);
-  assert.ok(noteText(dom).indexOf('пара не рисуется') !== -1, noteText(dom));
 });
 
 /* Добавляют снапшоты с рельса: призрак в его конце открывает тот же
@@ -1599,33 +1576,6 @@ test('в раскрытой строке RPM стоят под koji, а патч
                          ['koji', 'gitlab', 'RPM', 'патчи']);
 });
 
-/* Кнопка «наверх» появляется, только когда наверх действительно надо:
-   на нетронутой странице она была бы лишним пятном поверх таблицы. */
-test('кнопка «наверх» прячется на нетронутой странице', function () {
-  var dom = load();
-  assert.strictEqual(dom.id('totop').hidden, true);
-});
-
-test('кнопка «наверх» появляется ниже первого экрана и уходит обратно',
-  function () {
-    var dom = load();
-    dom.window.pageYOffset = dom.window.innerHeight + 1;
-    dom.fireWindow('scroll');
-    assert.strictEqual(dom.id('totop').hidden, false);
-
-    dom.window.pageYOffset = 0;
-    dom.fireWindow('scroll');
-    assert.strictEqual(dom.id('totop').hidden, true);
-  });
-
-test('щелчок по кнопке «наверх» поднимает страницу', function () {
-  var dom = load();
-  dom.window.pageYOffset = 2000;
-  dom.fireWindow('scroll');
-  dom.fire(dom.id('totop'), 'click', {});
-  assert.strictEqual(dom.window.pageYOffset, 0);
-});
-
 /* Крестик в поле поиска. Нативный рисует только WebKit, в Firefox его нет
    вовсе — поэтому свой, одинаковый везде. */
 function wait(ms) {
@@ -1985,4 +1935,16 @@ test('плашка показывает все три положения при�
   assert.strictEqual(String(node.className).indexOf('is-no'), -1,
                      node.className);
   assert.strictEqual(node.getAttribute('aria-pressed'), 'false');
+});
+
+/* Кнопка «наверх» и высота липкой шапки живут в своём модуле и покрыты там
+   же (viewport.test.js), но подключение этого модуля к настоящей странице —
+   вызов viewportmod.create() из ui.js — там не проверено: конструируется
+   модуль напрямую, без страницы. Здесь поднимаем страницу целиком и смотрим,
+   что прокрутка и правда показывает кнопку. */
+test('прокрутка настоящей страницы показывает кнопку «наверх»', function () {
+  var dom = load();
+  dom.window.pageYOffset = dom.window.innerHeight + 1;
+  dom.fireWindow('scroll');
+  assert.strictEqual(dom.id('totop').hidden, false);
 });

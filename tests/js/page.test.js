@@ -10,6 +10,7 @@ var diffmod = require('../../dashboard/assets/js/diff.js');
 var storemod = require('../../dashboard/assets/js/store.js');
 var labels = require('../../dashboard/assets/js/labels.js');
 var text = require('../../dashboard/assets/js/text.js');
+var searchmod = require('../../dashboard/assets/js/search.js');
 var pagemod = require('../../dashboard/assets/js/page.js');
 
 function patch(name, cls) {
@@ -55,7 +56,8 @@ function make(snapshots) {
   storemod.reset();
   if (snapshots) storemod.add(snapshots, 'проба.json');
   var p = pagemod.create({ viewmodel: viewmodel, diffmod: diffmod,
-                           store: storemod, labels: labels, text: text });
+                           store: storemod, labels: labels, text: text,
+                           search: searchmod });
   if (snapshots) p.applyData(viewmodel.buildPageData(storemod.snapshots()));
   return p;
 }
@@ -350,32 +352,6 @@ test('мёртвые фильтры уходят с обеих вкладок с
   assert.deepStrictEqual(p.st.filters.diff, {});
 });
 
-test('поиск по видимому полю не разворачивает строку', function () {
-  var p = make([snap('os-9.1', JUL)]);
-  p.st.q = 'nginx';
-  var items = p.visibleRows();
-  assert.strictEqual(items.length, 1);
-  assert.strictEqual(items[0].open, false);
-});
-
-test('поиск по владельцу строку не разворачивает', function () {
-  /* Владелец стоит в самой строке, и разворачивать её незачем: правило
-     «развернуть» — про совпадения, которых в строке не видно. */
-  var p = make([snap('os-9.1', JUL)]);
-  p.st.q = 'builder';
-  var items = p.visibleRows();
-  assert.strictEqual(items.length, 1);
-  assert.strictEqual(items[0].open, false);
-});
-
-test('поиск по времени сборки билда строку тоже не разворачивает', function () {
-  var p = make([snap('os-9.1', JUL)]);
-  p.st.q = '2026-05-14';
-  var items = p.visibleRows();
-  assert.strictEqual(items.length, 1);
-  assert.strictEqual(items[0].open, false);
-});
-
 test('сортировка по владельцу собирает билды одного человека подряд',
   function () {
     var p = make([snap('os-9.1', JUL, { builds: [
@@ -388,30 +364,6 @@ test('сортировка по владельцу собирает билды �
       ['alice', 'alice', 'zoe', 'zoe']);
   });
 
-test('совпадение только в деталях разворачивает строку', function () {
-  var p = make([snap('os-9.1', JUL,
-    { builds: [build('nginx', { patches: [patch('cve.patch', 'CVE')] })] })]);
-  p.st.q = 'cve.patch';
-  var items = p.visibleRows();
-  assert.strictEqual(items.length, 1);
-  assert.strictEqual(items[0].open, true);
-});
-
-test('совпадение только в ghost-патче находит строку и разворачивает её',
-  function () {
-    /* Ghost-патч — это «влито в ветку, не собрано»: патча нет в самом
-       билде, он лежит только в ghosts, а секция с ним — в раскрытии.
-       Не найти строку по нему значило бы, что вопрос «какие пакеты ещё
-       ждут CVE-2026-1234» дашборд не отвечает вовсе. */
-    var p = make([snap('os-9.1', JUL,
-      { builds: [build('nginx',
-                       { ghost_patches: [patch('CVE-2026-1234.patch', 'CVE')] })] })]);
-    p.st.q = 'cve-2026-1234';
-    var items = p.visibleRows();
-    assert.strictEqual(items.length, 1);
-    assert.strictEqual(items[0].open, true);
-  });
-
 test('под запрос не подошло ничего — строк нет, но всего их столько же',
   function () {
     var p = make([snap('os-9.1', JUL)]);
@@ -419,6 +371,34 @@ test('под запрос не подошло ничего — строк нет
     assert.strictEqual(p.visibleRows().length, 0);
     assert.strictEqual(p.totalRows(), 1);
   });
+
+/* deep — то, ради чего строку с совпадением только в деталях (здесь: в имени
+   патча) разворачивают сразу, а не оставляют свёрнутой: иначе непонятно, чем
+   она подошла под запрос. scanState в search.js посчитан юнит-тестами
+   отдельно, а вот доводит ли page.visibleRows() найденное deep до открытости
+   строки — нет; это и проверяем, вместе с обратным случаем, где совпадение
+   мелкое и раскрывать нечего. */
+test('совпадение только в имени патча разворачивает строку', function () {
+  var p = make([snap('os-9.1', JUL, { classes: ['CVE'],
+    builds: [build('nginx',
+      { patches: [patch('unique-patch-name.patch', 'CVE')] })] })]);
+  p.st.q = 'unique-patch-name';
+  var items = p.visibleRows();
+  assert.strictEqual(items.length, 1, 'строка с патчем не попала в выдачу');
+  assert.strictEqual(items[0].open, true,
+                     'совпадение только в патче обязано раскрыть строку');
+});
+
+test('совпадение в имени компонента строку не разворачивает', function () {
+  var p = make([snap('os-9.1', JUL, { classes: ['CVE'],
+    builds: [build('nginx',
+      { patches: [patch('unique-patch-name.patch', 'CVE')] })] })]);
+  p.st.q = 'nginx';
+  var items = p.visibleRows();
+  assert.strictEqual(items.length, 1, 'строка не попала в выдачу');
+  assert.strictEqual(items[0].open, false,
+                     'мелкое совпадение по имени не должно раскрывать строку');
+});
 
 test('ключ раскрытия несёт полное имя снапшота', function () {
   var p = make([snap('os-9.1', JUL)]);
@@ -447,6 +427,41 @@ test('сортировка по другой колонке начинается
   p.sortBy('name');
   p.sortBy('patches');
   assert.deepStrictEqual(p.st.sort.state, { key: 'patches', asc: true });
+});
+
+test('сортировка по Δ патчей считает и переписанные', function () {
+  /* Компонент, у которого переписан единственный патч, раньше стоял в
+     колонке с прочерком и по ней же уезжал вниз — то есть ровно тот
+     случай, ради которого 2.3.0 и делалась, из колонки не читался.
+
+     Патч отдан httpd, а не nginx: у обоих dpatch пока считался нулём,
+     ничью решало имя, и алфавит уже ставил nginx перед httpd что до
+     правки, что после — тест зеленел бы независимо от того, права
+     колонка или нет. Переписанный патч у httpd переворачивает алфавитную
+     подсказку: до правки побеждает она и наверх лезет nginx, после
+     правки побеждает вес патча и наверх должен лечь httpd. */
+  function withSha(sha) {
+    var p = patch('CVE-2026-3011.patch', 'CVE');
+    p.sha = sha;
+    return p;
+  }
+  var was = snap('os-9.1', JUL, { builds: [
+    build('nginx', { patches: [] }),
+    build('httpd', { patches: [withSha('aaa')] }) ] });
+  var now = snap('os-9.2', AUG, { builds: [
+    build('nginx', { patches: [] }),
+    build('httpd', { patches: [withSha('bbb')] }) ] });
+  var p = make([was, now]);
+  p.st.tab = 'diff';
+  /* Снимаем умолчание «только изменившиеся»: неизменившийся nginx нужен в
+     таблице именно затем, чтобы было с чем сравнивать порядок. */
+  p.toggleFilter('all');
+  p.sortBy('dpatch');            /* по возрастанию */
+  p.sortBy('dpatch');            /* второй клик по той же — по убыванию */
+  var order = p.sortRows(p.visibleRows()).map(function (i) {
+    return i.row.name;
+  });
+  assert.deepStrictEqual(order, ['httpd', 'nginx']);
 });
 
 test('отметка узла живёт в состоянии и снимается', function () {
@@ -577,7 +592,8 @@ test('смена состава снапшотов заводит кэш пер�
 test('две страницы не делят состояния', function () {
   var a = make([snap('os-9.1', JUL), snap('os-9.2', AUG)]);
   var b = pagemod.create({ viewmodel: viewmodel, diffmod: diffmod,
-                           store: storemod, labels: labels, text: text });
+                           store: storemod, labels: labels, text: text,
+                           search: searchmod });
   b.applyData(viewmodel.buildPageData(storemod.snapshots()));
   a.selectSnapshot(0);
   assert.strictEqual(a.st.tag, 0);

@@ -207,23 +207,27 @@
 
      Класс, ушедший целиком, остаётся с нулём и одной зачёркнутой строкой:
      «был и кончился» — тоже ответ, и молчать о нём нельзя. */
-  function patchesChangeHtml(oldPatches, newPatches, q) {
-    const inNew = {}, inOld = {};
+  function patchesChangeHtml(oldPatches, newPatches, rewritten, q) {
+    const inNew = {}, inOld = {}, redone = {};
     for (const p of newPatches) inNew[p.path] = p;
     for (const p of oldPatches) inOld[p.path] = p;
+    /* Переписанные приходят готовым списком путей. Правило «путь тот же,
+       содержимое другое, и обе sha известны» живёт в diff.js — вместе с
+       оговоркой про снапшоты до 2.3.0, которые sha не несут, — и должно
+       жить там одно. Разметка красит то, что ей сказали, ровно как она уже
+       поступает с «пришёл» и «ушёл»: выводя вердикт заново, она держала бы
+       вторую запись того же правила, и разошлись бы они молча.
+
+       own(), а не прямое обращение: ключи здесь — пути из GitLab, и путь
+       вида PATCH/constructor у голого объекта ответил бы функцией. */
+    for (const path of rewritten || []) redone[path] = 1;
     const items = [];
     for (const p of oldPatches) {
       const kept = own(inNew, p.path);
       /* Уцелевший берём из нового состояния: класс или ссылка могли
          поменяться, и показывать надо то, что есть сейчас. */
-      /* Переписанный — тот же путь и другое содержимое. Обе sha должны
-         быть известны: снапшоты до 2.3.0 их не несут, и метить патч по
-         одной стороне значило бы объявить переписанным то, чего мы не
-         сравнивали. */
-      const rewritten = Boolean(kept && p.sha && kept.sha
-                                && p.sha !== kept.sha);
       items.push({ p: kept || p,
-                   cls: kept ? (rewritten ? 'is-rewritten' : '')
+                   cls: kept ? (own(redone, p.path) ? 'is-rewritten' : '')
                              : 'is-removed' });
     }
     for (const p of newPatches) {
@@ -369,10 +373,21 @@
     return out;
   }
 
-  function delta(added, removed) {
-    if (!added && !removed) return '<span class="zero">—</span>';
+  /* Третий исход дописывается, а не переписывает первые два: этой же
+     функцией рисуется колонка Δ RPM, где переписанных не бывает — у
+     пакетов нет содержимого, которое можно сравнить, — и вызов с двумя
+     доводами обязан дать ровно прежнюю строку.
+
+     Цвет тот же янтарный, что у переписанного патча в списке «стало», у
+     «сменил ветку» и у «ветка +N»: на этой странице он значит
+     «разъехалось, но ничего не потеряно», и третья легенда тут не нужна. */
+  function delta(added, removed, rewritten) {
+    if (!added && !removed && !rewritten) return '<span class="zero">—</span>';
     return (added ? `<span class="plus">+${added}</span> ` : '')
-         + (removed ? `<span class="minus">−${removed}</span>` : '');
+         + (removed ? `<span class="minus">−${removed}</span>` : '')
+         + (rewritten
+              ? `${removed ? ' ' : ''}<span class="tilde">~${rewritten}</span>`
+              : '');
   }
 
   return { markHtml, marksHtml, linkHtml, kv, signHtml, meterHtml, aheadHtml,
