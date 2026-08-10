@@ -9,7 +9,7 @@ var hash = require('../../dashboard/assets/js/hash.js');
 test('пустой адрес не говорит ни о чём', function () {
   assert.deepStrictEqual(hash.parse(''),
     { tab: null, tag: null, pair: null, filters: null, any: null,
-      q: null, sort: null });
+      q: null, re: null, sort: null });
   assert.deepStrictEqual(hash.parse('#'), hash.parse(''));
 });
 
@@ -128,4 +128,22 @@ test('минус в f= проходит насквозь строкой', functi
   /* О смысле ключей hash.js не знает: минус разбирает page.restore. */
   assert.deepStrictEqual(hash.parse('#f=cve,-autogen').filters,
                          ['cve', '-autogen']);
+});
+
+test('режим регулярки уезжает в адрес и возвращается', function () {
+  assert.match(hash.format({ tab: 'state', tag: null, pair: null,
+                             filters: [], any: [], q: '^py', re: true,
+                             sort: { key: 'name', asc: true } }),
+               /(^|&)re=1(&|$)/);
+  assert.strictEqual(hash.parse('tab=state&q=%5Epy&re=1&f=&sort=name').re, '1');
+});
+
+test('выключенный режим в адрес не пишется вовсе', function () {
+  /* Умолчание — выключен, и ключ на каждой ссылке был бы шумом.
+     Отсутствие ключа значит ровно «выключен» и ничего больше. */
+  assert.doesNotMatch(hash.format({ tab: 'state', tag: null, pair: null,
+                                    filters: [], any: [], q: 'nginx', re: false,
+                                    sort: { key: 'name', asc: true } }),
+                      /re=/);
+  assert.strictEqual(hash.parse('tab=state&q=nginx&f=&sort=name').re, null);
 });

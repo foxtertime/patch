@@ -52,6 +52,9 @@
          снапшотов и лежат в pairSel. */
       tag: 0,
       q: '',
+      /* Идёт ли содержимое поля в регулярное выражение. Не по вкладкам:
+         поле поиска на странице одно на обе, и его признак живёт так же. */
+      regex: false,
       /* «Изменения» открываются на изменившихся компонентах: неизменившиеся
          строки в этой таблице — шум, из-за которого не видно изменившихся.
          Фильтр обычный: он виден на кнопке фильтров и снимается как любой
@@ -397,11 +400,12 @@
        заново на каждую строку таблицы значило бы делать это тысячи раз за
        перерисовку, а на регулярке это ещё и разбор шаблона. Помним
        последний вход и отдаём готовое. */
-    let lastQuery = null, lastMatcher = null;
+    let lastQuery = null, lastRegex = null, lastMatcher = null;
     function matcher() {
-      if (lastMatcher === null || lastQuery !== st.q) {
+      if (lastMatcher === null || lastQuery !== st.q || lastRegex !== st.regex) {
         lastQuery = st.q;
-        lastMatcher = querymod.compile(st.q, false);
+        lastRegex = st.regex;
+        lastMatcher = querymod.compile(st.q, st.regex);
       }
       return lastMatcher;
     }
@@ -594,6 +598,10 @@
       }
       if (parsed.sort) st.sort[st.tab] = parsed.sort;
       if (parsed.q !== null) st.q = parsed.q;
+      /* Присутствие ключа значит «включён», отсутствие — «выключен», и
+         третьего прочтения тут нет: умолчание известно, признак булев.
+         Поэтому ставим всегда, а не только когда ключ есть. */
+      st.regex = parsed.re !== null && parsed.re !== undefined;
     }
 
     /* Части текущего состояния под сборку ссылки: имена уже разрешены, а
@@ -607,6 +615,7 @@
           (key) => (activeFilters()[key] === -1 ? '-' : '') + key).sort(),
         any: keys(st.modes[st.tab]).sort(),
         q: st.q,
+        re: st.regex,
         sort: st.sort[st.tab]
       };
     }

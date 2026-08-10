@@ -29,7 +29,7 @@
      снапшот и жив ли такой фильтр, решает тот, у кого данные есть. */
   function parse(raw) {
     let out = { tab: null, tag: null, pair: null, filters: null, any: null,
-                q: null, sort: null };
+                q: null, re: null, sort: null };
     const body = String(raw === null || raw === undefined ? '' : raw)
       .replace(/^#/, '');
     if (!body) return out;
@@ -48,6 +48,7 @@
          второе — «все группы по И». */
       else if (key === 'any') out.any = val ? val.split(',') : [];
       else if (key === 'q') out.q = val.trim();
+      else if (key === 're') out.re = val;
       else if (key === 'sort') {
         bits = val.split(':');
         if (bits[0]) out.sort = { key: bits[0], asc: bits[1] !== 'desc' };
@@ -76,6 +77,9 @@
       out.push('any=' + encodeURIComponent(parts.any.join(',')));
     }
     if (parts.q) out.push('q=' + encodeURIComponent(parts.q));
+    /* re= пишем, только когда режим включён: выключен — это умолчание, и
+       ключ на каждой ссылке был бы шумом. Отсутствие читается однозначно. */
+    if (parts.re) out.push('re=1');
     out.push('sort=' + parts.sort.key + (parts.sort.asc ? '' : ':desc'));
     return '#' + out.join('&');
   }

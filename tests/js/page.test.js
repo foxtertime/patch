@@ -590,6 +590,38 @@ test('смена состава снапшотов заводит кэш пер�
   assert.strictEqual(p.pairFor([0, 2]).summary, false);
 });
 
+test('режим регулярки переживает круг через адрес', function () {
+  var p = make([snap('os-9.1', JUL)]);
+  p.st.q = '^ngi';
+  p.st.regex = true;
+  assert.strictEqual(p.hashParts().re, true);
+  p.st.regex = false;
+  p.restore({ tab: null, tag: null, pair: null, filters: null, any: null,
+              q: '^ngi', re: '1', sort: null });
+  assert.strictEqual(p.st.regex, true);
+});
+
+test('ссылка без re= выключает режим', function () {
+  /* Отсутствие ключа — не молчание, а «выключено»: у булева признака с
+     известным умолчанием другого прочтения нет. */
+  var p = make([snap('os-9.1', JUL)]);
+  p.st.regex = true;
+  p.restore({ tab: null, tag: null, pair: null, filters: null, any: null,
+              q: 'nginx', re: null, sort: null });
+  assert.strictEqual(p.st.regex, false);
+});
+
+test('матчер пересчитывается при смене режима, а не только запроса', function () {
+  /* Запрос тот же, режим другой — памятка обязана это заметить, иначе
+     нажатие кнопки ничего не изменит. */
+  var p = make([snap('os-9.1', JUL)]);
+  p.st.q = 'a.c';
+  p.st.regex = false;
+  assert.strictEqual(p.matcher().test('abc'), false);
+  p.st.regex = true;
+  assert.strictEqual(p.matcher().test('abc'), true);
+});
+
 test('две страницы не делят состояния', function () {
   var a = make([snap('os-9.1', JUL), snap('os-9.2', AUG)]);
   var b = pagemod.create({ viewmodel: viewmodel, diffmod: diffmod,
