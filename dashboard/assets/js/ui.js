@@ -220,12 +220,27 @@
     /* Шаблон не разобрался: строки не фильтруются, и надо сказать почему.
        Текст берём у браузера дословно — он называет место ошибки, а общий
        текст от нас не назвал бы. Подсказкой даём его целиком: в строке он
-       обрезан. */
+       обрезан.
+
+       Приглашение уступает причине: обе строки о неполадке с одним и тем же
+       полем не встают разом (нажатие кнопки, которое единственно включает
+       регулярку, само гасит st.reAsked), но причина непонятого шаблона
+       важнее — она о том, что человек видит прямо сейчас, а приглашение
+       ждать может. */
     const problem = page.matcher().problem;
-    qbad.hidden = !problem;
-    qbad.textContent = problem
-      ? 'регулярка не разбирается: ' + problem + ' — показаны все строки' : '';
-    if (problem) qbad.setAttribute('data-tip', problem);
+    const invite = st.reAsked && !st.regex;
+    const message = problem
+      ? 'регулярка не разбирается: ' + problem + ' — показаны все строки'
+      : (invite
+          ? 'ссылка просила искать регулярным выражением — включите кнопкой .*'
+          : '');
+    qbad.hidden = !message;
+    qbad.textContent = message;
+    /* data-tip ставится и снимается вместе с сообщением: узел сейчас hidden
+       и снаружи это не видно, но несимметричная пара «есть текст без
+       подсказки» — дефект сам по себе, а не только пока безвредный. */
+    if (message) qbad.setAttribute('data-tip', problem || message);
+    else qbad.removeAttribute('data-tip');
     expandBtn.textContent = allOpen(items) ? 'Collapse all' : 'Expand all';
     expandBtn.disabled = !items.length;
     copyBtn.disabled = !items.length;
@@ -432,6 +447,10 @@
 
   reBtn.addEventListener('click', () => {
     st.regex = !st.regex;
+    /* Предложение из адреса принято или отвергнуто — держать его дальше
+       незачем, а не погасить значило бы показывать приглашение и после
+       того, как человек уже на него ответил. */
+    st.reAsked = false;
     render();
   });
 

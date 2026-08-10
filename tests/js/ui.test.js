@@ -1074,6 +1074,9 @@ test('фильтр по классу не переживает смену сос
   await dom.tick();
   pressCard(dom, 'tab-state', 'sast');            /* человек включил фильтр */
   assert.strictEqual(filterBtn(dom).textContent, 'Фильтры · 1');
+  /* Вид кнопки красит класс, а не только подпись: переименование класса
+     разъехалось бы молча, потому что подпись осталась бы верной. */
+  assert.strictEqual(filterBtn(dom).className, 'toggle on');
   store.remove(0);
   store.add([snap('os-9.2', AUG,
                   { classes: ['CVE'],
@@ -1082,6 +1085,7 @@ test('фильтр по классу не переживает смену сос
   await dom.tick();
   assert.strictEqual(filterBtn(dom).textContent, 'Фильтры',
                      'фильтр класса из выгруженного снапшота остался живым');
+  assert.strictEqual(filterBtn(dom).className, 'toggle');
   assert.ok(dom.id('state-rows').innerHTML.indexOf('nginx') !== -1,
             'таблица пуста под фильтр, которого нет ни на одной карточке: '
             + dom.id('state-rows').innerHTML);
@@ -1951,11 +1955,13 @@ test('прокрутка настоящей страницы показывае�
 
 /* Непонятый шаблон не фильтрует и объясняет себя. Пустая таблица на каждой
    недописанной скобке была бы неотличима от «ничего не нашлось». Режим
-   включаем адресом: кнопки на этот момент ещё нет. */
+   включаем кнопкой сами: адрес с re=1 его больше не включает — самое
+   большее, о чём он попросит, проверено отдельными тестами про reAsked. */
 test('непонятая регулярка показывает все строки и называет причину',
   function () {
-    var dom = load({ hash: '#tab=state&q=&re=1&f=&sort=name' });
+    var dom = load();
     store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
+    dom.fire(dom.id('q-re'), 'click', {});
     dom.id('q').value = '^python(';
     dom.fire(dom.id('q'), 'input', {});
     return wait(200).then(function () {
@@ -1967,8 +1973,9 @@ test('непонятая регулярка показывает все стро
   });
 
 test('починенная регулярка убирает сообщение', function () {
-  var dom = load({ hash: '#tab=state&q=&re=1&f=&sort=name' });
+  var dom = load();
   store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
+  dom.fire(dom.id('q-re'), 'click', {});
   dom.id('q').value = '^nginx';
   dom.fire(dom.id('q'), 'input', {});
   return wait(200).then(function () {
@@ -1995,8 +2002,13 @@ test('кнопка режима переключает поиск на регу�
   store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00'),
              snap('os-9.2', '2026-08-01T00:00:00+03:00')], 'a.json');
   assert.strictEqual(dom.id('q-re').getAttribute('aria-pressed'), 'false');
+  /* Вид кнопки красит класс, а не только aria-pressed: переименование
+     класса в JS или в CSS разъехалось бы молча, потому что aria-pressed
+     остался бы верным. */
+  assert.strictEqual(dom.id('q-re').className, 'toggle mono');
   dom.fire(dom.id('q-re'), 'click', {});
   assert.strictEqual(dom.id('q-re').getAttribute('aria-pressed'), 'true');
+  assert.strictEqual(dom.id('q-re').className, 'toggle mono on');
   assert.match(dom.location.hash, /(^|&)re=1(&|$)/);
 });
 
@@ -2056,3 +2068,78 @@ test('отжатая кнопка убирает сообщение о непо�
     assert.strictEqual(dom.id('q-bad').hidden, true);
   });
 });
+
+/* Решение человека: ссылка с re=1 больше не включает режим сама — чужой
+   шаблон вроде (a+)+$ способен подвесить вкладку позже, когда снапшоты уже
+   в памяти, — но и промолчать об этом ключе нельзя. Кнопка на этот момент
+   уже нарисована и отжата: страница обязана сказать, зачем её нажимать. */
+test('ссылка с re=1 не включает режим, но показывает приглашение',
+  function () {
+    var dom = load({ hash: '#tab=state&q=nginx&re=1&f=&sort=name' });
+    store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
+    assert.strictEqual(dom.id('q-re').getAttribute('aria-pressed'), 'false',
+                       'ссылка не имеет права включить режим сама');
+    assert.strictEqual(dom.id('q-bad').hidden, false);
+    assert.match(dom.id('q-bad').textContent, /включите кнопкой/);
+  });
+
+test('нажатие кнопки гасит приглашение независимо от того, что дальше '
+   + 'делает с режимом', function () {
+  /* Погашенным приглашение обязано остаться и после того, как режим снова
+     выключили: предложение принято или отвергнуто один раз, а не «пока
+     включено». Если бы клик не гасил st.reAsked, второй клик, вернувший
+     режим на «выключено», снова показал бы приглашение. */
+  var dom = load({ hash: '#tab=state&q=nginx&re=1&f=&sort=name' });
+  store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
+  assert.strictEqual(dom.id('q-bad').hidden, false);
+  dom.fire(dom.id('q-re'), 'click', {});               /* включили */
+  dom.fire(dom.id('q-re'), 'click', {});               /* и снова выключили */
+  assert.strictEqual(dom.id('q-re').getAttribute('aria-pressed'), 'false');
+  assert.strictEqual(dom.id('q-bad').hidden, true,
+                     'приглашение погашено кликом, а не тем, включён ли режим сейчас');
+});
+
+/* Приоритет: у непонятого шаблона причина важнее приглашения — она про то,
+   что человек видит прямо сейчас. Обычным нажатием кнопки это не собрать
+   (клик гасит reAsked), но внешняя ссылка с тем же q= и re=1 поверх уже
+   включённого режима — собирает: reAsked снова true, а st.regex остался
+   включённым и от старого шаблона. */
+test('когда шаблон не разобрался, приоритет у причины, а не у приглашения',
+  function () {
+    var dom = load();
+    store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
+    dom.fire(dom.id('q-re'), 'click', {});
+    dom.id('q').value = '^python(';
+    dom.fire(dom.id('q'), 'input', {});
+    return wait(200).then(function () {
+      assert.match(dom.id('q-bad').textContent, /не разбирается/);
+      dom.location.hash = '#tab=state&q=%5Epython(&re=1&f=&sort=name';
+      dom.fireWindow('hashchange');
+      assert.strictEqual(dom.id('q-re').getAttribute('aria-pressed'), 'true',
+                         'режим остался включённым — restore его не трогает');
+      assert.match(dom.id('q-bad').textContent, /не разбирается/,
+                   'причина обязана победить приглашение');
+      assert.doesNotMatch(dom.id('q-bad').textContent, /включите кнопкой/);
+    });
+  });
+
+/* data-tip ставится вместе с сообщением и должен уходить вместе с ним —
+   иначе у скрытого узла остаётся подсказка без текста, который она
+   объясняет. Сегодня это безвредно, потому что узел hidden, но пара
+   обязана быть симметричной. */
+test('data-tip у q-bad появляется и пропадает вместе с сообщением',
+  function () {
+    var dom = load();
+    store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
+    assert.strictEqual(dom.id('q-bad').getAttribute('data-tip'), null);
+    dom.fire(dom.id('q-re'), 'click', {});
+    dom.id('q').value = '^python(';
+    dom.fire(dom.id('q'), 'input', {});
+    return wait(200).then(function () {
+      assert.ok(dom.id('q-bad').getAttribute('data-tip'),
+               'подсказка обязана появиться вместе с сообщением о причине');
+      dom.fire(dom.id('q-re'), 'click', {});          /* чинит сообщение */
+      assert.strictEqual(dom.id('q-bad').getAttribute('data-tip'), null,
+                         'подсказка обязана уйти вместе с сообщением');
+    });
+  });

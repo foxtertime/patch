@@ -55,6 +55,20 @@ test('ranges обычного поиска даёт все вхождения п
   assert.deepStrictEqual(m.ranges('abXab'), [[0, 2], [3, 5]]);
 });
 
+/* test() обычного поиска регистр игнорирует — это отдельно проверено выше.
+   Подсветка обязана находить то же самое: запрос nginx находит NGINX-1.24,
+   и, если ranges регистр не игнорирует, test() его находит, а подсветить
+   в нём нечего — обе задачи должны договариваться об одном. */
+test('ranges обычного поиска находит совпадение в другом регистре', function () {
+  var m = query.compile('nginx', false);
+  assert.deepStrictEqual(m.ranges('NGINX-1.24'), [[0, 5]]);
+});
+
+test('ranges регулярки находит совпадение в другом регистре', function () {
+  var m = query.compile('nginx', true);
+  assert.deepStrictEqual(m.ranges('NGINX-1.24'), [[0, 5]]);
+});
+
 test('ranges регулярки даёт все совпадения по порядку', function () {
   var m = query.compile('a.', true);
   assert.deepStrictEqual(m.ranges('axaybz'), [[0, 2], [2, 4]]);

@@ -46,6 +46,16 @@ test('подсветка обычного поиска — разметка це
   assert.strictEqual(text.hl('a<b', query.compile('lt', false)), 'a&lt;b');
 });
 
+/* Совпадение нулевой длины подсвечивать нечем — пустой span только
+   замусорил бы разметку. Такие даёт, например, шаблон x*: он совпадает с
+   пустотой перед каждым символом строки. Сверяем строку целиком, как и
+   соседний тест: правка hl не имеет права оставить в разметке ни одного
+   пустого <span>. */
+test('подсветка шаблона нулевой длины не оставляет пустых span', function () {
+  var m = query.compile('x*', true);
+  assert.strictEqual(text.hl('abc', m), 'abc');
+});
+
 test('ключ constructor не отвечает функцией Object', function () {
   assert.strictEqual(text.own({}, 'constructor'), undefined);
   assert.strictEqual(text.own({ constructor: 7 }, 'constructor'), 7);
