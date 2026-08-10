@@ -44,6 +44,7 @@ function diffRow(over) {
            old_inherited: false, new_inherited: false,
            old_patches: [], new_patches: [], rpm_rows: [],
            patches_added: [], patches_removed: [],
+           patches_rewritten: over.patches_rewritten || [],
            rpms_added: [], rpms_removed: [],
            old_owner: over.old_owner || 'builder',
            new_owner: over.new_owner || 'builder',
@@ -120,6 +121,37 @@ test('незнакомый статус не рисует стрелки', funct
                                open: false }], opts());
   assert.match(out, /<td class="dir"><\/td>/);
 });
+
+test('колонка Δ патчей показывает три исхода, Δ RPM — два', function () {
+  var row = diffRow({ patches_rewritten: ['PATCH/c.patch'] });
+  row.patches_added = ['PATCH/a.patch'];
+  row.patches_removed = ['PATCH/b.patch'];
+  row.rpms_added = ['nginx-1.24.0-4.el9.x86_64'];
+  row.rpms_removed = ['nginx-1.24.0-3.el9.x86_64'];
+  var out = tables.diffRows([{ row: row, open: false }], opts());
+  var cells = out.match(/<td class="pat">.*?<\/td>/g);
+  assert.strictEqual(cells.length, 2);
+  assert.match(cells[0], /tilde">~1</);
+  /* У пакетов третьего исхода нет и не будет: сравнивать в них нечего. */
+  assert.doesNotMatch(cells[1], /tilde/);
+});
+
+/* Δ-колонка выше показывает, что патч переписан, числом за «~»; сам янтарный
+   знак стоит в раскрытой детали, и его туда доносит tables.js, передавая
+   row.patches_rewritten третьим доводом в markup.patchesChangeHtml. Знак
+   собирает markup.js (markup.test.js), а вот дошёл ли до него список
+   переписанных путей именно с этой строки — не проверено нигде: тест ниже
+   про это. */
+test('раскрытая строка диффа несёт янтарный знак переписанного патча',
+  function () {
+    var p = { path: 'PATCH/a.patch', name: 'a.patch', 'class': 'CVE',
+              cves: [], url: null };
+    var row = diffRow({ patches_rewritten: ['PATCH/a.patch'] });
+    row.old_patches = [p];
+    row.new_patches = [p];
+    var out = tables.diffRows([{ row: row, open: true }], opts({ open: true }));
+    assert.match(out, /is-rewritten/, out);
+  });
 
 /* Раскрытая строка и её детали — один предмет: полоса слева идёт через
    обе, и рисует её CSS по классам, которые ставит разметка. */

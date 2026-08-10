@@ -14,19 +14,23 @@
                              require('./page.js'), require('./hash.js'),
                              require('./rail.js'), require('./files.js'),
                              require('./tips.js'), require('./toasts.js'),
-                             require('./filters.js'));
+                             require('./address.js'), require('./filters.js'),
+                             require('./search.js'), require('./copy.js'),
+                             require('./viewport.js'), require('./notices.js'));
   } else {
     root.KP = root.KP || {};
     root.KP.ui = factory(root.KP.viewmodel, root.KP.store, root.KP.diff,
                          root.KP.text, root.KP.labels, root.KP.markup,
                          root.KP.tables, root.KP.cards, root.KP.page,
                          root.KP.hash, root.KP.rail, root.KP.files,
-                         root.KP.tips, root.KP.toasts, root.KP.filters);
+                         root.KP.tips, root.KP.toasts, root.KP.address,
+                         root.KP.filters, root.KP.search, root.KP.copy,
+                         root.KP.viewport, root.KP.notices);
   }
 }(typeof globalThis !== 'undefined' ? globalThis : this,
   function (viewmodel, store, diffmod, text, labels, markup, tables, cards,
-            pagemod, hash, railmod, filesmod, tipsmod, toastsmod,
-            filtersmod) {
+            pagemod, hash, railmod, filesmod, tipsmod, toastsmod, addressmod,
+            filtersmod, searchmod, copymod, viewportmod, noticesmod) {
   'use strict';
 
   /* Состояние страницы живёт в page.js: там же и всё, что из него
@@ -34,7 +38,8 @@
      сортировка. Здесь — короткие имена для того, что зовут отсюда чаще
      всего. */
   let page = pagemod.create({ viewmodel: viewmodel, diffmod: diffmod,
-                              store: store, labels: labels, text: text });
+                              store: store, labels: labels, text: text,
+                              search: searchmod });
   const st = page.st;
   const curSnap = page.curSnap, curPair = page.curPair;
   const visibleRows = page.visibleRows, sortRows = page.sortRows;
@@ -60,11 +65,6 @@
   const fileInput = document.getElementById('file-input');
   const dropZone = document.getElementById('drop');
   const pickBtn = document.getElementById('pick');
-
-  let hashLock = false;
-  /* Писала ли страница адрес сама. С этого мгновения location.hash — её
-     собственное эхо, а не то, с чем её открыли. */
-  let hashIsOurs = false;
 
   /* ---------- вспомогательное ---------- */
 
@@ -108,9 +108,9 @@
   /* ---------- карточки, селекторы, чипы ---------- */
 
   /* Ширина карточки-среза. Браузер набивает строку под завязку и про
-     остаток не думает: одиннадцать срезов при десяти влезающих дают строку
-     из одной карточки. Считаем, на сколько строк они делятся поровну, и
-     задаём ширину числом — строка флексов растягивает то, что в ней стоит,
+     остаток не думает: двенадцать срезов при десяти влезающих дают вторую
+     строку из двух карточек. Считаем, на сколько строк они делятся поровну,
+     и задаём ширину числом — строка флексов растягивает то, что в ней стоит,
      поэтому короткая последняя строка занята целиком.
 
      Меряет тот, у кого есть раскладка: без неё (в тестах, у спрятанной
@@ -235,7 +235,7 @@
       body.innerHTML = st.tab === 'diff' ? tables.diffRows(items, rowOpts())
                                          : tables.stateRows(items, rowOpts());
     }
-    writeHash();
+    address.write();
   }
 
   /* Карточки перерисовываются только при смене вкладки, тега или пары:
@@ -287,85 +287,6 @@
     search.placeholder = name === 'diff'
       ? 'Компонент, версия, тег, ветка, патч, CVE, RPM…'
       : 'Компонент, тег, ветка, патч, CVE, RPM…';
-  }
-
-  /* ---------- состояние в адресной строке ---------- */
-
-  function writeHash() {
-    const next = hash.format(page.hashParts());
-    hashIsOurs = true;
-    if (location.hash === next) return;
-    hashLock = true;
-    try {
-      if (history && history.replaceState) history.replaceState(null, '', next);
-      else location.hash = next;
-    } catch (e) {
-      location.hash = next;
-    }
-    setTimeout(() => { hashLock = false; }, 0);
-  }
-
-  function readHash() {
-    const raw = location.hash.replace(/^#/, '');
-    if (!raw) return false;
-    page.restore(hash.parse(raw));
-    search.value = st.q;
-    /* Запрос мог приехать из ссылки — крестик обязан появиться вместе
-       с ним, а не ждать первого касания клавиатуры. */
-    clearBtn.hidden = !search.value;
-    return true;
-  }
-
-  /* ---------- копирование ---------- */
-
-  /* NVR диффа собирается из имени и evr: evr — это «epoch:version-release»,
-     а в NVR эпохи нет, поэтому ведущее «N:» отбрасываем. */
-  function nvrOf(row) {
-    if (row.nvr) return row.nvr;
-    const evr = row.new_evr || row.old_evr;
-    return evr ? row.name + '-' + String(evr).replace(/^[0-9]+:/, '') : row.name;
-  }
-
-  /* Подпись кнопки берём один раз при загрузке: если запомнить текущую, то
-     второй клик подряд запомнит «Скопировано» и вернёт кнопку к нему навсегда. */
-  const COPY_LABEL = copyBtn.textContent;
-  let flashTimer = null;
-
-  function flash(text) {
-    copyBtn.textContent = text;
-    if (flashTimer) clearTimeout(flashTimer);
-    flashTimer = setTimeout(() => {
-      flashTimer = null;
-      copyBtn.textContent = COPY_LABEL;
-    }, 1400);
-  }
-
-  function copyFallback(text) {
-    const area = document.createElement('textarea');
-    area.value = text;
-    area.setAttribute('readonly', 'readonly');
-    area.style.position = 'fixed';
-    area.style.left = '-9999px';
-    document.body.appendChild(area);
-    area.select();
-    let ok = false;
-    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
-    document.body.removeChild(area);
-    flash(ok ? 'Скопировано' : 'Не вышло');
-  }
-
-  function copyNvr() {
-    let items = sortRows(visibleRows()), lines = [], i;
-    for (i = 0; i < items.length; i++) lines.push(nvrOf(items[i].row));
-    const text = lines.join('\n');
-    if (!text) return;
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(
-        () => { flash(`Скопировано ${lines.length}`); },
-        () => { copyFallback(text); });
-    } else {
-      copyFallback(text);
-    }
   }
 
   /* ---------- события ---------- */
@@ -498,13 +419,6 @@
     render();
   });
 
-  copyBtn.addEventListener('click', copyNvr);
-
-  window.addEventListener('hashchange', () => {
-    if (hashLock) return;
-    if (readHash()) { page.dropDeadFilters(); showTab(st.tab); rebuild(); }
-  });
-
   /* ---------- владельцы участков страницы ---------- */
 
   /* Корень заполняется по ходу: рельс берёт метод в момент вызова, а не в
@@ -515,10 +429,16 @@
   const tips = tipsmod.create({ node: document.getElementById('tip') });
   const hideTip = tips.hide;
   const toasts = toastsmod.create({ node: document.getElementById('toasts') });
+  const address = addressmod.create({
+    page: page, hash: hash, dom: { search: search, clear: clearBtn },
+    /* Ссылка, присланная позже, — это смена всего сразу: вкладки, выбора,
+       фильтров. Что после неё перерисовать, знает корень. */
+    onExternal: () => { page.dropDeadFilters(); showTab(st.tab); rebuild(); } });
   let rail = railmod.create({ box: chainBox, page: page, store: store,
                               text: text, app: app, hideTip: hideTip });
   let files = filesmod.create({ store: store, toasts: toasts,
     dom: { input: fileInput, drop: dropZone, pick: pickBtn } });
+  const notices = noticesmod.create({ store: store, toasts: toasts });
   const filters = filtersmod.create({
     box: document.getElementById('filtermenu'),
     button: document.getElementById('filters'),
@@ -526,47 +446,13 @@
   app.render = render;
   app.renderStateCards = renderStateCards;
   app.renderDiffCards = renderDiffCards;
+  const copier = copymod.create({
+    button: copyBtn,
+    rowsOf: () => sortRows(visibleRows()).map((item) => item.row) });
 
 
-  /* ---------- «липкая» шапка ---------- */
-
-  function syncStickyOffset() {
-    if (!controls || !document.documentElement.style.setProperty) return;
-    document.documentElement.style.setProperty(
-      '--controls-h', controls.getBoundingClientRect().height + 'px');
-  }
-  if (typeof ResizeObserver === 'function') {
-    new ResizeObserver(syncStickyOffset).observe(controls);
-  } else {
-    window.addEventListener('resize', syncStickyOffset);
-  }
-  /* Ширина карточки посчитана от ширины окна и переживает её изменение не
-     сама: окно сузили — в строку влезает меньше, и делить надо заново. */
-  window.addEventListener('resize', fitAllCards);
-
-  /* ---------- кнопка «наверх» ---------- */
-
-  const toTop = document.getElementById('totop');
-
-  /* Порог — высота окна, а не круглое число точек: «ниже первого экрана»
-     человек видит глазами, а «ниже шестисот точек» ни о чём не говорит и
-     на разных окнах срабатывает по-разному. */
-  function syncToTop() {
-    toTop.hidden = window.pageYOffset <= window.innerHeight;
-  }
-
-  toTop.addEventListener('click', () => {
-    /* Плавную прокрутку понимают не все браузеры, и её отдельно просят
-       отключить те, кому от движения плохо. В обоих случаях поднимаемся
-       прыжком: доехать важнее, чем доехать красиво. */
-    const smooth = 'scrollBehavior' in document.documentElement.style
-      && !(window.matchMedia
-           && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-    if (smooth) window.scrollTo({ top: 0, behavior: 'smooth' });
-    else window.scrollTo(0, 0);
-  });
-
-  window.addEventListener('scroll', syncToTop);
+  viewportmod.create({ controls: controls, toTop: document.getElementById('totop'),
+                       onResize: fitAllCards });
 
   /* ---------- загрузка снапшотов ---------- */
 
@@ -584,44 +470,12 @@
   }
 
 
-  /* Что показано окошком и на каком составе. Предупреждение всплывает,
-     только когда состав снапшотов и правда стал другим, и только если
-     такой строки на прошлом составе не было.
-
-     Порядок из состава выкинут намеренно. Предупреждение про разные хабы
-     называет тот снапшот, который выбивается из ряда, а выбивается —
-     всегда не первый; от перестановки строка переписывается, хотя факт
-     под ней тот же самый. Сравнивай мы строки, окошко вылезало бы на
-     каждое перетаскивание узла и твердило человеку одно и то же за то,
-     что он двигает рельс. */
-  let shownWarnings = [];
-  let shownStock = '';
-
-  function stockOf() {
-    return store.list().map((item) => `${item.tag} ${item.generated}`)
-      .sort().join('\n');
-  }
-
   /* Состав снапшотов весь живёт на рельсе: там его показывают, там же
      добавляют, переставляют и убирают. Отдельного списка источников с теми
      же строками у страницы больше нет. */
   function renderSources() {
     rail.render();
-    const stock = stockOf();
-    const now = store.warnings();
-    const fresh = now.filter((line) => shownWarnings.indexOf(line) === -1);
-    /* Состав тот же — показываем ровно то, на что список вырос: причина
-       отказа дописывается в конец, а переписанное предупреждение про хабы
-       длины не меняет. Иначе отказ перестановки, ради которого хранилище
-       эту строку и заводит, остался бы непоказанным: после отката состав
-       возвращается к прежнему. */
-    const room = stock === shownStock
-      ? Math.max(0, now.length - shownWarnings.length) : fresh.length;
-    for (const line of fresh.slice(fresh.length - room)) {
-      toasts.show({ kind: 'warn', lines: [line] });
-    }
-    shownWarnings = now;
-    shownStock = stock;
+    notices.sync();
   }
 
   /* Единственная дверь для данных. Порядок здесь не косметический, и стоит он
@@ -633,14 +487,15 @@
     /* Адрес читаем, только пока он чужой — тот, с которым страницу открыли.
        Дальше в нём лежит наша же прошлая запись, и она вернула бы прежний
        выбор в обход picked, снова похоронив умолчание. Ссылку, присланную
-       позже, приносит hashchange. */
-    if (!hashIsOurs) readHash();
+       позже, приносит hashchange внутри address. */
+    if (!address.isOurs()) address.read();
     /* Фильтр переживает смену состава снапшотов, а его предмет — нет: класс
        патчей уходит вместе со своим снапшотом, метка строки — вместе с
-       последней такой строкой. Зовём отдельно от readHash(), который выше
-       зовут уже не всегда: иначе страница показывала бы пустую таблицу под
-       фильтр, которого не поставить и не снять — карточки с ним не осталось
-       ни одной, а в чипе вместо подписи стоял бы сам ключ. */
+       последней такой строкой. Зовём отдельно от address.read(), который
+       выше зовут уже не всегда: иначе страница показывала бы пустую
+       таблицу под фильтр, которого не поставить и не снять — карточки с
+       ним не осталось ни одной, а в чипе вместо подписи стоял бы сам
+       ключ. */
     page.dropDeadFilters();
     showTab(st.tab);
     rebuild();
@@ -658,11 +513,6 @@
   (function start() {
     syncEmpty();
     renderSources();
-    syncStickyOffset();
-    /* Браузер восстанавливает прокрутку при перезагрузке, и страница может
-       открыться уже внизу — тогда кнопка нужна сразу, не дожидаясь, пока
-       человек тронет колесо. */
-    syncToTop();
   }());
 
   return { applyData: applyData };

@@ -18,8 +18,11 @@
   function create(deps) {
     const viewmodel = deps.viewmodel, diffmod = deps.diffmod;
     const store = deps.store, labels = deps.labels, text = deps.text;
-    const own = text.own, keys = text.keys, setFrom = text.setFrom;
-    const has = text.has, slug = text.slug;
+    const own = text.own, keys = text.keys;
+    const slug = text.slug;
+    /* Поиск живёт отдельным модулем: он ничего не знает ни о состоянии, ни
+       о данных страницы — только о строке и запросе. */
+    const scanState = deps.search.scanState, scanDiff = deps.search.scanDiff;
 
     /* Данные страницы считаются не здесь: сюда приходит уже посчитанное
        viewmodel.js по снапшотам, которые человек подгрузил сам. */
@@ -321,14 +324,24 @@
     function stateMatches(row) { return matches(row, 'state'); }
     function diffMatches(row) { return matches(row, 'diff'); }
 
+    /* Строки вкладки. Правило «откуда их брать» одно на четверых —
+       счётчики меню, отсев мёртвых фильтров, видимые строки и общее
+       число, — и все четверо обязаны спрашивать в одном месте. Вкладка
+       приходит доводом: судить приходится и о той, на которой человека
+       сейчас нет. */
+    function rowsOf(tab) {
+      const host = tab === 'diff' ? curPair() : curSnap();
+      if (!host) return [];
+      return tab === 'diff' ? host.rows : host.builds;
+    }
+
     /* Сколько строк вкладки подходит под каждый признак само по себе, без
        оглядки на другие фильтры: так же считают плашки. Зовут это при
        открытии меню, а не на каждую перерисовку — иначе лишний проход по
        всем строкам на каждый клик. */
     function filterCounts() {
       const tab = st.tab;
-      const host = tab === 'diff' ? curPair() : curSnap();
-      const list = host ? (tab === 'diff' ? host.rows : host.builds) : [];
+      const list = rowsOf(tab);
       const out = {};
       for (const group of labels.groups(tab)) {
         for (const key of group.keys) {
@@ -353,8 +366,7 @@
       for (i = 0; i < classes.length; i++) {
         if (slug(classes[i]) === key) return true;
       }
-      const host = tab === 'diff' ? curPair() : curSnap();
-      const rows = host ? (tab === 'diff' ? host.rows : host.builds) : [];
+      const rows = rowsOf(tab);
       for (i = 0; i < rows.length; i++) {
         if (rows[i].marks.indexOf(key) !== -1) return true;
       }
@@ -378,77 +390,6 @@
       }
     }
 
-    /* ---------- поиск ---------- */
-
-    /* Поиск идёт и по видимым полям строки, и по её деталям. Если совпало
-       только в деталях, строка не просто остаётся — она сразу разворачивается,
-       иначе непонятно, почему она в выдаче. */
-    function scanState(row, q) {
-      if (!q) return { show: true, deep: false };
-      /* Видимое в самой строке — мелкое совпадение: разворачивать её незачем,
-         человек и так видит, за что она попала в выдачу. Владелец и время
-         сборки билда стоят в своих колонках, поэтому они здесь, а не ниже. */
-      const shallow = has(row.name, q) || has(row.nvr, q) || has(row.branch, q)
-                 || has(row.evr, q) || has(row.tagged_in, q)
-                 || has(row.owner, q) || has(row.completed, q);
-      let deep = has(row.project, q);
-      let i, j, p;
-      for (i = 0; !deep && i < (row.koji_tags || []).length; i++) {
-        if (has(row.koji_tags[i], q)) deep = true;
-      }
-      for (i = 0; !deep && i < row.patches.length; i++) {
-        p = row.patches[i];
-        if (has(p.name, q) || has(p.path, q) || has(p['class'], q)) deep = true;
-        for (j = 0; !deep && j < (p.cves || []).length; j++) {
-          if (has(p.cves[j], q)) deep = true;
-        }
-      }
-      /* Ghost-патчи — то самое место, где живёт «влито в ветку, не
-         собрано»: без них запрос по имени CVE не находил бы строку вовсе,
-         хотя вопрос дашборда патчей CVE как раз «какие пакеты его ещё
-         ждут». Секция ghost-ов лежит в раскрытии, поэтому совпадение здесь
-         тоже глубокое — строка обязана открыться, а не просто остаться в
-         выдаче. */
-      for (i = 0; !deep && i < (row.ghosts || []).length; i++) {
-        p = row.ghosts[i];
-        if (has(p.name, q) || has(p.path, q) || has(p['class'], q)) deep = true;
-        for (j = 0; !deep && j < (p.cves || []).length; j++) {
-          if (has(p.cves[j], q)) deep = true;
-        }
-      }
-      for (i = 0; !deep && i < row.rpms.length; i++) {
-        if (has(row.rpms[i], q)) deep = true;
-      }
-      for (i = 0; !deep && i < row.problems.length; i++) {
-        if (has(row.problems[i], q)) deep = true;
-      }
-      return { show: shallow || deep, deep: !shallow && deep };
-    }
-
-    function scanDiff(row, q) {
-      if (!q) return { show: true, deep: false };
-      const shallow = has(row.name, q) || has(row.old_evr, q) || has(row.new_evr, q);
-      let deep = has(row.old_branch, q) || has(row.new_branch, q)
-              || has(row.old_tagged_in, q) || has(row.new_tagged_in, q);
-      const lists = [row.old_patches, row.new_patches];
-      let i, j, k, p;
-      for (i = 0; !deep && i < lists.length; i++) {
-        for (j = 0; !deep && j < lists[i].length; j++) {
-          p = lists[i][j];
-          if (has(p.name, q) || has(p.path, q) || has(p['class'], q)) deep = true;
-          for (k = 0; !deep && k < (p.cves || []).length; k++) {
-            if (has(p.cves[k], q)) deep = true;
-          }
-        }
-      }
-      for (i = 0; !deep && i < row.rpm_rows.length; i++) {
-        for (j = 0; !deep && j < 2; j++) {
-          if (row.rpm_rows[i][j] && has(row.rpm_rows[i][j], q)) deep = true;
-        }
-      }
-      return { show: shallow || deep, deep: !shallow && deep };
-    }
-
     /* ---------- какие строки видны ---------- */
 
     /* Строки одной вкладки: сперва фильтры, потом поиск. Правило одно на
@@ -465,21 +406,12 @@
     }
 
     function visibleRows() {
-      if (st.tab === 'diff') {
-        const pair = curPair();
-        return pick(pair ? pair.rows : [], diffMatches, scanDiff);
-      }
-      const snap = curSnap();
-      return pick(snap ? snap.builds : [], stateMatches, scanState);
+      if (st.tab === 'diff') return pick(rowsOf('diff'), diffMatches, scanDiff);
+      return pick(rowsOf('state'), stateMatches, scanState);
     }
 
     function totalRows() {
-      if (st.tab === 'diff') {
-        const pair = curPair();
-        return pair ? pair.rows.length : 0;
-      }
-      const s = curSnap();
-      return s ? s.builds.length : 0;
+      return rowsOf(st.tab).length;
     }
 
     /* Ключ раскрытой строки. Снапшот и пара названы полными именами по той же
@@ -510,7 +442,10 @@
       if (st.tab === 'diff') {
         if (key === 'old') return row.old_evr || '';
         if (key === 'new') return row.new_evr || '';
-        if (key === 'dpatch') return row.patches_added.length + row.patches_removed.length;
+        if (key === 'dpatch') {
+          return row.patches_added.length + row.patches_removed.length
+               + (row.patches_rewritten || []).length;
+        }
         if (key === 'drpm') return row.rpms_added.length + row.rpms_removed.length;
         return row.name || '';
       }
