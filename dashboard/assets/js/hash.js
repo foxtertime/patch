@@ -47,7 +47,7 @@
          список — разные вещи: первое значит «ссылка о режимах молчит»,
          второе — «все группы по И». */
       else if (key === 'any') out.any = val ? val.split(',') : [];
-      else if (key === 'q') out.q = val.trim().toLowerCase();
+      else if (key === 'q') out.q = val.trim();
       else if (key === 'sort') {
         bits = val.split(':');
         if (bits[0]) out.sort = { key: bits[0], asc: bits[1] !== 'desc' };

@@ -16,7 +16,8 @@
                              require('./tips.js'), require('./toasts.js'),
                              require('./address.js'), require('./filters.js'),
                              require('./search.js'), require('./copy.js'),
-                             require('./viewport.js'), require('./notices.js'));
+                             require('./viewport.js'), require('./notices.js'),
+                             require('./query.js'));
   } else {
     root.KP = root.KP || {};
     root.KP.ui = factory(root.KP.viewmodel, root.KP.store, root.KP.diff,
@@ -25,12 +26,12 @@
                          root.KP.hash, root.KP.rail, root.KP.files,
                          root.KP.tips, root.KP.toasts, root.KP.address,
                          root.KP.filters, root.KP.search, root.KP.copy,
-                         root.KP.viewport, root.KP.notices);
+                         root.KP.viewport, root.KP.notices, root.KP.query);
   }
 }(typeof globalThis !== 'undefined' ? globalThis : this,
   function (viewmodel, store, diffmod, text, labels, markup, tables, cards,
             pagemod, hash, railmod, filesmod, tipsmod, toastsmod, addressmod,
-            filtersmod, searchmod, copymod, viewportmod, noticesmod) {
+            filtersmod, searchmod, copymod, viewportmod, noticesmod, querymod) {
   'use strict';
 
   /* Состояние страницы живёт в page.js: там же и всё, что из него
@@ -39,7 +40,7 @@
      всего. */
   let page = pagemod.create({ viewmodel: viewmodel, diffmod: diffmod,
                               store: store, labels: labels, text: text,
-                              search: searchmod });
+                              search: searchmod, query: querymod });
   const st = page.st;
   const curSnap = page.curSnap, curPair = page.curPair;
   const visibleRows = page.visibleRows, sortRows = page.sortRows;
@@ -190,7 +191,7 @@
      и то же — разойдись они здесь, разъехались бы и colspan у деталей. */
   function rowOpts() {
     const pair = st.tab === 'diff' ? curPair() : null;
-    return { q: st.q, cols: colCount(st.tab), keyOf: rowKey, openOf: openOf,
+    return { q: page.matcher(), cols: colCount(st.tab), keyOf: rowKey, openOf: openOf,
              oldTag: pair ? pair.old : 'было',
              newTag: pair ? pair['new'] : 'стало' };
   }
@@ -390,7 +391,7 @@
     if (searchTimer) clearTimeout(searchTimer);
     searchTimer = setTimeout(() => {
       searchTimer = null;
-      st.q = search.value.trim().toLowerCase();
+      st.q = search.value.trim();
       render();
     }, SEARCH_DELAY);
   });

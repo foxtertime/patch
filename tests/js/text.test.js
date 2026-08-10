@@ -4,6 +4,9 @@
 var test = require('node:test');
 var assert = require('node:assert');
 var text = require('../../dashboard/assets/js/text.js');
+var query = require('../../dashboard/assets/js/query.js');
+
+function q(typed) { return query.compile(typed || '', false); }
 
 test('экранируются все пять опасных знаков', function () {
   assert.strictEqual(text.esc('<a href="x" \'y\'>&'),
@@ -16,13 +19,25 @@ test('пустое значение — пустая строка, а не «nul
 });
 
 test('подсветка экранирует и то, что подсветила', function () {
-  assert.strictEqual(text.hl('<b>ab</b>', 'b'),
+  assert.strictEqual(text.hl('<b>ab</b>', q('b')),
     '&lt;<span class="hit">b</span>&gt;a<span class="hit">b</span>'
     + '&lt;/<span class="hit">b</span>&gt;');
 });
 
 test('без запроса подсветка — просто экранирование', function () {
-  assert.strictEqual(text.hl('<b>', ''), '&lt;b&gt;');
+  assert.strictEqual(text.hl('<b>', q()), '&lt;b&gt;');
+});
+
+/* Подсветка обычного поиска — то, что видно на каждой строке таблицы.
+   Сверяем строку целиком, а не по кускам: правка hl не имеет права
+   поменять ни один символ разметки. */
+test('подсветка обычного поиска — разметка целиком', function () {
+  var m = query.compile('ab', false);
+  assert.strictEqual(text.hl('xabyab', m),
+    'x<span class="hit">ab</span>y<span class="hit">ab</span>');
+  assert.strictEqual(text.hl('<b>ab</b>', m),
+    '&lt;b&gt;<span class="hit">ab</span>&lt;/b&gt;');
+  assert.strictEqual(text.hl('ничего', m), 'ничего');
 });
 
 test('ключ constructor не отвечает функцией Object', function () {

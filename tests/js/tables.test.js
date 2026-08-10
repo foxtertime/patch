@@ -6,12 +6,15 @@ var test = require('node:test');
 var assert = require('node:assert');
 var labels = require('../../dashboard/assets/js/labels.js');
 var tables = require('../../dashboard/assets/js/tables.js');
+var query = require('../../dashboard/assets/js/query.js');
 
 labels.setClasses(['CVE', 'other']);
 
+function q(typed) { return query.compile(typed || '', false); }
+
 function opts(over) {
   over = over || {};
-  return { q: over.q || '', cols: over.cols || 9,
+  return { q: q(over.q), cols: over.cols || 9,
            keyOf: function (row) { return 'k:' + row.name; },
            openOf: function (key, deep) {
              return over.open === undefined ? Boolean(deep) : over.open;
@@ -191,7 +194,7 @@ test('стрелка раскрытия — один глиф, состояни�
 });
 
 test('подпись блока несёт счётчик', function () {
-  var out = tables.stateDetail(stateRow(), '');
+  var out = tables.stateDetail(stateRow(), q());
   assert.match(out, /RPM<span class="n">· 1<\/span>/, out);
   assert.match(out, /патчи<span class="n">· 0<\/span>/, out);
 });
@@ -202,7 +205,7 @@ test('подпись блока несёт счётчик', function () {
    вся левая сторона, потом вся правая, — списки начинались бы на разной
    высоте из-за списков патчей над ними, и выравнивание пропало бы. */
 test('куски сторон идут парами: шапка, сводка, патчи, пакеты', function () {
-  var out = tables.diffDetail(diffRow(), '', 'os-9.1', 'os-9.4');
+  var out = tables.diffDetail(diffRow(), q(), 'os-9.1', 'os-9.4');
   var order = (out.match(/side-head|class="side"/g) || []);
   assert.deepStrictEqual(order, ['side-head', 'side-head',
                                  'class="side"', 'class="side"',
@@ -213,13 +216,13 @@ test('куски сторон идут парами: шапка, сводка, �
 });
 
 test('имена концов в детали диффа приходят доводами', function () {
-  var out = tables.diffDetail(diffRow(), '', 'os-9.1', 'os-9.4');
+  var out = tables.diffDetail(diffRow(), q(), 'os-9.1', 'os-9.4');
   assert.match(out, /было · <b>os-9\.1<\/b>/);
   assert.match(out, /стало · <b>os-9\.4<\/b>/);
 });
 
 test('деталь состояния показывает оба источника', function () {
-  var out = tables.stateDetail(stateRow(), '');
+  var out = tables.stateDetail(stateRow(), q());
   assert.match(out, /<div class="bl">koji<\/div>/);
   assert.match(out, /<div class="bl">gitlab<\/div>/);
 });
@@ -229,7 +232,7 @@ test('метку from-commit деталь не повторяет', function () 
      раскрытия сообщает то же самое второй раз. */
   var row = stateRow();
   row.ref_kind = 'commit';
-  assert.doesNotMatch(tables.stateDetail(row, ''), /from-commit/);
+  assert.doesNotMatch(tables.stateDetail(row, q()), /from-commit/);
 });
 
 test('владелец билда стоит в строке', function () {
@@ -255,7 +258,7 @@ test('в блоке koji стоят все поля билда', function () {
      строке: сюда приходят, когда строки уже мало. */
   var row = stateRow();
   row.koji_url = 'https://koji.example.com/koji/buildinfo?buildID=1';
-  var out = tables.stateDetail(row, '');
+  var out = tables.stateDetail(row, q());
   assert.match(out, /NVR/);
   assert.match(out, /основной тег/);
   assert.match(out, /другие теги/);
@@ -274,7 +277,7 @@ test('билд из SRPM подписан srpm, а блок назван srpm', 
   row.ref_kind = 'srpm';
   row.branch = 'mc-4.8-1.el9.src.rpm';
   row.project = null;
-  var out = tables.stateDetail(row, '');
+  var out = tables.stateDetail(row, q());
   assert.match(out, /<span class="k">srpm<\/span>/, out);
   assert.match(out, /<div class="bl">srpm<\/div>/, out);
   assert.doesNotMatch(out, /<div class="bl">gitlab<\/div>/, out);
@@ -290,7 +293,7 @@ test('билд с коммита назван коммитом, а не ветк
   var row = stateRow();
   row.ref_kind = 'commit';
   row.branch = 'abc1234';
-  var out = tables.stateDetail(row, '');
+  var out = tables.stateDetail(row, q());
   assert.match(out,
     /<span class="k">коммит<\/span><span class="v"><span class="mono">abc1234/);
   assert.doesNotMatch(out, /from-commit/);
@@ -355,7 +358,7 @@ test('без ghost блок патчей прежний', function () {
 test('сводка стороны диффа несёт всю карточку билда', function () {
   /* «Было» и «стало» — это две карточки одного билда, и обрезать их до
      трёх строк значит заставлять уходить из раскрытия за остальным. */
-  var out = tables.diffDetail(diffRow(), '', 'os-9.1', 'os-9.4');
+  var out = tables.diffDetail(diffRow(), q(), 'os-9.1', 'os-9.4');
   assert.match(out, /версия/);
   assert.match(out, /тег/);
   assert.match(out, /ветка/);
@@ -375,7 +378,7 @@ test('стороны диффа подписаны каждая своим ви�
   var out = tables.diffDetail(diffRow({ old_ref_kind: 'branch',
                                         new_ref_kind: 'srpm',
                                         new_branch: 'mc-4.8-1.el9.src.rpm' }),
-                              '', 'os-9.1', 'os-9.4');
+                              q(), 'os-9.1', 'os-9.4');
   assert.match(out, /<span class="k">ветка<\/span>/, out);
   assert.match(out, /<span class="k">srpm<\/span>/, out);
 });
@@ -383,7 +386,7 @@ test('стороны диффа подписаны каждая своим ви�
 test('сменившийся владелец помечен на стороне «стало»', function () {
   var out = tables.diffDetail(diffRow({ old_owner: 'alice',
                                         new_owner: 'bob' }),
-                              '', 'os-9.1', 'os-9.4');
+                              q(), 'os-9.1', 'os-9.4');
   assert.match(out, /<span class="is-added">bob<\/span>/);
   assert.doesNotMatch(out, /<span class="is-added">alice<\/span>/);
 });
@@ -391,18 +394,18 @@ test('сменившийся владелец помечен на стороне
 test('переехавший проект помечен на стороне «стало»', function () {
   var out = tables.diffDetail(diffRow({ old_project: 'core/nginx',
                                         new_project: 'web/nginx' }),
-                              '', 'os-9.1', 'os-9.4');
+                              q(), 'os-9.1', 'os-9.4');
   assert.match(out, /is-added">web\/nginx</);
 });
 
 test('одинаковые владелец и проект ничем не помечены', function () {
-  var out = tables.diffDetail(diffRow(), '', 'os-9.1', 'os-9.4');
+  var out = tables.diffDetail(diffRow(), q(), 'os-9.1', 'os-9.4');
   assert.doesNotMatch(out, /is-added">builder</);
   assert.doesNotMatch(out, /is-added">core\/nginx</);
 });
 
 test('блок проблем появляется только когда они есть', function () {
-  assert.doesNotMatch(tables.stateDetail(stateRow(), ''), /проблемы/);
-  assert.match(tables.stateDetail(stateRow({ problems: ['нет ветки'] }), ''),
+  assert.doesNotMatch(tables.stateDetail(stateRow(), q()), /проблемы/);
+  assert.match(tables.stateDetail(stateRow({ problems: ['нет ветки'] }), q()),
                /<li>нет ветки<\/li>/);
 });

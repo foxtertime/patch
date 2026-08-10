@@ -23,6 +23,7 @@
     /* Поиск живёт отдельным модулем: он ничего не знает ни о состоянии, ни
        о данных страницы — только о строке и запросе. */
     const scanState = deps.search.scanState, scanDiff = deps.search.scanDiff;
+    const querymod = deps.query;
 
     /* Данные страницы считаются не здесь: сюда приходит уже посчитанное
        viewmodel.js по снапшотам, которые человек подгрузил сам. */
@@ -392,13 +393,27 @@
 
     /* ---------- какие строки видны ---------- */
 
+    /* Матчер запроса, посчитанный один раз на отрисовку. Компилировать его
+       заново на каждую строку таблицы значило бы делать это тысячи раз за
+       перерисовку, а на регулярке это ещё и разбор шаблона. Помним
+       последний вход и отдаём готовое. */
+    let lastQuery = null, lastMatcher = null;
+    function matcher() {
+      if (lastMatcher === null || lastQuery !== st.q) {
+        lastQuery = st.q;
+        lastMatcher = querymod.compile(st.q, false);
+      }
+      return lastMatcher;
+    }
+
     /* Строки одной вкладки: сперва фильтры, потом поиск. Правило одно на
        обе, разные у них только источник строк и пара считалок. */
     function pick(rows, matches, scan) {
       const out = [];
+      const q = matcher();
       for (const row of rows) {
         if (!matches(row)) continue;
-        const found = scan(row, st.q);
+        const found = scan(row, q);
         if (!found.show) continue;
         out.push({ row, open: found.deep });
       }
@@ -611,7 +626,7 @@
       activeFilters, filterState, setFilter, toggleFilter,
       groupMode, setGroupMode, filterCounts,
       knownFilter, dropDeadFilters,
-      visibleRows, totalRows,
+      visibleRows, totalRows, matcher,
       sortRows, sortBy,
       rowKey, openOf, setOpen,
       restore, hashParts

@@ -12,6 +12,7 @@ var labels = require('../../dashboard/assets/js/labels.js');
 var text = require('../../dashboard/assets/js/text.js');
 var searchmod = require('../../dashboard/assets/js/search.js');
 var pagemod = require('../../dashboard/assets/js/page.js');
+var querymod = require('../../dashboard/assets/js/query.js');
 
 function patch(name, cls) {
   return { path: 'PATCH/' + name, name: name, 'class': cls, cves: [],
@@ -57,7 +58,7 @@ function make(snapshots) {
   if (snapshots) storemod.add(snapshots, 'проба.json');
   var p = pagemod.create({ viewmodel: viewmodel, diffmod: diffmod,
                            store: storemod, labels: labels, text: text,
-                           search: searchmod });
+                           search: searchmod, query: querymod });
   if (snapshots) p.applyData(viewmodel.buildPageData(storemod.snapshots()));
   return p;
 }
@@ -593,7 +594,7 @@ test('две страницы не делят состояния', function () {
   var a = make([snap('os-9.1', JUL), snap('os-9.2', AUG)]);
   var b = pagemod.create({ viewmodel: viewmodel, diffmod: diffmod,
                            store: storemod, labels: labels, text: text,
-                           search: searchmod });
+                           search: searchmod, query: querymod });
   b.applyData(viewmodel.buildPageData(storemod.snapshots()));
   a.selectSnapshot(0);
   assert.strictEqual(a.st.tag, 0);
