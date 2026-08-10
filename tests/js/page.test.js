@@ -12,6 +12,7 @@ var labels = require('../../dashboard/assets/js/labels.js');
 var text = require('../../dashboard/assets/js/text.js');
 var searchmod = require('../../dashboard/assets/js/search.js');
 var pagemod = require('../../dashboard/assets/js/page.js');
+var querymod = require('../../dashboard/assets/js/query.js');
 
 function patch(name, cls) {
   return { path: 'PATCH/' + name, name: name, 'class': cls, cves: [],
@@ -57,7 +58,7 @@ function make(snapshots) {
   if (snapshots) storemod.add(snapshots, 'проба.json');
   var p = pagemod.create({ viewmodel: viewmodel, diffmod: diffmod,
                            store: storemod, labels: labels, text: text,
-                           search: searchmod });
+                           search: searchmod, query: querymod });
   if (snapshots) p.applyData(viewmodel.buildPageData(storemod.snapshots()));
   return p;
 }
@@ -589,11 +590,111 @@ test('смена состава снапшотов заводит кэш пер�
   assert.strictEqual(p.pairFor([0, 2]).summary, false);
 });
 
+/* Было: «режим регулярки переживает круг через адрес» — адрес и правда
+   переносил режим через перезагрузку. Решение человека это отменило: замер
+   показал, что чужой шаблон вроде (a+)+$ способен подвесить вкладку не при
+   открытии ссылки, а позже, когда снапшоты уже в памяти. Предмет теста тот
+   же — круг через адрес, — но смысл другой: режим больше не переносится,
+   переносится только просьба его включить. */
+test('круг через адрес режим не переносит, но просьбу доносит', function () {
+  var p = make([snap('os-9.1', JUL)]);
+  p.st.q = '^ngi';
+  p.st.regex = true;
+  assert.strictEqual(p.hashParts().re, true,
+                     'адрес по-прежнему пишет re=1, пока включено кнопкой');
+  p.st.regex = false;
+  p.restore({ tab: null, tag: null, pair: null, filters: null, any: null,
+              q: '^ngi', re: '1', sort: null });
+  assert.strictEqual(p.st.regex, false,
+                     'ссылка с re=1 не имеет права включить режим сама');
+  assert.strictEqual(p.st.reAsked, true,
+                     'но и промолчать о шаблоне в ссылке нельзя');
+});
+
+/* Было: «ссылка без re= выключает режим» — раньше restore() решал за
+   кнопку и в эту сторону тоже. Теперь restore() режима не касается вовсе:
+   ни включить, ни выключить, — так что уже включённый кнопкой режим
+   переживает и такую ссылку, а сама ссылка ни о чём не просит. */
+test('ссылка без re= не трогает уже включённый режим и не считается просьбой',
+  function () {
+    var p = make([snap('os-9.1', JUL)]);
+    p.st.regex = true;
+    p.restore({ tab: null, tag: null, pair: null, filters: null, any: null,
+                q: 'nginx', re: null, sort: null });
+    assert.strictEqual(p.st.regex, true,
+                       'restore больше не решает за кнопку ни в одну сторону');
+    assert.strictEqual(p.st.reAsked, false);
+  });
+
+/* Пункт 6: любое значение re=, кроме ровно '1', не считается просьбой —
+   это разбирает re=0 отдельно от «ключа нет вовсе» (тест выше) и от
+   произвольного мусора в значении. */
+test('re=0, пустой re= и re= с посторонним значением не считаются просьбой',
+  function () {
+    var p = make([snap('os-9.1', JUL)]);
+    p.restore({ tab: null, tag: null, pair: null, filters: null, any: null,
+                q: 'nginx', re: '0', sort: null });
+    assert.strictEqual(p.st.reAsked, false, 're=0 не просьба');
+    p.restore({ tab: null, tag: null, pair: null, filters: null, any: null,
+                q: 'nginx', re: '', sort: null });
+    assert.strictEqual(p.st.reAsked, false, 'пустой re= не просьба');
+    p.restore({ tab: null, tag: null, pair: null, filters: null, any: null,
+                q: 'nginx', re: 'true', sort: null });
+    assert.strictEqual(p.st.reAsked, false,
+                       're= с посторонним значением тоже не просьба');
+  });
+
+test('матчер пересчитывается при смене режима, а не только запроса', function () {
+  /* Запрос тот же, режим другой — памятка обязана это заметить, иначе
+     нажатие кнопки ничего не изменит. */
+  var p = make([snap('os-9.1', JUL)]);
+  p.st.q = 'a.c';
+  p.st.regex = false;
+  assert.strictEqual(p.matcher().test('abc'), false);
+  p.st.regex = true;
+  assert.strictEqual(p.matcher().test('abc'), true);
+});
+
+/* Правильностная половина памятки — «ключ по режиму» — сторожится тестом
+   выше: без него смена режима на том же запросе не поменяла бы матчер.
+   Производительная половина — «не чаще одного раза на отрисовку» — не
+   сторожилась ничем: подмени условие на «пересчитывать всегда», и оба
+   предыдущих теста остались бы зелёными, потому что после смены режима они
+   и должны пересчитать. Считаем вызовы compile() через свою заглушку
+   вместо настоящего query.js: один вызов page.matcher() плюс один проход
+   visibleRows() — это то, что в одну отрисовку делает ui.js (rowOpts() и
+   pick() внутри). */
+test('матчер компилируется один раз на отрисовку, а не на каждое обращение',
+  function () {
+    var calls = 0;
+    var countingQuery = {
+      compile: function (raw, regex) {
+        calls += 1;
+        return querymod.compile(raw, regex);
+      }
+    };
+    storemod.reset();
+    storemod.add([snap('os-9.1', JUL,
+                  { builds: [build('a'), build('b'), build('c')] })],
+                'проба.json');
+    var p = pagemod.create({ viewmodel: viewmodel, diffmod: diffmod,
+                             store: storemod, labels: labels, text: text,
+                             search: searchmod, query: countingQuery });
+    p.applyData(viewmodel.buildPageData(storemod.snapshots()));
+    p.st.q = 'a';
+    calls = 0;                    /* сбрасываем счётчик после подготовки */
+    p.matcher();
+    p.matcher();
+    p.visibleRows();
+    assert.strictEqual(calls, 1,
+      'compile() позвался ' + calls + ' раз(а) на одну отрисовку вместо одного');
+  });
+
 test('две страницы не делят состояния', function () {
   var a = make([snap('os-9.1', JUL), snap('os-9.2', AUG)]);
   var b = pagemod.create({ viewmodel: viewmodel, diffmod: diffmod,
                            store: storemod, labels: labels, text: text,
-                           search: searchmod });
+                           search: searchmod, query: querymod });
   b.applyData(viewmodel.buildPageData(storemod.snapshots()));
   a.selectSnapshot(0);
   assert.strictEqual(a.st.tag, 0);

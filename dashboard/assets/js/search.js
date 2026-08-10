@@ -33,7 +33,7 @@
   }
 
   function scanState(row, q) {
-    if (!q) return { show: true, deep: false };
+    if (q.empty) return { show: true, deep: false };
     /* Видимое в самой строке — мелкое совпадение: разворачивать её незачем,
        человек и так видит, за что она попала в выдачу. Владелец и время
        сборки билда стоят в своих колонках, поэтому они здесь, а не ниже. */
@@ -55,7 +55,7 @@
   }
 
   function scanDiff(row, q) {
-    if (!q) return { show: true, deep: false };
+    if (q.empty) return { show: true, deep: false };
     const shallow = has(row.name, q) || has(row.old_evr, q)
                  || has(row.new_evr, q);
     const deep = has(row.old_branch, q) || has(row.new_branch, q)

@@ -9,7 +9,7 @@ var hash = require('../../dashboard/assets/js/hash.js');
 test('пустой адрес не говорит ни о чём', function () {
   assert.deepStrictEqual(hash.parse(''),
     { tab: null, tag: null, pair: null, filters: null, any: null,
-      q: null, sort: null });
+      q: null, re: null, sort: null });
   assert.deepStrictEqual(hash.parse('#'), hash.parse(''));
 });
 
@@ -43,8 +43,12 @@ test('знак равенства внутри значения пережива
   assert.strictEqual(hash.parse('#q=a%3Db').q, 'a=b');
 });
 
-test('запрос приводится к нижнему регистру и обрезается', function () {
-  assert.strictEqual(hash.parse('#q=%20NGINX%20').q, 'nginx');
+/* Регистр запроса больше не трогается здесь: в Задаче 3 в поле поедут
+   регулярные шаблоны, а \S от приведения к нижнему регистру превратился бы
+   в \s — в свою противоположность. Регистронезависимость обычного поиска
+   живёт внутри матчера (query.js), а не в разборе адреса. */
+test('запрос обрезается, но регистр не трогается', function () {
+  assert.strictEqual(hash.parse('#q=%20NGINX%20').q, 'NGINX');
 });
 
 test('порядок сортировки по умолчанию — по возрастанию', function () {
@@ -124,4 +128,22 @@ test('минус в f= проходит насквозь строкой', functi
   /* О смысле ключей hash.js не знает: минус разбирает page.restore. */
   assert.deepStrictEqual(hash.parse('#f=cve,-autogen').filters,
                          ['cve', '-autogen']);
+});
+
+test('режим регулярки уезжает в адрес и возвращается', function () {
+  assert.match(hash.format({ tab: 'state', tag: null, pair: null,
+                             filters: [], any: [], q: '^py', re: true,
+                             sort: { key: 'name', asc: true } }),
+               /(^|&)re=1(&|$)/);
+  assert.strictEqual(hash.parse('tab=state&q=%5Epy&re=1&f=&sort=name').re, '1');
+});
+
+test('выключенный режим в адрес не пишется вовсе', function () {
+  /* Умолчание — выключен, и ключ на каждой ссылке был бы шумом.
+     Отсутствие ключа значит ровно «выключен» и ничего больше. */
+  assert.doesNotMatch(hash.format({ tab: 'state', tag: null, pair: null,
+                                    filters: [], any: [], q: 'nginx', re: false,
+                                    sort: { key: 'name', asc: true } }),
+                      /re=/);
+  assert.strictEqual(hash.parse('tab=state&q=nginx&f=&sort=name').re, null);
 });

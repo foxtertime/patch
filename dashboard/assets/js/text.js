@@ -17,16 +17,25 @@
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
-  /* Экранирует и подсвечивает вхождения текущего запроса. Всё, что попадает
-     в DOM из данных, проходит либо через esc(), либо через hl(). */
+  /* Экранирует и подсвечивает совпадения текущего запроса. Всё, что
+     попадает в DOM из данных, проходит либо через esc(), либо через hl().
+
+     Запрос приходит матчером, а не строкой: где именно совпало, знает он,
+     а дело этой функции — экранировать и обернуть. Порядок здесь
+     обязателен: позиции считаются по сырой строке, потому что по
+     экранированной они бы поехали — «&amp;» длиннее «&», и подсветка
+     встала бы не на то место. */
   function hl(s, q) {
     s = String(s === null || s === undefined ? '' : s);
-    if (!q) return esc(s);
-    let low = s.toLowerCase(), out = '', from = 0, at;
-    while ((at = low.indexOf(q, from)) !== -1) {
-      out += esc(s.slice(from, at)) + '<span class="hit">'
-          + esc(s.slice(at, at + q.length)) + '</span>';
-      from = at + q.length;
+    if (q.empty) return esc(s);
+    let out = '', from = 0;
+    for (const range of q.ranges(s)) {
+      /* Совпадение нулевой длины подсвечивать нечем: пустой span только
+         замусорил бы разметку. Такие даёт, например, шаблон x*. */
+      if (range[1] <= range[0]) continue;
+      out += esc(s.slice(from, range[0])) + '<span class="hit">'
+          + esc(s.slice(range[0], range[1])) + '</span>';
+      from = range[1];
     }
     return out + esc(s.slice(from));
   }
@@ -40,9 +49,11 @@
     return Object.prototype.hasOwnProperty.call(map, key) ? map[key] : undefined;
   }
 
+  /* Совпало ли значение. Как именно — знает матчер; здесь только
+     приведение неизвестного к строке: null и undefined ищутся как пустая
+     строка, а не роняют поиск. */
   function has(value, q) {
-    return String(value === null || value === undefined ? '' : value)
-      .toLowerCase().indexOf(q) !== -1;
+    return q.test(String(value === null || value === undefined ? '' : value));
   }
 
   function slug(s) {

@@ -151,7 +151,7 @@
     if (!path.endsWith(tail)) return true;
     const dir = path.slice(0, -tail.length);
     if (dir.indexOf('/') !== -1) return true;
-    return Boolean(q) && text.has(path, q) && !text.has(p.name, q);
+    return !q.empty && text.has(path, q) && !text.has(p.name, q);
   }
 
   /* Имя патча — ссылка на диф в GitLab, если он известен, иначе просто

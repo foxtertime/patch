@@ -6,6 +6,9 @@ var test = require('node:test');
 var assert = require('node:assert');
 var labels = require('../../dashboard/assets/js/labels.js');
 var markup = require('../../dashboard/assets/js/markup.js');
+var query = require('../../dashboard/assets/js/query.js');
+
+function q(typed) { return query.compile(typed || '', false); }
 
 function patch(name, cls) {
   return { path: 'PATCH/' + name, name: name, 'class': cls, cves: [],
@@ -47,28 +50,28 @@ test('ссылка с недопустимой схемой не рисуетс�
 });
 
 test('колонка тега: прочерк для прямого, имя для унаследованного', function () {
-  assert.match(markup.taggedCell({ inherited: false }, ''), /—/);
-  assert.match(markup.taggedCell({ inherited: null }, ''), /\?/);
+  assert.match(markup.taggedCell({ inherited: false }, q()), /—/);
+  assert.match(markup.taggedCell({ inherited: null }, q()), /\?/);
   assert.strictEqual(markup.taggedCell({ inherited: true, tagged_in: 'os-9.1' },
-                                       ''), 'os-9.1');
+                                       q()), 'os-9.1');
 });
 
 /* Дата и время — два уровня одной ячейки, и пробела между ними нет: время
    встаёт блоком, а пробел висел бы в хвосте первой строки. */
 test('время сборки билда делится на дату и бледное время', function () {
-  var out = markup.builtHtml('2026-05-14 10:00:00', '');
+  var out = markup.builtHtml('2026-05-14 10:00:00', q());
   assert.match(out, /^2026-05-14<span class="tm">10:00:00<\/span>$/);
 });
 
 test('снапшот без времени сборки билда несёт одну дату', function () {
-  assert.strictEqual(markup.builtHtml('2026-05-14', ''), '2026-05-14');
+  assert.strictEqual(markup.builtHtml('2026-05-14', q()), '2026-05-14');
 });
 
 test('патчи группируются по классам и считаются', function () {
   labels.setClasses(['CVE', 'other']);
   var out = markup.patchesHtml([patch('a.patch', 'CVE'),
                                 patch('b.patch', 'other'),
-                                patch('c.patch', 'CVE')], '', null, '');
+                                patch('c.patch', 'CVE')], q(), null, '');
   assert.match(out, /<div class="pgroup c-cve">/);
   assert.match(out, /CVE <span class="n">2<\/span>/);
   assert.match(out, /other <span class="n">1<\/span>/);
@@ -79,7 +82,7 @@ test('патчи группируются по классам и считают�
    этого был вдвое длиннее, а нового в нём ноль. */
 test('путь, повторяющий имя, второй строкой не печатается', function () {
   labels.setClasses(['CVE']);
-  var out = markup.patchesHtml([patch('a.patch', 'CVE')], '', null, '');
+  var out = markup.patchesHtml([patch('a.patch', 'CVE')], q(), null, '');
   assert.doesNotMatch(out, /ppath/, out);
 });
 
@@ -87,19 +90,19 @@ test('патч из подкаталога путь показывает', funct
   labels.setClasses(['CVE']);
   var p = patch('a.patch', 'CVE');
   p.path = 'PATCH/sub/a.patch';
-  var out = markup.patchesHtml([p], '', null, '');
+  var out = markup.patchesHtml([p], q(), null, '');
   assert.match(out, /class="ppath">PATCH\/sub\/a\.patch</, out);
 });
 
 test('путь показывается, если поиск попал в него, а не в имя', function () {
   labels.setClasses(['CVE']);
-  var out = markup.patchesHtml([patch('a.patch', 'CVE')], 'patch/a', null, '');
+  var out = markup.patchesHtml([patch('a.patch', 'CVE')], q('patch/a'), null, '');
   assert.match(out, /ppath/, out);
 });
 
 test('поиск по имени лишней строки не добавляет', function () {
   labels.setClasses(['CVE']);
-  var out = markup.patchesHtml([patch('a.patch', 'CVE')], 'a.pat', null, '');
+  var out = markup.patchesHtml([patch('a.patch', 'CVE')], q('a.pat'), null, '');
   assert.doesNotMatch(out, /ppath/, out);
 });
 
@@ -108,7 +111,7 @@ test('путь, устроенный не как «каталог/имя», пе
     labels.setClasses(['CVE']);
     var p = patch('a.patch', 'CVE');
     p.path = 'совсем-другое';
-    assert.match(markup.patchesHtml([p], '', null, ''), /ppath/);
+    assert.match(markup.patchesHtml([p], q(), null, ''), /ppath/);
   });
 
 /* Дифф патчей живёт только в стороне «стало»: там и новое состояние, и
@@ -119,7 +122,7 @@ test('в «стало» пришедший патч помечен знаком 
     labels.setClasses(['CVE']);
     var was = [patch('a.patch', 'CVE')];
     var now = [patch('a.patch', 'CVE'), patch('b.patch', 'CVE')];
-    var out = markup.patchesChangeHtml(was, now, [], '');
+    var out = markup.patchesChangeHtml(was, now, [], q());
     assert.match(out, /<li class="is-added"><span class="sign">\+<\/span>/);
     assert.ok(out.indexOf('a.patch') < out.indexOf('b.patch'),
               'пришедший должен стоять ниже уцелевшего: ' + out);
@@ -129,7 +132,7 @@ test('в «стало» ушедший патч зачёркнут на своё
   labels.setClasses(['CVE']);
   var was = [patch('a.patch', 'CVE'), patch('b.patch', 'CVE')];
   var now = [patch('b.patch', 'CVE')];
-  var out = markup.patchesChangeHtml(was, now, [], '');
+  var out = markup.patchesChangeHtml(was, now, [], q());
   assert.match(out, /<li class="is-removed"><span class="sign">−<\/span>/);
   assert.ok(out.indexOf('a.patch') < out.indexOf('b.patch'),
             'ушедший должен остаться на своём прежнем месте: ' + out);
@@ -139,7 +142,7 @@ test('счётчик группы считает новое состояние, 
   function () {
     labels.setClasses(['CVE']);
     var was = [patch('a.patch', 'CVE'), patch('b.patch', 'CVE')];
-    var out = markup.patchesChangeHtml(was, [patch('b.patch', 'CVE')], [], '');
+    var out = markup.patchesChangeHtml(was, [patch('b.patch', 'CVE')], [], q());
     assert.match(out, /CVE <span class="n">1<\/span>/, out);
   });
 
@@ -147,14 +150,14 @@ test('класс, ушедший целиком, остаётся с нулём 
   function () {
     labels.setClasses(['CVE', 'SAST']);
     var was = [patch('a.patch', 'CVE'), patch('s.patch', 'SAST')];
-    var out = markup.patchesChangeHtml(was, [patch('a.patch', 'CVE')], [], '');
+    var out = markup.patchesChangeHtml(was, [patch('a.patch', 'CVE')], [], q());
     assert.match(out, /SAST <span class="n">0<\/span>/, out);
     assert.match(out, /is-removed/, out);
   });
 
 test('в «было» пометок нет ни одной', function () {
   labels.setClasses(['CVE']);
-  var out = markup.patchesHtml([patch('a.patch', 'CVE')], '');
+  var out = markup.patchesHtml([patch('a.patch', 'CVE')], q());
   assert.doesNotMatch(out, /is-added|is-removed|class="sign"/, out);
 });
 
@@ -166,7 +169,7 @@ function withSha(name, sha) {
 test('переписанный патч помечен знаком и классом', function () {
   var html = markup.patchesChangeHtml([withSha('a.patch', 'aaa')],
                                       [withSha('a.patch', 'bbb')],
-                                      ['PATCH/a.patch'], '');
+                                      ['PATCH/a.patch'], q());
   assert.match(html, /class="is-rewritten"/);
   assert.match(html, /<span class="sign">~<\/span>/);
 });
@@ -182,23 +185,23 @@ test('переписанные приходят списком, а не выво
                cves: [], url: null, sha: 'bbb' }];
   labels.setClasses(['CVE']);
 
-  var silent = markup.patchesChangeHtml(was, now, [], '');
+  var silent = markup.patchesChangeHtml(was, now, [], q());
   assert.doesNotMatch(silent, /is-rewritten/,
     'sha разные, но списка нет — разметка не имеет права решать сама');
 
-  var told = markup.patchesChangeHtml(was, now, ['PATCH/a.patch'], '');
+  var told = markup.patchesChangeHtml(was, now, ['PATCH/a.patch'], q());
   assert.match(told, /is-rewritten/);
   assert.match(told, /class="sign">~/);
 });
 
 test('сторона «было» по-прежнему не метится', function () {
-  var html = markup.patchesHtml([withSha('a.patch', 'aaa')], '');
+  var html = markup.patchesHtml([withSha('a.patch', 'aaa')], q());
   assert.strictEqual(html.indexOf('is-rewritten'), -1);
   assert.strictEqual(html.indexOf('class="sign"'), -1);
 });
 
 test('пакеты режутся на блоки по смене архитектуры', function () {
-  var out = markup.rpmsHtml(['p-1-1.src', 'p-1-1.x86_64', 'q-1-1.x86_64'], '');
+  var out = markup.rpmsHtml(['p-1-1.src', 'p-1-1.x86_64', 'q-1-1.x86_64'], q());
   assert.match(out, /src <span class="n">1<\/span>/);
   assert.match(out, /x86_64 <span class="n">2<\/span>/);
 });
@@ -215,7 +218,7 @@ test('в «стало» ушедший пакет зачёркнут, прише
     var out = markup.rpmsChangeHtml(
       [['p-1-1.x86_64', 'p-1-2.x86_64'],
        ['gone-1-1.x86_64', null],
-       [null, 'fresh-1-1.x86_64']], '');
+       [null, 'fresh-1-1.x86_64']], q());
     assert.match(out, /<li class="is-removed"><span class="sign">−<\/span>gone/);
     assert.match(out, /<li class="is-added"><span class="sign">\+<\/span>fresh/);
     assert.match(out, /<li>p-1-2\.x86_64<\/li>/, out);
@@ -224,13 +227,13 @@ test('в «стало» ушедший пакет зачёркнут, прише
 test('счётчик архитектуры считает новое состояние', function () {
   /* Из архитектуры ушёл последний пакет: блок остаётся с нулём и одной
      зачёркнутой строкой — «была и кончилась» тоже ответ. */
-  var out = markup.rpmsChangeHtml([['gone-1-1.noarch', null]], '');
+  var out = markup.rpmsChangeHtml([['gone-1-1.noarch', null]], q());
   assert.match(out, /noarch <span class="n">0<\/span>/, out);
 });
 
 test('в «было» пакеты идут без пометок', function () {
   var rows = [['p-1-1.x86_64', null]];
-  var out = markup.rpmsHtml(markup.rpmSideList(rows, 0), '');
+  var out = markup.rpmsHtml(markup.rpmSideList(rows, 0), q());
   assert.doesNotMatch(out, /is-removed|is-added|class="sign"/, out);
   assert.match(out, /x86_64 <span class="n">1<\/span>/, out);
 });
@@ -276,7 +279,7 @@ function ghost(name, side, cls) {
 }
 
 test('без ghost-патчей секции нет', function () {
-  assert.strictEqual(markup.ghostsHtml([], ''), '');
+  assert.strictEqual(markup.ghostsHtml([], q()), '');
 });
 
 test('стороны идут в одном порядке и подписаны по-разному', function () {
@@ -284,7 +287,7 @@ test('стороны идут в одном порядке и подписаны
   // поданы вперемешку
   var html = markup.ghostsHtml([ghost('c.patch', 'build'),
                                 ghost('a.patch', 'branch'),
-                                ghost('b.patch', 'changed')], '');
+                                ghost('b.patch', 'changed')], q());
   var order = ['нет в пакете', 'в пакете старый', 'нет в ветке'];
   var at = order.map(function (t) { return html.indexOf(t); });
   assert.ok(at[0] !== -1 && at[0] < at[1] && at[1] < at[2]);
@@ -293,34 +296,34 @@ test('стороны идут в одном порядке и подписаны
 test('черта на всю секцию одна, а не по одной на сторону', function () {
   var html = markup.ghostsHtml([ghost('a.patch', 'branch'),
                                 ghost('b.patch', 'changed'),
-                                ghost('c.patch', 'build')], '');
+                                ghost('c.patch', 'build')], q());
   assert.strictEqual(html.split('class="ghosts"').length - 1, 1);
 });
 
 test('у каждой стороны свой счётчик и своя подсказка', function () {
   var html = markup.ghostsHtml([ghost('a.patch', 'branch'),
-                                ghost('b.patch', 'branch')], '');
+                                ghost('b.patch', 'branch')], q());
   assert.match(html,
     /<div class="gside" data-tip="[^"]+">нет в пакете<span class="n">2</);
 });
 
 test('полоса списка серая: цвет полосы значит класс, а его тут нет',
      function () {
-       var html = markup.ghostsHtml([ghost('a.patch', 'branch')], '');
+       var html = markup.ghostsHtml([ghost('a.patch', 'branch')], q());
        assert.match(html, /<ul class="glist">/);
        assert.strictEqual(html.indexOf('class="plist"'), -1);
      });
 
 test('строка с незнакомой стороной не рисуется и в счёт не идёт', function () {
-  assert.strictEqual(markup.ghostsHtml([ghost('a.patch', 'нечто')], ''), '');
+  assert.strictEqual(markup.ghostsHtml([ghost('a.patch', 'нечто')], q()), '');
   var html = markup.ghostsHtml([ghost('a.patch', 'branch'),
-                                ghost('b.patch', 'нечто')], '');
+                                ghost('b.patch', 'нечто')], q());
   assert.match(html, /нет в пакете<span class="n">1</);
   assert.strictEqual(html.indexOf('b.patch'), -1);
 });
 
 test('класс патча виден и покрашен', function () {
-  var html = markup.ghostsHtml([ghost('a.patch', 'branch', 'SAST')], '');
+  var html = markup.ghostsHtml([ghost('a.patch', 'branch', 'SAST')], q());
   assert.match(html, /SAST/);
   assert.match(html, /class="pcls [^"]+"/);
 });

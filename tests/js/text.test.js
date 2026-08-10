@@ -4,6 +4,9 @@
 var test = require('node:test');
 var assert = require('node:assert');
 var text = require('../../dashboard/assets/js/text.js');
+var query = require('../../dashboard/assets/js/query.js');
+
+function q(typed) { return query.compile(typed || '', false); }
 
 test('экранируются все пять опасных знаков', function () {
   assert.strictEqual(text.esc('<a href="x" \'y\'>&'),
@@ -16,13 +19,41 @@ test('пустое значение — пустая строка, а не «nul
 });
 
 test('подсветка экранирует и то, что подсветила', function () {
-  assert.strictEqual(text.hl('<b>ab</b>', 'b'),
+  assert.strictEqual(text.hl('<b>ab</b>', q('b')),
     '&lt;<span class="hit">b</span>&gt;a<span class="hit">b</span>'
     + '&lt;/<span class="hit">b</span>&gt;');
 });
 
 test('без запроса подсветка — просто экранирование', function () {
-  assert.strictEqual(text.hl('<b>', ''), '&lt;b&gt;');
+  assert.strictEqual(text.hl('<b>', q()), '&lt;b&gt;');
+});
+
+/* Подсветка обычного поиска — то, что видно на каждой строке таблицы.
+   Сверяем строку целиком, а не по кускам: правка hl не имеет права
+   поменять ни один символ разметки. */
+test('подсветка обычного поиска — разметка целиком', function () {
+  var m = query.compile('ab', false);
+  assert.strictEqual(text.hl('xabyab', m),
+    'x<span class="hit">ab</span>y<span class="hit">ab</span>');
+  assert.strictEqual(text.hl('<b>ab</b>', m),
+    '&lt;b&gt;<span class="hit">ab</span>&lt;/b&gt;');
+  assert.strictEqual(text.hl('ничего', m), 'ничего');
+  /* Позиции считаются по сырой строке: посчитай их по экранированной —
+     «<» стал бы «&lt;» и не нашёлся бы вовсе, а «lt» нашлось бы там,
+     где человек ничего не набирал. */
+  assert.strictEqual(text.hl('a<b', query.compile('<', false)),
+    'a<span class="hit">&lt;</span>b');
+  assert.strictEqual(text.hl('a<b', query.compile('lt', false)), 'a&lt;b');
+});
+
+/* Совпадение нулевой длины подсвечивать нечем — пустой span только
+   замусорил бы разметку. Такие даёт, например, шаблон x*: он совпадает с
+   пустотой перед каждым символом строки. Сверяем строку целиком, как и
+   соседний тест: правка hl не имеет права оставить в разметке ни одного
+   пустого <span>. */
+test('подсветка шаблона нулевой длины не оставляет пустых span', function () {
+  var m = query.compile('x*', true);
+  assert.strictEqual(text.hl('abc', m), 'abc');
 });
 
 test('ключ constructor не отвечает функцией Object', function () {
