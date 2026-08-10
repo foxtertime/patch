@@ -38,6 +38,12 @@ test('подсветка обычного поиска — разметка це
   assert.strictEqual(text.hl('<b>ab</b>', m),
     '&lt;b&gt;<span class="hit">ab</span>&lt;/b&gt;');
   assert.strictEqual(text.hl('ничего', m), 'ничего');
+  /* Позиции считаются по сырой строке: посчитай их по экранированной —
+     «<» стал бы «&lt;» и не нашёлся бы вовсе, а «lt» нашлось бы там,
+     где человек ничего не набирал. */
+  assert.strictEqual(text.hl('a<b', query.compile('<', false)),
+    'a<span class="hit">&lt;</span>b');
+  assert.strictEqual(text.hl('a<b', query.compile('lt', false)), 'a&lt;b');
 });
 
 test('ключ constructor не отвечает функцией Object', function () {
