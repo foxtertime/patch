@@ -52,6 +52,11 @@ Node.prototype.setAttribute = function (name, value) {
   else this.attrs[name] = String(value);
 };
 
+Node.prototype.removeAttribute = function (name) {
+  if (name === 'class') this.className = '';
+  else delete this.attrs[name];
+};
+
 Node.prototype.appendChild = function (node) {
   node.parentNode = this;
   this.children.push(node);

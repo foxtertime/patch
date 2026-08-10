@@ -16,7 +16,8 @@
                              require('./tips.js'), require('./toasts.js'),
                              require('./address.js'), require('./filters.js'),
                              require('./search.js'), require('./copy.js'),
-                             require('./viewport.js'), require('./notices.js'));
+                             require('./viewport.js'), require('./notices.js'),
+                             require('./query.js'));
   } else {
     root.KP = root.KP || {};
     root.KP.ui = factory(root.KP.viewmodel, root.KP.store, root.KP.diff,
@@ -25,12 +26,12 @@
                          root.KP.hash, root.KP.rail, root.KP.files,
                          root.KP.tips, root.KP.toasts, root.KP.address,
                          root.KP.filters, root.KP.search, root.KP.copy,
-                         root.KP.viewport, root.KP.notices);
+                         root.KP.viewport, root.KP.notices, root.KP.query);
   }
 }(typeof globalThis !== 'undefined' ? globalThis : this,
   function (viewmodel, store, diffmod, text, labels, markup, tables, cards,
             pagemod, hash, railmod, filesmod, tipsmod, toastsmod, addressmod,
-            filtersmod, searchmod, copymod, viewportmod, noticesmod) {
+            filtersmod, searchmod, copymod, viewportmod, noticesmod, querymod) {
   'use strict';
 
   /* Состояние страницы живёт в page.js: там же и всё, что из него
@@ -39,7 +40,7 @@
      всего. */
   let page = pagemod.create({ viewmodel: viewmodel, diffmod: diffmod,
                               store: store, labels: labels, text: text,
-                              search: searchmod });
+                              search: searchmod, query: querymod });
   const st = page.st;
   const curSnap = page.curSnap, curPair = page.curPair;
   const visibleRows = page.visibleRows, sortRows = page.sortRows;
@@ -52,7 +53,9 @@
   let controls = document.getElementById('controls');
   const search = document.getElementById('q');
   const clearBtn = document.getElementById('q-clear');
+  const reBtn = document.getElementById('q-re');
   const counter = document.getElementById('count');
+  const qbad = document.getElementById('q-bad');
   const expandBtn = document.getElementById('expand');
   const copyBtn = document.getElementById('copy-nvr');
   const tabBtns = Array.from(document.querySelectorAll('.tab'));
@@ -190,7 +193,7 @@
      и то же — разойдись они здесь, разъехались бы и colspan у деталей. */
   function rowOpts() {
     const pair = st.tab === 'diff' ? curPair() : null;
-    return { q: st.q, cols: colCount(st.tab), keyOf: rowKey, openOf: openOf,
+    return { q: page.matcher(), cols: colCount(st.tab), keyOf: rowKey, openOf: openOf,
              oldTag: pair ? pair.old : 'было',
              newTag: pair ? pair['new'] : 'стало' };
   }
@@ -214,11 +217,36 @@
       : plural(total, 'билд', 'билда', 'билдов');
 
     counter.textContent = items.length + ' / ' + total + ' ' + word;
+    /* Шаблон не разобрался: строки не фильтруются, и надо сказать почему.
+       Текст берём у браузера дословно — он называет место ошибки, а общий
+       текст от нас не назвал бы. Подсказкой даём его целиком: в строке он
+       обрезан.
+
+       Приглашение уступает причине: обе строки о неполадке с одним и тем же
+       полем не встают разом (нажатие кнопки, которое единственно включает
+       регулярку, само гасит st.reAsked), но причина непонятого шаблона
+       важнее — она о том, что человек видит прямо сейчас, а приглашение
+       ждать может. */
+    const problem = page.matcher().problem;
+    const invite = st.reAsked && !st.regex;
+    const message = problem
+      ? 'регулярка не разбирается: ' + problem + ' — показаны все строки'
+      : (invite
+          ? 'ссылка просила искать регулярным выражением — включите кнопкой .*'
+          : '');
+    qbad.hidden = !message;
+    qbad.textContent = message;
+    /* data-tip ставится и снимается вместе с сообщением: узел сейчас hidden
+       и снаружи это не видно, но несимметричная пара «есть текст без
+       подсказки» — дефект сам по себе, а не только пока безвредный. */
+    if (message) qbad.setAttribute('data-tip', problem || message);
+    else qbad.removeAttribute('data-tip');
     expandBtn.textContent = allOpen(items) ? 'Collapse all' : 'Expand all';
     expandBtn.disabled = !items.length;
     copyBtn.disabled = !items.length;
 
     syncCards();
+    syncRe();
     filters.sync();
     syncArrows();
     /* Рельс показывает текущий выбор, а он меняется и без смены состава:
@@ -390,7 +418,7 @@
     if (searchTimer) clearTimeout(searchTimer);
     searchTimer = setTimeout(() => {
       searchTimer = null;
-      st.q = search.value.trim().toLowerCase();
+      st.q = search.value.trim();
       render();
     }, SEARCH_DELAY);
   });
@@ -407,6 +435,24 @@
     /* Курсор обратно в поле: крестиком чаще всего чистят, чтобы набрать
        другое, а не чтобы уйти со страницы. */
     search.focus();
+    render();
+  });
+
+  /* Вид кнопки считается от состояния, а не переключается на месте. Из
+     адреса режим больше не приезжает — оттуда приходит только просьба его
+     включить, — но состояние остаётся единственным источником правды, и
+     кнопка обязана показывать его, а не помнить свои нажатия отдельно. */
+  function syncRe() {
+    reBtn.setAttribute('aria-pressed', String(st.regex));
+    reBtn.className = st.regex ? 'toggle mono on' : 'toggle mono';
+  }
+
+  reBtn.addEventListener('click', () => {
+    st.regex = !st.regex;
+    /* Предложение из адреса принято или отвергнуто — держать его дальше
+       незачем, а не погасить значило бы показывать приглашение и после
+       того, как человек уже на него ответил. */
+    st.reAsked = false;
     render();
   });
 

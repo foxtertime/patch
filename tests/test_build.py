@@ -1,9 +1,10 @@
 """Сборка страницы: шаблон, стили и скрипты в одном файле."""
+import os
 import re
 import unittest
 
 from dashboard import __version__
-from dashboard.build import STYLES, SCRIPTS, BuildError, build_html
+from dashboard.build import ASSETS, STYLES, SCRIPTS, BuildError, build_html
 from dashboard.config import DEFAULT_PATCH_CLASSES
 
 RICH = "tests/fixtures/rich-old.json"
@@ -29,6 +30,17 @@ class BuildHtml(unittest.TestCase):
         for name in SCRIPTS:
             self.assertIn("/* %s */" % name, html,
                           "в собранном файле нет %s" % name)
+
+    def test_scripts_matches_js_directory(self):
+        # SCRIPTS перечисляется руками, и файл, забытый в списке, обходит
+        # test_every_script_is_inlined молча: оно ходит по SCRIPTS, а не по
+        # каталогу, так что забытый файл там просто не проверяется. Собранная
+        # страница при этом мертва с первой отрисовки — KP.<модуль> не
+        # определён. Сверяем множества в обе стороны: и лишний файл на диске,
+        # и лишнее (удалённое) имя в SCRIPTS должны быть замечены.
+        on_disk = {name for name in os.listdir(os.path.join(ASSETS, "js"))
+                   if name.endswith(".js")}
+        self.assertEqual(on_disk, set(SCRIPTS))
 
     def test_scripts_go_in_dependency_order(self):
         html = build_html()
