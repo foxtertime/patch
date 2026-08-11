@@ -49,12 +49,20 @@ test('ссылка с недопустимой схемой не рисуетс�
   assert.match(markup.linkHtml('https://hub/x', 'koji'), /href="https:\/\/hub\/x"/);
 });
 
-test('колонка тега: прочерк для прямого, имя для унаследованного', function () {
-  assert.match(markup.taggedCell({ inherited: false }, q()), /—/);
-  assert.match(markup.taggedCell({ inherited: null }, q()), /\?/);
-  assert.strictEqual(markup.taggedCell({ inherited: true, tagged_in: 'os-9.1' },
-                                       q()), 'os-9.1');
-});
+test('колонка тега называет тег и у прямого билда, и у унаследованного',
+  function () {
+    assert.strictEqual(markup.taggedCell({ inherited: false,
+                                           tagged_in: 'os-9.2' }, q()),
+                       'os-9.2');
+    assert.strictEqual(markup.taggedCell({ inherited: true,
+                                           tagged_in: 'os-9.1' }, q()),
+                       'os-9.1');
+    /* Тега не записывал сам снапшот — вопросительный знак, а не имя
+       выбранного тега: «неизвестно» и «прямой» не одно и то же. */
+    assert.match(markup.taggedCell({ inherited: null }, q()), /\?/);
+    assert.match(markup.taggedCell({ inherited: null,
+                                     tagged_in: null }, q()), /\?/);
+  });
 
 /* Дата и время — два уровня одной ячейки, и пробела между ними нет: время
    встаёт блоком, а пробел висел бы в хвосте первой строки. */
