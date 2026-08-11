@@ -822,6 +822,87 @@ class BranchAheadTest(unittest.TestCase):
         self.assertTrue(any("gitlab:" in p.text for p in build.problems))
 
 
+class AutogenGapTest(unittest.TestCase):
+    """Автоген обещает патчи класса, которых в билде нет.
+
+    Сводный список заводят там, где патчи этого класса собирают; лежит он в
+    каталоге, а ни одного такого патча рядом нет. Сбор при этом состоялся
+    полностью — отсюда предупреждение, а не ошибка.
+    """
+
+    def _nginx(self, paths, classes=None):
+        cfg = config()
+        if classes is not None:
+            cfg = Config(koji_hub=cfg.koji_hub, koji_web=cfg.koji_web,
+                         gitlab_hosts=HOSTS, patch_classes=classes)
+        koji, gitlab, _ = clients_with_source(
+            {NGINX_TREE: tree(paths)},
+            "git+ssh://git@gitlab.example.com/g/nginx?#origin/br")
+        snapshot = collect_tag("os-9.2", cfg, koji, gitlab, jobs=1)
+        return snapshot.by_name()["nginx"]
+
+    def gaps(self, build):
+        return [p for p in build.problems if p.text.startswith("autogen:")]
+
+    def test_autogen_without_its_patches_is_a_warning(self):
+        build = self._nginx(["PATCH/autogen-cve-patches.inc.new"])
+        gaps = self.gaps(build)
+        self.assertEqual([p.level for p in gaps], ["warning"])
+        self.assertIn("autogen-cve-patches.inc.new", gaps[0].text)
+        self.assertIn("CVE", gaps[0].text)
+
+    def test_patch_of_that_class_removes_the_warning(self):
+        build = self._nginx(["PATCH/autogen-cve-patches.inc.new",
+                             "PATCH/CVE-2026-3011.patch"])
+        self.assertEqual(self.gaps(build), [])
+
+    def test_every_class_is_answered_for_separately(self):
+        # SAST-патч есть, CVE-патча нет: предупреждение ровно одно
+        build = self._nginx(["PATCH/autogen-cve-patches.inc",
+                             "PATCH/autogen-sast-patches.inc",
+                             "PATCH/sast-src.core.patch"])
+        self.assertEqual([p.text for p in self.gaps(build)],
+                         ["autogen: есть autogen-cve-patches.inc, но ни "
+                          "одного патча класса CVE"])
+
+    def test_autogen_without_a_marker_says_nothing(self):
+        """Имя ни о каком классе не заявляет — и молчать не о чем."""
+        self.assertEqual(self.gaps(self._nginx(["PATCH/autogen-patches.inc"])),
+                         [])
+
+    def test_marker_is_read_by_the_rules_of_the_config(self):
+        """Маркер класса не обязан совпадать с его именем.
+
+        В конфиге по умолчанию fuzz — это DAST, и автоген с fuzz в имени
+        обещает патчи именно DAST. Правила AUTOGEN здесь нарочно нет: сводный
+        список не считается патчем своего класса при любом порядке правил.
+        """
+        build = self._nginx(["PATCH/autogen-fuzz-patches.inc"],
+                            classes=[("DAST", r"(?i)(?:dast|fuzz)"),
+                                     ("other", ".*")])
+        self.assertEqual([p.text for p in self.gaps(build)],
+                         ["autogen: есть autogen-fuzz-patches.inc, но ни "
+                          "одного патча класса DAST"])
+
+    def test_unread_directory_says_nothing(self):
+        """Каталог не прочитался: пустой список патчей — про наше незнание.
+
+        Сказать по нему «автоген есть, а патчей нет» было бы выдумкой: мы не
+        знаем даже, есть ли там автоген.
+        """
+        koji, gitlab, _ = clients_with_source(
+            {NGINX_TREE: Response(500, {"message": "boom"}, {})},
+            "git+ssh://git@gitlab.example.com/g/nginx?#origin/br")
+        build = collect_tag("os-9.2", config(), koji, gitlab,
+                            jobs=1).by_name()["nginx"]
+        self.assertEqual(self.gaps(build), [])
+
+    def test_two_autogen_files_of_one_class_warn_once(self):
+        build = self._nginx(["PATCH/autogen-cve-patches.inc",
+                             "PATCH/autogen-cve-patches.inc.new"])
+        self.assertEqual(len(self.gaps(build)), 1)
+
+
 class GhostPatchesTest(unittest.TestCase):
     def _nginx(self, built, tip, ahead=2):
         routes = {

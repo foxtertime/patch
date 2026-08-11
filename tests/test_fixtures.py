@@ -161,6 +161,20 @@ class InterestingCasesTest(unittest.TestCase):
         self.assertGreater(len(build.source.project), 30)
         self.assertGreater(len(build.rpms), 15)
 
+    def test_the_wide_snapshot_carries_a_warning_without_an_error(self):
+        """Билд, у которого есть предупреждение и нет ни одной ошибки.
+
+        Без него ни один снапшот не показывал бы янтарную полосу отдельно от
+        красной, а правило «строка красится по самой критичной» проверялось
+        бы только тестами.
+        """
+        build = snapshot("rich-wide.json").by_name()["libxml2"]
+        self.assertEqual([p.level for p in build.problems], ["warning"])
+        # автоген обещает CVE, а патча этого класса в билде нет
+        self.assertIn("autogen", build.problems[0].text)
+        self.assertIn("CVE", build.problems[0].text)
+        self.assertNotIn("CVE", [p.cls for p in build.patches])
+
     def test_the_big_snapshot_is_the_size_of_a_real_tag(self):
         many = snapshot("rich-many.json")
         self.assertGreater(len(many.builds), 100)

@@ -1,6 +1,7 @@
 """Сбор снапшота одного тега из koji и GitLab."""
 import logging
 import os
+import re
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -240,6 +241,11 @@ def _attach_patches(build: Build, info: dict, gitlab_client,
     commit = _describe_source(build, info, parsed, gitlab_client)
     ref, tree = _collect_patches(build, gitlab_client, parsed, commit,
                                  classifier)
+    # Только по прочитанному каталогу: у неудачного чтения список патчей пуст
+    # не потому, что патчей нет, и «автоген есть, а патчей нет» было бы про
+    # наше незнание, а не про билд.
+    if tree.present:
+        _autogen_gaps(build, classifier)
     if ref != commit:
         # откат на ветку: коммита в репозитории нет, и сравнивать с ним
         # ветку бессмысленно — точка отсчёта пропала вместе с коммитом
@@ -438,6 +444,64 @@ def _ghosts(built, tip, parsed, commit, classifier, gitlab_client):
     return out
 
 
+# Сгенерированный список патчей: autogen-cve-patches.inc и подобные. Правило
+# то же, каким их отбирает классификатор по умолчанию, но живёт оно здесь
+# отдельно: класс в конфиге можно назвать как угодно, а «это сводный список,
+# а не патч» — свойство самого имени файла.
+_AUTOGEN_RE = re.compile(r"(?i)^autogen[-_]")
+
+
+def _named_class(text: str, classifier: Classifier) -> Optional[str]:
+    """Класс, названный в имени файла: autogen-cve-… → CVE.
+
+    Сперва ищем имя класса целым словом — так подписан и сам файл. Если его
+    там нет, спрашиваем классификатор: маркер класса не обязан совпадать с
+    его именем (fuzz — это DAST), и правило об этом знает, а мы нет.
+    """
+    for name in classifier.class_names():
+        # Класс самих сводных списков заявить нельзя: «автоген обещает
+        # автоген» — не расхождение, а тавтология.
+        if _AUTOGEN_RE.search(name + "-"):
+            continue
+        if re.search(r"(?i)(?:^|[^a-z0-9])%s(?:[^a-z0-9]|$)" % re.escape(name),
+                     text):
+            return name
+    guess = classifier.classify(text)
+    # «other» — не класс, а его отсутствие; autogen внутри autogen значил бы,
+    # что мы не сняли приставку и читаем то же имя второй раз.
+    return None if guess in ("other", "AUTOGEN") or _AUTOGEN_RE.search(text) \
+        else guess
+
+
+def _autogen_gaps(build: Build, classifier: Classifier) -> None:
+    """Автоген обещает патчи класса, которых в билде нет.
+
+    Сводный список autogen-cve-patches.inc заводят там, где патчи CVE
+    собирают; лежит он в каталоге, а ни одного патча этого класса рядом нет.
+    Это не отказ сбора — данные прочитаны полностью, — но расхождение внутри
+    ветки, и увидеть его иначе как перебором раскрытий нельзя.
+    """
+    # Сам сводный список за патч своего класса не считается: в конфиге
+    # правило AUTOGEN стоит первым и уводит такие файлы в свой класс, но
+    # порядок правил — дело того, кто пишет конфиг, а «список — не патч»
+    # верно при любом порядке.
+    present = set(p.cls for p in build.patches
+                  if not _AUTOGEN_RE.search(p.name))
+    seen = {}
+    for patch in build.patches:
+        if not _AUTOGEN_RE.search(patch.name):
+            continue
+        claimed = _named_class(_AUTOGEN_RE.sub("", patch.name), classifier)
+        # Автоген без маркера класса ни о чём не заявляет: не о чем и молчать.
+        if claimed is None or claimed in present or claimed in seen:
+            continue
+        seen[claimed] = patch.name
+    for claimed in sorted(seen):
+        build.problems.append(Problem(
+            "autogen: есть %s, но ни одного патча класса %s"
+            % (seen[claimed], claimed), "warning"))
+
+
 def _patch(path, parsed, ref, classifier, gitlab_client, ghost=None,
            sha=None):
     name = os.path.basename(path)
@@ -449,7 +513,8 @@ def _patch(path, parsed, ref, classifier, gitlab_client, ghost=None,
 
 # Проблемы, у которых после двоеточия стоит произвольный текст: в сводке их
 # группируем по префиксу, иначе одна строка stderr растёт до числа билдов.
-_GROUPED_PROBLEMS = ("gitlab:", "internal error:", "bad source url:")
+_GROUPED_PROBLEMS = ("gitlab:", "internal error:", "bad source url:",
+                     "autogen:")
 
 
 def error_builds(snapshots) -> int:

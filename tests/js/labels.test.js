@@ -150,3 +150,13 @@ test('строка, которую нечем назвать, целиком и�
   assert.deepStrictEqual(p, { title: '', text: 'просто строка без источника',
                               known: false });
 });
+
+/* Автоген обещает патчи класса, которых в билде нет: сбор пишет это
+   предупреждение с префиксом autogen, и подпись у блока своя. */
+test('автоген подписан по-русски', function () {
+  var p = labels.problem('autogen: есть autogen-cve-patches.inc, но ни одного '
+                         + 'патча класса CVE');
+  assert.strictEqual(p.title, 'автоген');
+  assert.strictEqual(p.known, true);
+  assert.match(p.text, /^есть autogen-cve-patches\.inc/);
+});

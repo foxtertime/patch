@@ -623,6 +623,26 @@ def wide_snapshot():
                               "конфиге, запрошен gitlab.example.com",
                               "warning"),
                       Problem("gitlab: нечего сравнивать", "note")]),
+            # Автоген обещает патчи CVE, а в билде их нет: каталог прочитан
+            # целиком, сбор состоялся — отсюда предупреждение, а не отказ.
+            # Строка от этого янтарная, и ради неё случай тут и стоит: без
+            # него ни один снапшот не показывал бы предупреждение отдельно
+            # от ошибки.
+            Build(nvr="libxml2-2.12.5-2.el9", name="libxml2",
+                  version="2.12.5", release="2.el9", build_id=161,
+                  task_id=261, owner="core",
+                  completed="2026-10-28 11:20:00", tag_name="os-9.6",
+                  tags=["os-9.6"],
+                  source=src("core/libxml2", "os-9.6"),
+                  patch_dir_present=True,
+                  patches=[patch("autogen-cve-patches.inc", "AUTOGEN"),
+                           patch("sast-libxml2-parser.patch", "SAST")],
+                  rpms=["libxml2-2.12.5-2.el9.x86_64",
+                        "libxml2-devel-2.12.5-2.el9.x86_64",
+                        "libxml2-2.12.5-2.el9.src"],
+                  problems=[Problem("autogen: есть autogen-cve-patches.inc, "
+                                    "но ни одного патча класса CVE",
+                                    "warning")]),
         ])
 
 
