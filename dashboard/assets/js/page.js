@@ -248,6 +248,7 @@
          даёт ни того, ни другого — она ни о чём не предупреждает. */
       if (key === 'problem') return row.level === 'error';
       if (key === 'warning') return row.level === 'warning';
+      if (key === 'note') return row.level === 'note';
       return row.marks.indexOf(key) !== -1;
     }
 

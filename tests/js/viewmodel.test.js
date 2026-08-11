@@ -736,3 +736,27 @@ test('метка источника не зависит от уровня', func
     .snapshots[0].builds[0];
   assert.ok(row.marks.indexOf('gitlab-error') !== -1, row.marks.join());
 });
+
+/* Уровня три, и счётчика тоже три: билд считается по самой критичной своей
+   записи и попадает ровно в один из них — иначе сумма трёх карточек была бы
+   больше числа билдов. */
+test('билды с заметками считаются отдельно от прочих', function () {
+  var counts = data([snap('os-9.2', [
+    build('nginx', { problems: [{ level: 'error', text: 'нет ветки' }] }),
+    build('curl', { problems: [{ level: 'warning', text: 'с ветки' }] }),
+    build('vim', { problems: [{ level: 'note', text: 'нечего сравнивать' },
+                              { level: 'note', text: 'и ещё раз нечего' }] }),
+    build('zlib')])]).snapshots[0].counts;
+  assert.strictEqual(counts.problems, 1);
+  assert.strictEqual(counts.warnings, 1);
+  assert.strictEqual(counts.notes, 1);
+});
+
+test('заметка при ошибке в счёт заметок не идёт', function () {
+  var counts = data([snap('os-9.2', [
+    build('nginx', { problems: [{ level: 'note', text: 'нечего сравнивать' },
+                                { level: 'error', text: 'нет ветки' }] })])])
+    .snapshots[0].counts;
+  assert.strictEqual(counts.problems, 1);
+  assert.strictEqual(counts.notes, 0);
+});

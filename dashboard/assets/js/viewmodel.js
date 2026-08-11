@@ -269,20 +269,22 @@
       byClass[classNames[i]] = { builds: 0, files: 0 };
     }
     let withPatches = 0, withoutPatches = 0, problems = 0, files = 0;
-    let inherited = 0, direct = 0, warnings = 0;
+    let inherited = 0, direct = 0, warnings = 0, notes = 0;
     for (i = 0; i < rows.length; i++) {
       row = rows[i];
       if (row.inherited === true) inherited += 1;
       else if (row.inherited === false) direct += 1;
       if (row.patches.length) withPatches += 1;
       if (row.patch_dir_present === false) withoutPatches += 1;
-      /* Билд с ошибкой считается проблемным, и только он: предупреждение
-         значит «данные есть, но с оговоркой», и записать такой билд в
-         проблемные значило бы обещать беду там, где её нет. Считаются они
-         врозь — билд с ошибкой и предупреждением попадёт только в первый
-         счётчик, иначе сумма двух карточек была бы больше числа билдов. */
+      /* Билд считается по самой критичной своей записи, и только по ней:
+         с ошибкой и предупреждением разом он попадёт только в первый
+         счётчик, иначе сумма трёх карточек была бы больше числа билдов.
+         Уровни врозь, потому что и значат они разное: ошибка — «данных не
+         хватает», предупреждение — «данные есть, но с оговоркой», заметка —
+         «к сведению, ничего не случилось». */
       if (row.level === 'error') problems += 1;
       else if (row.level === 'warning') warnings += 1;
+      else if (row.level === 'note') notes += 1;
       files += row.patches.length;
       counts = row.patch_counts;
       for (name in counts) {
@@ -298,7 +300,7 @@
     return { builds: rows.length, with_patches: withPatches,
              inherited: inherited, direct: direct,
              without_patches: withoutPatches, problems: problems,
-             warnings: warnings,
+             warnings: warnings, notes: notes,
              patch_files: files, by_class: byClass };
   }
 

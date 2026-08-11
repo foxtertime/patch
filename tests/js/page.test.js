@@ -554,3 +554,16 @@ test('заметка не делает строку ни проблемной, �
   p.setFilter('warning', 1);
   assert.deepStrictEqual(rows(p), []);
 });
+
+/* Третий уровень записей сбора отбирается так же, как два первых: по
+   уровню строки, а не по наличию записей. */
+test('фильтр «с заметками» берёт строки, где заметка — самое строгое',
+  function () {
+    var p = make([snap('os-9.1', JUL, { builds: [
+      build('nginx', { problems: [{ level: 'note', text: 'нечего сравнивать' }] }),
+      build('curl', { problems: [{ level: 'warning', text: 'с ветки' },
+                                 { level: 'note', text: 'нечего сравнивать' }] }),
+      build('zlib')] })]);
+    p.setFilter('note', 1);
+    assert.deepStrictEqual(rows(p), ['nginx']);
+  });

@@ -569,7 +569,11 @@ def wide_snapshot():
             same(prev, "httpd", "os-9.6", tag_name="os-9.4",
                  tags=["os-9.4", "os-9.6"]),
             same(prev, "zlib", "os-9.6"),
-            same(prev, "vim", "os-9.6", tag_name=None, tags=[]),
+            # Заметка и ничего больше: строка не красится вовсе, а карточка
+            # «с заметками» перестаёт быть нулём — без такого билда третий
+            # уровень записей сбора негде посмотреть глазами.
+            same(prev, "vim", "os-9.6", tag_name=None, tags=[],
+                 problems=[Problem("gitlab: нечего сравнивать", "note")]),
             same(prev, "kernel", "os-9.6"),
             same(prev, "curl", "os-9.6"),
             same(prev, "openssl", "os-9.6"),

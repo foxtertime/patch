@@ -12,7 +12,8 @@ function snapshot(over) {
            builds: over.builds || [{ rpms: ['a.x86_64', 'b.x86_64'] }],
            counts: Object.assign({
              builds: 1, with_patches: 1, patch_files: 3, inherited: 0,
-             direct: 1, problems: 0, warnings: 0, without_patches: 0,
+             direct: 1, problems: 0, warnings: 0, notes: 0,
+             without_patches: 0,
              by_class: { CVE: { builds: 1, files: 3 } }
            }, over.counts || {}) };
 }
@@ -181,19 +182,36 @@ test('у предупреждений своя карточка со своим 
 /* Раскладку держит css, и держится она на именах блоков: ряд итогов — три
    тематических блока, разрезы — две полосы. Числа и состав карточек при
    этом прежние, поэтому проверяем именно обёртки. */
-test('ряд итогов разложен по трём группам', function () {
+test('ряд итогов разложен по трём плоскостям', function () {
   var out = cards.stateCards(snapshot()).big;
   assert.match(out, /<div class="cgroup lead">/, out);
   assert.strictEqual(out.split('class="cgroup').length - 1, 3, out);
 });
 
-test('число тега стоит в своей группе одно', function () {
-  /* Группа «lead» — та, где css делает число крупнее прочих: ячейка в ней
-     должна быть ровно одна, иначе крупным станет не то число. */
+/* Наследование — про состав тега, а не про содержимое билдов: стоять оно
+   должно рядом с числом тега, а не с патчами. */
+test('число тега и наследование — одна группа, патчи отдельно', function () {
   var out = cards.stateCards(snapshot()).big;
-  var lead = out.slice(out.indexOf('cgroup lead'), out.indexOf('cgroup"'));
-  assert.strictEqual(lead.split('class="card').length - 1, 1, lead);
+  var lead = out.slice(out.indexOf('cgroup lead'), out.indexOf('cgroup one'));
   assert.match(lead, /data-filter="all"/, lead);
+  assert.match(lead, /data-filter="inherited"/, lead);
+  assert.strictEqual(lead.split('class="card').length - 1, 2, lead);
+  var one = out.slice(out.indexOf('cgroup one'), out.indexOf('cgroup health'));
+  assert.match(one, /data-filter="has-patch"/, one);
+  assert.strictEqual(one.split('class="card').length - 1, 1, one);
+});
+
+/* Уровня записей сбора три, и карточек столько же: билд считается по самой
+   критичной своей записи и попадает ровно в одну из трёх. */
+test('у каждого уровня записей своя карточка', function () {
+  var out = cards.stateCards(snapshot({ counts: { problems: 2, warnings: 1,
+                                                  notes: 3 } })).big;
+  var health = out.slice(out.indexOf('cgroup health'));
+  assert.match(health, /data-filter="problem"/, health);
+  assert.match(health, /data-filter="warning"/, health);
+  assert.match(health, /data-filter="note"/, health);
+  assert.match(health, /с заметками/, health);
+  assert.strictEqual(health.split('class="card').length - 1, 3, health);
 });
 
 test('стороны перехода и вспомогательные числа — разные группы',

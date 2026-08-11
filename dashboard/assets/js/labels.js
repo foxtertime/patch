@@ -16,7 +16,7 @@
   const LABELS = {
     "all": "все",
     "has-patch": "с патчами", "problem": "с проблемами",
-    "warning": "с предупреждениями",
+    "warning": "с предупреждениями", "note": "с заметками",
     "no-patch": "нет каталога PATCH", "no-source": "нет источника",
     "from-commit": "собран с коммита", "from-srpm": "собран из SRPM",
     "branch-ahead": "ветка ушла вперёд",
@@ -59,7 +59,7 @@
                         "coverage": 1, "distsuffix": 1, "license": 1, "spec": 1,
                         "changelog": 1, "files": 1, "other": 1 };
   const CALM_MARKS = { "from-commit": "warn", "from-srpm": "warn",
-                       "warning": "warn",
+                       "warning": "warn", "note": "calm",
                        "branch-ahead": "warn",
                        "patches~": "warn",
                        "no-patch": "calm",
@@ -86,8 +86,8 @@
         keys: ["has-patch", "inherited", "from-commit", "from-srpm",
                "branch-ahead"] },
       { id: "trouble", label: "проблемы",
-        keys: ["problem", "warning", "no-patch", "no-source", "gitlab-error",
-               "internal-error"] }
+        keys: ["problem", "warning", "note", "no-patch", "no-source",
+               "gitlab-error", "internal-error"] }
     ],
     diff: [
       { id: "status", label: "статус",

@@ -689,7 +689,8 @@
     "problems": 2,
     "with_patches": 3,
     "without_patches": 1,
-    "warnings": 0
+    "warnings": 0,
+    "notes": 0
    },
    "generated": "2026-07-01T00:00:00+03:00",
    "koji_web": "https://hub/koji",
@@ -974,7 +975,8 @@
     "problems": 1,
     "with_patches": 3,
     "without_patches": 1,
-    "warnings": 0
+    "warnings": 0,
+    "notes": 0
    },
    "generated": "2026-08-01T00:00:00+03:00",
    "koji_web": "https://hub/koji",

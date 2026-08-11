@@ -231,7 +231,12 @@
      }
     ],
     "patches_ref": null,
-    "problems": [],
+    "problems": [
+     {
+      "level": "note",
+      "text": "gitlab: нечего сравнивать"
+     }
+    ],
     "release": "1.el9",
     "rpms": [
      "vim-9.0-1.el9.x86_64"
@@ -5068,7 +5073,7 @@
     "version": "6.5"
    }
   ],
-  "dashboard": "2.6.3",
+  "dashboard": "3.2.2",
   "generated": "2026-12-01T00:00:00+03:00",
   "koji_hub": "https://hub/kojihub",
   "koji_web": "https://hub/koji",
