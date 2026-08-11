@@ -671,3 +671,68 @@ test('эталон паритета содержит интересные слу
   assert.ok(rows.some(function (r) { return r.tagged_in === null; }));
   assert.ok(rows.some(function (r) { return r.inherited === true; }));
 });
+
+/* Уровень проблемы пишет сбор, а страница по нему красит. Разбор живёт
+   здесь: строка из снапшота прежней схемы, объект из нынешней и уровень,
+   которого страница не знает, — три случая одного правила. */
+test('проблема строкой читается как ошибка', function () {
+  var row = data([snap('os-9.2', [
+    build('nginx', { problems: ['gitlab: ref not found'] })])])
+    .snapshots[0].builds[0];
+  assert.deepStrictEqual(row.problems,
+                         [{ level: 'error', text: 'gitlab: ref not found' }]);
+  assert.strictEqual(row.level, 'error');
+});
+
+test('уровень из снапшота доезжает до строки', function () {
+  var row = data([snap('os-9.2', [
+    build('nginx', { problems: [{ level: 'warning', text: 'с ветки' }] })])])
+    .snapshots[0].builds[0];
+  assert.strictEqual(row.level, 'warning');
+});
+
+test('незнакомый уровень читается как ошибка', function () {
+  /* Снапшот собран версией новее страницы. Занизить чужую проблему хуже,
+     чем завысить: заниженная не покрасит строку и потеряется. */
+  var row = data([snap('os-9.2', [
+    build('nginx', { problems: [{ level: 'critical', text: 'бум' }] })])])
+    .snapshots[0].builds[0];
+  assert.strictEqual(row.level, 'error');
+});
+
+test('уровень строки — самый критичный из её проблем', function () {
+  var row = data([snap('os-9.2', [
+    build('nginx', { problems: [{ level: 'note', text: 'нечего сравнивать' },
+                                { level: 'warning', text: 'с ветки' },
+                                { level: 'error', text: 'нет ветки' }] })])])
+    .snapshots[0].builds[0];
+  assert.strictEqual(row.level, 'error');
+});
+
+test('без проблем у строки нет и уровня', function () {
+  var row = data([snap('os-9.2', [build('nginx')])]).snapshots[0].builds[0];
+  assert.strictEqual(row.level, null);
+});
+
+/* Счётчики карточек: билд попадает ровно в одну из двух — иначе сумма была
+   бы больше числа билдов, и обе карточки врали бы разом. */
+test('билды с ошибками и с предупреждениями считаются врозь', function () {
+  var counts = data([snap('os-9.2', [
+    build('nginx', { problems: [{ level: 'error', text: 'нет ветки' },
+                                { level: 'warning', text: 'с ветки' }] }),
+    build('curl', { problems: [{ level: 'warning', text: 'с ветки' }] }),
+    build('vim', { problems: [{ level: 'note', text: 'нечего сравнивать' }] }),
+    build('zlib')])]).snapshots[0].counts;
+  assert.strictEqual(counts.problems, 1);
+  assert.strictEqual(counts.warnings, 1);
+});
+
+/* Метка говорит, откуда проблема, а уровень — насколько она плоха. Метку
+   ставит текст: gitlab-error у предупреждения от gitlab остаётся. */
+test('метка источника не зависит от уровня', function () {
+  var row = data([snap('os-9.2', [
+    build('nginx', { problems: [{ level: 'warning',
+                                  text: 'gitlab: патчи сняты с ветки' }] })])])
+    .snapshots[0].builds[0];
+  assert.ok(row.marks.indexOf('gitlab-error') !== -1, row.marks.join());
+});

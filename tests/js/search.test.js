@@ -76,3 +76,14 @@ test('CVE ищется одинаково в патчах билда и в ghost
   assert.deepStrictEqual(byPatch, byGhost);
   assert.deepStrictEqual(byPatch, { show: true, deep: true });
 });
+
+/* Проблемы лежат в раскрытии, и совпадение в них — глубокое: строка обязана
+   открыться на том месте, из-за которого нашлась. Ищем по тексту проблемы —
+   уровень это цвет, а не слово, которое набирают в поле. */
+test('поиск по тексту проблемы находит строку и разворачивает её', function () {
+  var row = { name: 'nginx', patches: [], rpms: [],
+              problems: [{ level: 'error', text: 'gitlab: ref not found' }] };
+  var out = search.scanState(row, q('ref not found'));
+  assert.strictEqual(out.show, true);
+  assert.strictEqual(out.deep, true);
+});

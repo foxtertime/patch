@@ -281,7 +281,10 @@
     ],
     "patches_ref": null,
     "problems": [
-     "internal error: koji не ответил за 60 с"
+     {
+      "level": "error",
+      "text": "internal error: koji не ответил за 60 с"
+     }
     ],
     "release": "620.el9",
     "rpms": [
@@ -534,8 +537,22 @@
     ],
     "patches_ref": null,
     "problems": [
-     "gitlab: 403 на каталоге PATCH",
-     "internal error: не разобрать changelog.yaml"
+     {
+      "level": "error",
+      "text": "gitlab: 403 на каталоге PATCH"
+     },
+     {
+      "level": "error",
+      "text": "internal error: не разобрать changelog.yaml"
+     },
+     {
+      "level": "warning",
+      "text": "gitlab: host mirror.example.com не описан в конфиге, запрошен gitlab.example.com"
+     },
+     {
+      "level": "note",
+      "text": "gitlab: нечего сравнивать"
+     }
     ],
     "release": "1.el9",
     "rpms": [
@@ -582,7 +599,7 @@
     "version": "131.0.6778.204"
    }
   ],
-  "dashboard": "2.2.0",
+  "dashboard": "2.6.3",
   "generated": "2026-11-01T00:00:00+03:00",
   "koji_hub": "https://hub/kojihub",
   "koji_web": "https://hub/koji",
@@ -599,7 +616,7 @@
    "FILES",
    "other"
   ],
-  "schema": 1,
+  "schema": 2,
   "tag": "os-9.6"
  }
 ]

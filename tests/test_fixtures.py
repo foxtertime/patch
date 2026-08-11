@@ -62,9 +62,10 @@ def marks_of(build, tag):
     if build.source is not None and build.source.commits_ahead:
         marks.add("branch-ahead")
     for problem in build.problems:
-        if problem.startswith("gitlab:") or problem.startswith("bad source"):
+        text = problem.text
+        if text.startswith("gitlab:") or text.startswith("bad source"):
             marks.add("gitlab-error")
-        if problem.startswith("internal error"):
+        if text.startswith("internal error"):
             marks.add("internal-error")
     return marks
 
@@ -254,7 +255,7 @@ class DriftChainTest(unittest.TestCase):
         glibc = drift.by_name()["glibc"]
         self.assertEqual(glibc.patches_ref, glibc.source.ref)
         self.assertIsNotNone(glibc.source.commit)
-        self.assertTrue(any("недоступен" in p for p in glibc.problems))
+        self.assertTrue(any("недоступен" in p.text for p in glibc.problems))
 
     def test_catching_up_turns_a_ghost_into_a_patch(self):
         before = snapshot("rich-drift.json").by_name()

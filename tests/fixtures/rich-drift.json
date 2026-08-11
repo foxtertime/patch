@@ -262,7 +262,10 @@
     ],
     "patches_ref": "os-9.8",
     "problems": [
-     "gitlab: коммит 5c0a7f31d84b недоступен, патчи сняты с ветки"
+     {
+      "level": "warning",
+      "text": "gitlab: коммит 5c0a7f31d84b недоступен, патчи сняты с ветки"
+     }
     ],
     "release": "61.el9",
     "rpms": [
@@ -382,7 +385,7 @@
     "version": "3.11.9"
    }
   ],
-  "dashboard": "2.2.0",
+  "dashboard": "2.6.3",
   "generated": "2026-08-07T00:00:00+03:00",
   "koji_hub": "https://hub/kojihub",
   "koji_web": "https://hub/koji",
@@ -399,7 +402,7 @@
    "FILES",
    "other"
   ],
-  "schema": 1,
+  "schema": 2,
   "tag": "os-9.8"
  }
 ]

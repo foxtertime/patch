@@ -4,9 +4,10 @@ import tempfile
 import unittest
 
 from dashboard import __version__
-from dashboard.model import (SCHEMA, Build, Patch, Snapshot, SnapshotError,
-                             Source, dump_snapshots, load_snapshots,
-                             snapshot_from_dict, snapshot_to_dict)
+from dashboard.model import (SCHEMA, Build, Patch, Problem, Snapshot,
+                             SnapshotError, Source, dump_snapshots,
+                             load_snapshots, snapshot_from_dict,
+                             snapshot_to_dict)
 
 
 def sample_build(name="nginx"):
@@ -63,13 +64,13 @@ class SerialisationTest(unittest.TestCase):
         build = sample_build()
         build.source = None
         build.patch_dir_present = None
-        build.problems = ["no source url"]
+        build.problems = [Problem("no source url")]
         snap = Snapshot(tag="t", generated="g", koji_hub="h", koji_web=None,
                         builds=[build])
         again = snapshot_from_dict(snapshot_to_dict(snap))
         self.assertIsNone(again.builds[0].source)
         self.assertIsNone(again.builds[0].patch_dir_present)
-        self.assertEqual(again.builds[0].problems, ["no source url"])
+        self.assertEqual(again.builds[0].problems, [Problem("no source url")])
 
     def test_unknown_schema_rejected(self):
         data = snapshot_to_dict(sample_snapshot())
@@ -143,6 +144,45 @@ class SerialisationTest(unittest.TestCase):
         data = snapshot_to_dict(sample_snapshot())
         del data["patch_classes"]
         self.assertEqual(snapshot_from_dict(data).patch_classes, [])
+
+
+class ProblemLevelTest(unittest.TestCase):
+    """Уровень проблемы: его пишет сбор, а страница только красит.
+
+    Схема 1 уровней не знала вовсе, и её снапшоты обязаны читаться дальше:
+    отказаться от них значило бы обесценить всё, что собрано раньше.
+    """
+
+    def test_problem_keeps_its_level_through_a_roundtrip(self):
+        build = sample_build()
+        build.problems = [Problem("gitlab: ref not found"),
+                          Problem("gitlab: патчи сняты с ветки", "warning"),
+                          Problem("gitlab: нечего сравнивать", "note")]
+        snap = Snapshot(tag="t", generated="g", koji_hub="h", builds=[build])
+        again = snapshot_from_dict(snapshot_to_dict(snap))
+        self.assertEqual([p.level for p in again.builds[0].problems],
+                         ["error", "warning", "note"])
+
+    def test_level_is_error_unless_said_otherwise(self):
+        self.assertEqual(Problem("что-то").level, "error")
+
+    def test_old_snapshot_reads_strings_as_errors(self):
+        data = snapshot_to_dict(sample_snapshot())
+        data["schema"] = 1
+        data["builds"][0]["problems"] = ["gitlab: ref not found"]
+        build = snapshot_from_dict(data).builds[0]
+        self.assertEqual(build.problems,
+                         [Problem("gitlab: ref not found", "error")])
+
+    def test_unknown_level_reads_as_error(self):
+        """Снапшот собран версией новее — уровня, которого мы не знаем, нет.
+
+        Занизить чужую проблему хуже, чем завысить: заниженная не покрасит
+        строку и потеряется вместе с поводом, ради которого её записали.
+        """
+        self.assertEqual(
+            Problem.from_dict({"level": "critical", "text": "бум"}).level,
+            "error")
 
 
 class FileIoTest(unittest.TestCase):

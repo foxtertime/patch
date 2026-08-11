@@ -73,10 +73,16 @@
      подсвечивается: подсветка обещала бы, что запрос нашёлся в данных, а
      он нашёлся в словаре. Незнакомый источник приехал из снапшота, и его
      подсвечиваем наравне с текстом. */
-  function problemHtml(line, q) {
-    const p = labels.problem(line);
+  function problemHtml(problem, q) {
+    /* Строкой проблема приезжает из снапшота прежней схемы — там уровня
+       нет вовсе, и такая проблема считается ошибкой. Разбирает её всё равно
+       viewmodel, но markup зовут и напрямую из тестов. */
+    const item = typeof problem === 'string'
+      ? { level: 'error', text: problem } : (problem || {});
+    const level = item.level || 'error';
+    const p = labels.problem(item.text);
     const title = p.known ? esc(p.title) : hl(p.title, q);
-    return '<div class="prob">'
+    return `<div class="prob ${esc(level)}">`
       + (p.title ? `<div class="pkind">${title}</div>` : '')
       + (p.text ? `<div class="ptext">${hl(p.text, q)}</div>` : '')
       + '</div>';

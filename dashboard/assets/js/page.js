@@ -242,7 +242,12 @@
         return row.marks.indexOf(key) !== -1;
       }
       if (key === 'has-patch') return row.patches.length > 0;
-      if (key === 'problem') return row.problems.length > 0;
+      /* Признак строки — её уровень, а не наличие записей в problems: билд
+         с одним предупреждением стоит под «с предупреждениями», а не под
+         «с проблемами», и попадает ровно в одну из двух выборок. Заметка не
+         даёт ни того, ни другого — она ни о чём не предупреждает. */
+      if (key === 'problem') return row.level === 'error';
+      if (key === 'warning') return row.level === 'warning';
       return row.marks.indexOf(key) !== -1;
     }
 

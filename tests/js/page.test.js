@@ -524,3 +524,33 @@ test('две страницы не делят состояния', function () {
   assert.strictEqual(a.st.tag, 0);
   assert.strictEqual(b.st.tag, 1);
 });
+
+/* Признак строки — её уровень: билд с одним предупреждением стоит под «с
+   предупреждениями», а не под «с проблемами». Иначе две карточки показывали
+   бы одни и те же строки, и разделять их было бы незачем. */
+test('фильтры «с проблемами» и «с предупреждениями» не пересекаются',
+  function () {
+    var p = make([snap('os-9.1', JUL, { builds: [
+      build('nginx', { problems: [{ level: 'error', text: 'нет ветки' },
+                                  { level: 'warning', text: 'с ветки' }] }),
+      build('curl', { problems: [{ level: 'warning', text: 'с ветки' }] }),
+      build('vim', { problems: [{ level: 'note', text: 'нечего сравнивать' }] }),
+      build('zlib')] })]);
+    p.setFilter('problem', 1);
+    assert.deepStrictEqual(rows(p), ['nginx']);
+    p.setFilter('problem', 0);
+    p.setFilter('warning', 1);
+    assert.deepStrictEqual(rows(p), ['curl']);
+  });
+
+/* Заметка ни о чём не предупреждает: строка с ней не попадает ни в одну из
+   двух выборок и не красится вовсе. */
+test('заметка не делает строку ни проблемной, ни предупреждённой', function () {
+  var p = make([snap('os-9.1', JUL, { builds: [
+    build('vim', { problems: [{ level: 'note', text: 'нечего сравнивать' }] })] })]);
+  p.setFilter('problem', 1);
+  assert.deepStrictEqual(rows(p), []);
+  p.setFilter('problem', 0);
+  p.setFilter('warning', 1);
+  assert.deepStrictEqual(rows(p), []);
+});

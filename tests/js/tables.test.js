@@ -22,8 +22,29 @@ function opts(over) {
            oldTag: over.oldTag || 'было', newTag: over.newTag || 'стало' };
 }
 
+/* Проблемы в тестах пишут короче — строкой или объектом; строка читается
+   как ошибка, ровно как её читает viewmodel у снапшота прежней схемы. */
+function problems(list) {
+  return (list || []).map(function (p) {
+    return typeof p === 'string' ? { level: 'error', text: p } : p;
+  });
+}
+
+/* Тот же выбор самой критичной, что делает viewmodel: строка красится по
+   ней, и подставлять уровень руками в каждом тесте незачем. */
+function worst(list) {
+  var order = ['error', 'warning', 'note'], i, j;
+  for (i = 0; i < order.length; i++) {
+    for (j = 0; j < list.length; j++) {
+      if (list[j].level === order[i]) return order[i];
+    }
+  }
+  return null;
+}
+
 function stateRow(over) {
   over = over || {};
+  var probs = problems(over.problems);
   return { name: 'nginx', nvr: 'nginx-1.24.0-3.el9', evr: '1.24.0-3.el9',
            branch: 'os-9.2', tagged_in: 'os-9.2', inherited: false,
            koji_tags: ['os-9.2'], project: 'group/nginx', owner: 'builder',
@@ -31,7 +52,9 @@ function stateRow(over) {
            ref_kind: 'branch', patch_dir_present: true, source_url: null,
            koji_url: null, patches: over.patches || [], patch_counts: {},
            rpms: over.rpms || ['nginx-1.24.0-3.el9.x86_64'],
-           problems: over.problems || [], marks: over.marks || [],
+           problems: probs,
+           level: over.level !== undefined ? over.level : worst(probs),
+           marks: over.marks || [],
            commit: null, commit_url: null, commits_ahead: null,
            patches_ref: null, ghosts: over.ghosts || [] };
 }
@@ -85,6 +108,31 @@ test('строка с проблемой помечена классом bad', f
   var out = tables.stateRows(
     [{ row: stateRow({ problems: ['нет источника'] }), open: false }], opts());
   assert.match(out, /class="main-row bad"/);
+});
+
+/* Уровень строки — самый критичный из её проблем: одна ошибка сильнее
+   любого числа предупреждений. Иначе билд, у которого сломался сбор,
+   читался бы как «просто оговорка». */
+test('строка с предупреждением помечена warn, а не bad', function () {
+  var out = tables.stateRows(
+    [{ row: stateRow({ problems: [{ level: 'warning', text: 'с ветки' }] }),
+       open: false }], opts());
+  assert.match(out, /class="main-row warn"/, out);
+});
+
+test('ошибка перебивает предупреждение', function () {
+  var out = tables.stateRows(
+    [{ row: stateRow({ problems: [{ level: 'warning', text: 'с ветки' },
+                                  { level: 'error', text: 'нет ветки' }] }),
+       open: false }], opts());
+  assert.match(out, /class="main-row bad"/, out);
+});
+
+test('заметка строку не красит', function () {
+  var out = tables.stateRows(
+    [{ row: stateRow({ problems: [{ level: 'note', text: 'нечего сравнивать' }] }),
+       open: false }], opts());
+  assert.match(out, /class="main-row"/, out);
 });
 
 test('строка без источника тоже помечена bad', function () {
@@ -408,7 +456,7 @@ test('блок проблем появляется только когда он�
   assert.doesNotMatch(tables.stateDetail(stateRow(), q()), /проблемы/);
   var out = tables.stateDetail(
     stateRow({ problems: ['gitlab: нет ветки'] }), q());
-  assert.match(out, /class="prob"/, out);
+  assert.match(out, /class="prob error"/, out);
   assert.match(out, /class="pkind">GitLab</, out);
   assert.match(out, /class="ptext">нет ветки</, out);
 });
@@ -419,5 +467,5 @@ test('каждая проблема — свой блок', function () {
   var out = tables.stateDetail(
     stateRow({ problems: ['gitlab: нет ветки', 'koji: нет деталей билда'] }),
     q());
-  assert.strictEqual(out.split('class="prob"').length - 1, 2, out);
+  assert.strictEqual(out.split('class="prob ').length - 1, 2, out);
 });

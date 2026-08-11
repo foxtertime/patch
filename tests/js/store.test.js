@@ -35,6 +35,17 @@ test('чужая версия схемы отклоняется', function () {
   assert.match(out.error, /схем/);
 });
 
+/* Схема 2 отличается от первой только тем, что проблема в ней объект с
+   уровнем, а не строка: разбирать умеет и то, и другое, поэтому старые
+   файлы страница читает наравне с новыми. */
+test('снапшот прежней схемы читается наравне с нынешним', function () {
+  var old = snap('os-9.1', '2026-07-01T00:00:00+03:00');
+  old.schema = 1;
+  old.builds = [{ name: 'nginx', nvr: 'nginx-1-1', problems: ['gitlab: 500'] }];
+  var out = store.parseText(JSON.stringify(old), 'a.json');
+  assert.strictEqual(out.ok, true, out.error);
+});
+
 test('объект без builds — не снапшот', function () {
   var out = store.parseText('{"schema": 1, "tag": "os-9.1"}', 'a.json');
   assert.strictEqual(out.ok, false);

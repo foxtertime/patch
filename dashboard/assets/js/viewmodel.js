@@ -138,16 +138,44 @@
     return 0;
   }
 
+  /* Уровни проблемы от самого критичного к самому спокойному. Порядок и
+     есть старшинство: строка красится по первому найденному. */
+  const LEVELS = ['error', 'warning', 'note'];
+
+  /* Проблема из снапшота: у schema 2 это объект с уровнем, у прежней —
+     строка. Строка читается как ошибка: занизить чужую проблему хуже, чем
+     завысить — заниженная не покрасит строку и потеряется. Незнакомый
+     уровень (снапшот собран версией новее страницы) читается так же. */
+  function problemDict(item) {
+    if (typeof item === 'string') return { level: 'error', text: item };
+    const level = item && item.level;
+    return { level: LEVELS.indexOf(level) === -1 ? 'error' : level,
+             text: String((item && item.text) || '') };
+  }
+
+  /* Самая критичная из проблем билда, null — если проблем нет вовсе. Ею
+     красится и полоса строки, и подпись в колонке меток: одна проблема
+     уровнем выше перекрывает любое число тех, что ниже. */
+  function worstLevel(problems) {
+    for (const level of LEVELS) {
+      for (const problem of problems) {
+        if (problem.level === level) return level;
+      }
+    }
+    return null;
+  }
+
   /* Метки строки, всегда в одном и том же порядке.
 
      Порядок здесь позиционный: колонку «метки» читают по месту, а порядок
      файлов в каталоге PATCH задаёт GitLab и он разный от репозитория к
      репозиторию. Без сортировки у одной строки первым стоял бы cve, у
      соседней sast, и колонка перестала бы читаться. */
-  function buildMarks(build, tag, classOrder) {
+  function buildMarks(build, tag, classOrder, problems) {
     classOrder = classOrder || [];
-    let marks = [], patches = build.patches || [], problems = build.problems || [];
+    let marks = [], patches = build.patches || [];
     let i, key, gitlabError = false, internalError = false;
+    problems = problems || (build.problems || []).map(problemDict);
     for (i = 0; i < patches.length; i++) {
       key = slug(patches[i]['class']);
       if (marks.indexOf(key) === -1) marks.push(key);
@@ -165,9 +193,11 @@
     if (build.source && build.source.commits_ahead) marks.push('branch-ahead');
     if (build.patch_dir_present === false) marks.push('no-patch');
     for (i = 0; i < problems.length; i++) {
-      if (problems[i].indexOf('gitlab:') === 0
-          || problems[i].indexOf('bad source') === 0) gitlabError = true;
-      if (problems[i].indexOf('internal error') === 0) internalError = true;
+      /* Метка говорит, откуда проблема, а не насколько она плоха: насколько
+         — это уровень, и он красит строку сам. */
+      if (problems[i].text.indexOf('gitlab:') === 0
+          || problems[i].text.indexOf('bad source') === 0) gitlabError = true;
+      if (problems[i].text.indexOf('internal error') === 0) internalError = true;
     }
     if (gitlabError) marks.push('gitlab-error');
     if (internalError) marks.push('internal-error');
@@ -193,6 +223,7 @@
     let counts = {}, patches = build.patches || [], i;
     for (i = 0; i < patches.length; i++) bump(counts, patches[i]['class']);
     let source = build.source || null;
+    const problems = (build.problems || []).map(problemDict);
     return {
       name: orNull(build.name), nvr: orNull(build.nvr),
       version: orNull(build.version), release: orNull(build.release),
@@ -223,8 +254,12 @@
       // архитектуры и сам ничего не пересортировывает
       patch_counts: counts, rpms: rpmsmod.sortRpms(build.rpms || []),
       patch_dir_present: orNull(build.patch_dir_present),
-      problems: (build.problems || []).slice(),
-      marks: buildMarks(build, tag, classOrder)
+      problems: problems,
+      /* Уровень строки считаем здесь, а не при отрисовке: по нему красят
+         полосу, считают карточки и отбирают строки под фильтр — трижды
+         пересчитывать одно и то же незачем. */
+      level: worstLevel(problems),
+      marks: buildMarks(build, tag, classOrder, problems)
     };
   }
 
@@ -234,14 +269,20 @@
       byClass[classNames[i]] = { builds: 0, files: 0 };
     }
     let withPatches = 0, withoutPatches = 0, problems = 0, files = 0;
-    let inherited = 0, direct = 0;
+    let inherited = 0, direct = 0, warnings = 0;
     for (i = 0; i < rows.length; i++) {
       row = rows[i];
       if (row.inherited === true) inherited += 1;
       else if (row.inherited === false) direct += 1;
       if (row.patches.length) withPatches += 1;
       if (row.patch_dir_present === false) withoutPatches += 1;
-      if (row.problems.length) problems += 1;
+      /* Билд с ошибкой считается проблемным, и только он: предупреждение
+         значит «данные есть, но с оговоркой», и записать такой билд в
+         проблемные значило бы обещать беду там, где её нет. Считаются они
+         врозь — билд с ошибкой и предупреждением попадёт только в первый
+         счётчик, иначе сумма двух карточек была бы больше числа билдов. */
+      if (row.level === 'error') problems += 1;
+      else if (row.level === 'warning') warnings += 1;
       files += row.patches.length;
       counts = row.patch_counts;
       for (name in counts) {
@@ -257,6 +298,7 @@
     return { builds: rows.length, with_patches: withPatches,
              inherited: inherited, direct: direct,
              without_patches: withoutPatches, problems: problems,
+             warnings: warnings,
              patch_files: files, by_class: byClass };
   }
 

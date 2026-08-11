@@ -16,12 +16,23 @@
     return Object.prototype.toString.call(value) === '[object Array]';
   }
 
+  /* Схемы снапшота, которые страница читает. Их две: в первой проблема
+     билда — строка без уровня, во второй — объект с уровнем, и разбирает
+     обе viewmodel. Отказаться от первой значило бы обесценить всё, что
+     собрано раньше, — а сравнение с прошлым месяцем и есть то, ради чего
+     снапшоты хранят. */
+  const SCHEMAS = [1, 2];
+
+  function knownSchema(value) {
+    return SCHEMAS.indexOf(value) !== -1;
+  }
+
   /* Минимум, при котором снапшот вообще можно показать. Глубже не лезем:
      модель почти все поля билда объявляет необязательными, и отказ от
      целого файла из-за одного билда потерял бы все остальные. */
   function isSnapshot(value) {
     return Boolean(value) && typeof value === 'object' && !isArray(value)
-        && value.schema === 1 && typeof value.tag === 'string'
+        && knownSchema(value.schema) && typeof value.tag === 'string'
         && typeof value.generated === 'string' && isArray(value.builds);
   }
 
@@ -187,10 +198,10 @@
       /* Чужую версию схемы называем прямо: «это не снапшот» сбило бы с
          толку человека, у которого файл сделан другой версией dashboard. */
       if (snapshot && typeof snapshot === 'object' && !isArray(snapshot)
-          && snapshot.schema !== undefined && snapshot.schema !== 1) {
+          && snapshot.schema !== undefined && !knownSchema(snapshot.schema)) {
         return { ok: false,
                  error: fileName + ': версия схемы ' + snapshot.schema
-                      + ', а дашборд понимает только 1' };
+                      + ', а дашборд понимает ' + SCHEMAS.join(' и ') };
       }
       if (!isSnapshot(snapshot)) {
         return { ok: false,

@@ -12,7 +12,7 @@ function snapshot(over) {
            builds: over.builds || [{ rpms: ['a.x86_64', 'b.x86_64'] }],
            counts: Object.assign({
              builds: 1, with_patches: 1, patch_files: 3, inherited: 0,
-             direct: 1, problems: 0, without_patches: 0,
+             direct: 1, problems: 0, warnings: 0, without_patches: 0,
              by_class: { CVE: { builds: 1, files: 3 } }
            }, over.counts || {}) };
 }
@@ -194,4 +194,14 @@ test('срок между сборами считается как на рель
 test('нечитаемое время сбора не роняет срок', function () {
   var out = cards.pairCards(pair(), side('a', '', 1), side('b', 'никогда', 1));
   assert.match(out, /class="n">—<\/div>/, out);
+});
+
+/* Билды с оговоркой ищут ровно так же, как проблемные, — кликом по
+   карточке. Своя карточка, а не строка в чужой подсказке: смешанные, они
+   потерялись бы и те, и другие. */
+test('у предупреждений своя карточка со своим фильтром', function () {
+  var out = cards.stateCards(snapshot({ counts: { problems: 2, warnings: 5 } })).big;
+  assert.match(out, /data-filter="warning"/, out);
+  assert.match(out, /с предупреждениями/, out);
+  assert.match(out, /data-filter="problem"/, out);
 });

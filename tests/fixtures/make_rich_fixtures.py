@@ -13,8 +13,8 @@ from dataclasses import replace
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 
-from dashboard.model import (Build, Patch, Snapshot, Source,  # noqa: E402
-                             dump_snapshots, snapshot_to_dict)
+from dashboard.model import (Build, Patch, Problem, Snapshot,  # noqa: E402
+                             Source, dump_snapshots, snapshot_to_dict)
 
 CLASSES = ["AUTOGEN", "CVE", "SAST", "DAST", "COVERAGE", "SPEC",
            "CHANGELOG", "FILES", "other"]
@@ -140,7 +140,7 @@ def old_snapshot():
                   source=src("web/httpd", "abc123", kind="commit"),
                   patch_dir_present=False, patches=[],
                   rpms=["httpd-2.4.62-1.el9.x86_64"],
-                  problems=["gitlab: 404 на дереве ветки"]),
+                  problems=[Problem("gitlab: 404 на дереве ветки")]),
             # тег неизвестен, внутренняя ошибка, дата без времени
             Build(nvr="vim-9.0-1.el9", name="vim", version="9.0",
                   release="1.el9", build_id=103, owner="editor",
@@ -148,7 +148,7 @@ def old_snapshot():
                   source=None, patch_dir_present=None,
                   patches=[patch("coverage-vim.patch", "COVERAGE")],
                   rpms=["vim-9.0-1.el9.x86_64"],
-                  problems=["internal error: boom"]),
+                  problems=[Problem("internal error: boom")]),
             # откат версии в новом теге, неразбираемое время
             Build(nvr="zlib-1.3-2.el9", name="zlib", version="1.3",
                   release="2.el9", build_id=104, owner="builder",
@@ -189,7 +189,7 @@ def new_snapshot():
                   source=src("web/httpd", "abc123", kind="commit"),
                   patch_dir_present=False, patches=[],
                   rpms=["httpd-2.4.62-1.el9.x86_64"],
-                  problems=["gitlab: 404 на дереве ветки"]),
+                  problems=[Problem("gitlab: 404 на дереве ветки")]),
             # откат: 1.3-2 → 1.3-1
             Build(nvr="zlib-1.3-1.el9", name="zlib", version="1.3",
                   release="1.el9", build_id=114, owner="builder",
@@ -250,7 +250,7 @@ def newer_snapshot():
                   source=src("web/httpd", "abc123", kind="commit"),
                   patch_dir_present=False, patches=[],
                   rpms=["httpd-2.4.62-1.el9.x86_64"],
-                  problems=["gitlab: 404 на дереве ветки"]),
+                  problems=[Problem("gitlab: 404 на дереве ветки")]),
             # релиз вернулся к тому, что был в os-9.1
             Build(nvr="zlib-1.3-2.el9", name="zlib", version="1.3",
                   release="2.el9", build_id=104, owner="builder",
@@ -351,7 +351,7 @@ def newest_snapshot():
                   source=src("web/httpd", "abc123", kind="commit"),
                   patch_dir_present=False, patches=[],
                   rpms=["httpd-2.4.62-1.el9.x86_64"],
-                  problems=["gitlab: 404 на дереве ветки"]),
+                  problems=[Problem("gitlab: 404 на дереве ветки")]),
             # не менялся с os-9.3
             Build(nvr="zlib-1.3-2.el9", name="zlib", version="1.3",
                   release="2.el9", build_id=104, owner="builder",
@@ -481,7 +481,7 @@ def again_snapshot():
                        "kernel-modules-5.14.0-620.el9.x86_64",
                        "kernel-modules-extra-5.14.0-620.el9.x86_64",
                        "kernel-5.14.0-620.el9.aarch64"],
-                 problems=["internal error: koji не ответил за 60 с"]),
+                 problems=[Problem("internal error: koji не ответил за 60 с")]),
             # не менялся
             same(prev, "curl", "os-9.4"),
             # собран роботом: владельца koji не назвал, времени сборки тоже
@@ -616,8 +616,13 @@ def wide_snapshot():
                         "chromium-common-131.0.6778.204-1.el9.s390x",
                         "chromium-libs-131.0.6778.204-1.el9.s390x",
                         "chromium-doc-131.0.6778.204-1.el9.noarch"],
-                  problems=["gitlab: 403 на каталоге PATCH",
-                            "internal error: не разобрать changelog.yaml"]),
+                  problems=[
+                      Problem("gitlab: 403 на каталоге PATCH"),
+                      Problem("internal error: не разобрать changelog.yaml"),
+                      Problem("gitlab: host mirror.example.com не описан в "
+                              "конфиге, запрошен gitlab.example.com",
+                              "warning"),
+                      Problem("gitlab: нечего сравнивать", "note")]),
         ])
 
 
@@ -682,9 +687,14 @@ def many_builds():
             if i % 6 == 0:
                 patches.append(patch("%s.spec.patch" % name, "SPEC"))
         if i % 11 == 0:
-            problems.append("gitlab: 404 на дереве ветки")
+            problems.append(Problem("gitlab: 404 на дереве ветки"))
         if i % 13 == 5:
-            problems.append("internal error: сборка без исходников")
+            problems.append(Problem("internal error: сборка без исходников"))
+        # Предупреждение без единой ошибки — строка обязана быть янтарной, а
+        # не красной: на большом теге такие билды и проверяют правило.
+        if i % 7 == 3 and i % 11 and i % 13 != 5:
+            problems.append(Problem("gitlab: коммит 0f1a2b3c4d5e недоступен, "
+                                    "патчи сняты с ветки", "warning"))
         rpms = ["%s.%s" % (nvr, ARCHES[j])
                 for j in range(1 + i % len(ARCHES))]
         rpms.append(nvr + ".src")
@@ -1018,8 +1028,9 @@ def drift_snapshot():
                   patches=[pat("core/glibc", tag, "coverage-glibc.patch",
                                "COVERAGE")],
                   rpms=["glibc-2.34-61.el9.x86_64"],
-                  problems=["gitlab: коммит %s недоступен, патчи сняты с "
-                            "ветки" % GLIBC_GONE[:12]]),
+                  problems=[Problem("gitlab: коммит %s недоступен, патчи "
+                                    "сняты с ветки" % GLIBC_GONE[:12],
+                                    "warning")]),
             # Собран прямо с коммита: ветки у такого билда нет, сравнивать
             # не с чем. Считать его «снятым с ветки» нельзя — точнее
             # источника не бывает.

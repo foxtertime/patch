@@ -341,7 +341,7 @@ test('класс патча виден и покрашен', function () {
    набрано. */
 test('проблема рисуется блоком из подписи и текста', function () {
   var out = markup.problemHtml('gitlab: ветка os-9.6 не найдена', q());
-  assert.match(out, /class="prob"/);
+  assert.match(out, /class="prob error"/);
   assert.match(out, /class="pkind">GitLab</);
   assert.match(out, /class="ptext">ветка os-9\.6 не найдена</);
 });
@@ -371,4 +371,21 @@ test('разметка из проблемы экранируется', function
   var out = markup.problemsHtml(['<img src=x>: <b>бум</b>'], q());
   assert.strictEqual(out.indexOf('<img'), -1, out);
   assert.strictEqual(out.indexOf('<b>'), -1, out);
+});
+
+/* Уровень проблемы виден в разметке классом: цвет подписи и полосы блока
+   даёт css, а не разметка, и правило у них одно. */
+test('уровень проблемы уезжает в класс блока', function () {
+  var warn = markup.problemHtml({ level: 'warning', text: 'gitlab: с ветки' },
+                                q());
+  assert.match(warn, /class="prob warning"/);
+  var note = markup.problemHtml({ level: 'note', text: 'gitlab: нечего' }, q());
+  assert.match(note, /class="prob note"/);
+});
+
+/* Проблема из снапшота прежней схемы приезжает строкой без уровня —
+   и читается как ошибка: занизить чужую проблему хуже, чем завысить. */
+test('проблема строкой читается как ошибка', function () {
+  assert.match(markup.problemHtml('koji: нет деталей билда', q()),
+               /class="prob error"/);
 });

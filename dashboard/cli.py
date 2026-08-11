@@ -7,7 +7,7 @@ from typing import List, Optional
 
 from . import __version__, logs
 from .build import BuildError, build_html
-from .collect import collect_tag
+from .collect import collect_tag, error_builds
 from .config import ConfigError, load_config
 from .gitlabclient import GitlabClient
 from .model import dump_snapshots
@@ -123,7 +123,11 @@ def main(argv: Optional[List[str]] = None) -> int:
         logger.info("всего за %.1f с", time.monotonic() - started)
 
         if args.max_problems is not None:
-            problems = sum(1 for s in snapshots for b in s.builds if b.problems)
+            # Считаем билды с ошибками, а не с любой записью в problems:
+            # предупреждение говорит «данные есть, но с оговоркой», и ронять
+            # из-за него прогон значит требовать от сбора того, чего он не
+            # обещал. Само правило — в collect: там же, где проблемы заводят.
+            problems = error_builds(snapshots)
             if problems > args.max_problems:
                 logger.warning("проблемных билдов %d > %d", problems,
                                args.max_problems)
