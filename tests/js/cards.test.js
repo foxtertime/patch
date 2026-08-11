@@ -223,13 +223,31 @@ test('стороны перехода и вспомогательные числ
     assert.strictEqual(out.split('class="cgroup').length - 1, 2, out);
   });
 
-test('разрезы идут двумя полосами, состав и порядок прежние', function () {
-  var out = cards.diffCards(pair());
-  assert.strictEqual(out.split('class="cgroup full"').length - 1, 2, out);
-  var keys = (out.match(/data-filter="([^"]+)"/g) || [])
-    .map(function (m) { return m.slice(13, -1); });
-  assert.deepStrictEqual(keys, ['changed', 'added', 'removed', 'upgraded',
-                                'downgraded', 'unchanged', 'patches+',
-                                'patches-', 'patches~', 'repackaged',
-                                'branch-changed', 'tag-changed']);
+/* Разрезы разложены по вопросам, на которые отвечают: что стало с самим
+   компонентом, что стало с его версией, что с патчами, что со сборкой.
+   Порядок чисел от этого не меняется — границы легли там, где один вопрос
+   и так сменялся другим. */
+test('разрезы идут четырьмя плоскостями, состав и порядок прежние',
+  function () {
+    var out = cards.diffCards(pair());
+    assert.strictEqual(out.split('class="cgroup cut"').length - 1, 4, out);
+    var keys = (out.match(/data-filter="([^"]+)"/g) || [])
+      .map(function (m) { return m.slice(13, -1); });
+    assert.deepStrictEqual(keys, ['changed', 'added', 'removed', 'upgraded',
+                                  'downgraded', 'unchanged', 'patches+',
+                                  'patches-', 'patches~', 'repackaged',
+                                  'branch-changed', 'tag-changed']);
+  });
+
+/* Плоскость — вопрос, а не порядковый номер: в каждой ровно те три числа,
+   что на него отвечают. Ряды складывает раскладка, по две плоскости в
+   ряд, — скрипт о рядах не знает. */
+test('в каждой плоскости разрезов свои три числа', function () {
+  var planes = cards.diffCards(pair()).split('class="cgroup cut"').slice(1);
+  assert.strictEqual(planes.length, 4);
+  planes.forEach(function (plane) {
+    assert.strictEqual(plane.split('data-filter="').length - 1, 3, plane);
+  });
+  assert.match(planes[1], /data-filter="upgraded"/, planes[1]);
+  assert.match(planes[2], /data-filter="patches~"/, planes[2]);
 });
