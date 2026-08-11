@@ -109,44 +109,10 @@
 
   /* ---------- карточки, селекторы, чипы ---------- */
 
-  /* Ширина карточки-среза. Браузер набивает строку под завязку и про
-     остаток не думает: двенадцать срезов при десяти влезающих дают вторую
-     строку из двух карточек. Считаем, на сколько строк они делятся поровну,
-     и задаём ширину числом — строка флексов растягивает то, что в ней стоит,
-     поэтому короткая последняя строка занята целиком.
-
-     Меряет тот, у кого есть раскладка: без неё (в тестах, у спрятанной
-     вкладки) ширина нулевая, и трогать нечего — карточки останутся при
-     своём минимуме из стилей. */
-  function fitCards(box) {
-    if (!box || !window.getComputedStyle || !box.clientWidth) return;
-    const list = box.querySelectorAll('.card');
-    if (!list.length) return;
-    const style = window.getComputedStyle(box);
-    const gap = parseFloat(style.columnGap) || 0;
-    const min = parseFloat(style.getPropertyValue('--card-min')) || 1;
-    const cols = cards.columnsFor(list.length, box.clientWidth, min, gap);
-    /* Минус пиксель: при точном делении браузер иногда не пускает последнюю
-       карточку в строку, и она уезжает вниз одна — ровно то, от чего
-       считали. */
-    const width = (box.clientWidth - (cols - 1) * gap) / cols - 1;
-    box.style.setProperty('--card-w', Math.max(min, width) + 'px');
-  }
-
-  /* Все четыре ряда карточек: итоги и срезы на обеих вкладках. Правило одно
-     на всех, и минимум своей ширины каждый ряд несёт в своих стилях. */
-  const CARD_BOXES = ['state-cards', 'class-cards', 'diff-pair', 'diff-cards'];
-
-  function fitAllCards() {
-    for (const id of CARD_BOXES) fitCards(document.getElementById(id));
-  }
-
   function renderStateCards() {
     const out = cards.stateCards(curSnap());
     document.getElementById('state-cards').innerHTML = out.big;
     document.getElementById('class-cards').innerHTML = out.classes;
-    fitCards(document.getElementById('state-cards'));
-    fitCards(document.getElementById('class-cards'));
   }
 
   function renderDiffCards() {
@@ -158,8 +124,6 @@
     document.getElementById('diff-pair').innerHTML = ends
       ? cards.pairCards(pair, snaps[ends[0]], snaps[ends[1]]) : '';
     document.getElementById('diff-cards').innerHTML = cards.diffCards(pair);
-    fitCards(document.getElementById('diff-pair'));
-    fitCards(document.getElementById('diff-cards'));
   }
 
   /* Плашка показывает все три положения признака: нажата — «есть», класс
@@ -290,9 +254,6 @@
     }
     stateSection.hidden = name !== 'state';
     diffSection.hidden = name !== 'diff';
-    /* У спрятанной вкладки ширины нет, и посчитанная при её отрисовке
-       ширина карточки была бы взята из нуля. Считаем, когда показали. */
-    fitAllCards();
     /* Панель поиска одна на страницу и переезжает к активной таблице:
        два одинаковых поля с разными id путали бы и пользователя, и код. */
     const host = name === 'diff' ? diffSection : stateSection;
@@ -476,8 +437,8 @@
     rowsOf: () => sortRows(visibleRows()).map((item) => item.row) });
 
 
-  viewportmod.create({ controls: controls, toTop: document.getElementById('totop'),
-                       onResize: fitAllCards });
+  viewportmod.create({ controls: controls,
+                       toTop: document.getElementById('totop') });
 
   /* ---------- загрузка снапшотов ---------- */
 

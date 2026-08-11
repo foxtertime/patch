@@ -89,34 +89,6 @@ test('карточка диффа подписана «из скольких»',
   assert.match(cards.diffCards(pair()), /<span class="unit">из 2<\/span>/);
 });
 
-/* Раскладка карточек по строкам: числа здесь — произвольные аргументы
-   функции, а не число карточек на какой-то конкретной вкладке. Одиннадцать
-   при десяти влезающих дают вторую строку из одной штуки и пустоту за ней;
-   считалка делит их на строки поровну. Ширину меряет тот, у кого есть
-   раскладка, — здесь её задаёт тест. */
-test('карточки делятся на строки поровну', function () {
-  // у функции: влезает десять, аргумент одиннадцать — две строки по шесть и пять
-  assert.strictEqual(cards.columnsFor(11, 1360, 122, 10), 6);
-  // у функции: влезает десять, аргумент десять — одна строка
-  assert.strictEqual(cards.columnsFor(10, 1360, 122, 10), 10);
-  // у функции: влезает четыре, аргумент одиннадцать — три строки по четыре
-  assert.strictEqual(cards.columnsFor(11, 550, 122, 10), 4);
-});
-
-test('карточек меньше, чем влезает в строку — строка одна', function () {
-  assert.strictEqual(cards.columnsFor(3, 1360, 122, 10), 3);
-  assert.strictEqual(cards.columnsFor(1, 1360, 122, 10), 1);
-});
-
-/* Узкое окно: даже одна карточка в строку — это строка, а не деление на
-   ноль. */
-test('в узком окне остаётся один столбец', function () {
-  assert.strictEqual(cards.columnsFor(11, 100, 122, 10), 1);
-});
-
-test('без карточек столбцов нет', function () {
-  assert.strictEqual(cards.columnsFor(0, 1360, 122, 10), 0);
-});
 
 /* Итоги перехода: стороны, разница и срок. Числа сторон берём у снапшотов,
    а не по строкам таблицы: строка — это компонент перехода, и компонент,
@@ -204,4 +176,44 @@ test('у предупреждений своя карточка со своим 
   assert.match(out, /data-filter="warning"/, out);
   assert.match(out, /с предупреждениями/, out);
   assert.match(out, /data-filter="problem"/, out);
+});
+
+/* Раскладку держит css, и держится она на именах блоков: ряд итогов — три
+   тематических блока, разрезы — две полосы. Числа и состав карточек при
+   этом прежние, поэтому проверяем именно обёртки. */
+test('ряд итогов разложен по трём блокам', function () {
+  var out = cards.stateCards(snapshot()).big;
+  assert.match(out, /<div class="cgroup solo">/, out);
+  assert.match(out, /<div class="cgroup">/, out);
+  assert.match(out, /<div class="cgroup apart">/, out);
+  assert.strictEqual(out.split('class="cgroup').length - 1, 3, out);
+});
+
+test('число тега стоит в блоке одно', function () {
+  /* Блок «solo» — тот, что css делает вдвое шире: карточка в нём должна
+     быть ровно одна, иначе ширина достанется не тому. */
+  var out = cards.stateCards(snapshot()).big;
+  var solo = out.slice(out.indexOf('cgroup solo'), out.indexOf('cgroup"'));
+  assert.strictEqual(solo.split('class="card').length - 1, 1, solo);
+  assert.match(solo, /data-filter="all"/, solo);
+});
+
+test('стороны перехода и вспомогательные карточки — разные блоки',
+  function () {
+    var out = cards.pairCards(pair(), side('os-9.1', '', 1),
+                              side('os-9.2', '', 2));
+    assert.match(out, /<div class="cgroup major">/, out);
+    assert.match(out, /<div class="cgroup apart">/, out);
+    assert.strictEqual(out.split('class="cgroup').length - 1, 2, out);
+  });
+
+test('разрезы идут двумя полосами, состав и порядок прежние', function () {
+  var out = cards.diffCards(pair());
+  assert.strictEqual(out.split('class="cgroup full"').length - 1, 2, out);
+  var keys = (out.match(/data-filter="([^"]+)"/g) || [])
+    .map(function (m) { return m.slice(13, -1); });
+  assert.deepStrictEqual(keys, ['changed', 'added', 'removed', 'upgraded',
+                                'downgraded', 'unchanged', 'patches+',
+                                'patches-', 'patches~', 'repackaged',
+                                'branch-changed', 'tag-changed']);
 });
