@@ -82,7 +82,10 @@
     const level = item.level || 'error';
     const p = labels.problem(item.text);
     const title = p.known ? esc(p.title) : hl(p.title, q);
-    return `<div class="prob ${esc(level)}">`
+    /* Приставка lvl- у класса уровня не украшение: голым словом note уже
+       помечена приписка к значению, и заметка под тем же именем забирала
+       бы себе её отступ слева. */
+    return `<div class="prob lvl-${esc(level)}">`
       + (p.title ? `<div class="pkind">${title}</div>` : '')
       + (p.text ? `<div class="ptext">${hl(p.text, q)}</div>` : '')
       + '</div>';

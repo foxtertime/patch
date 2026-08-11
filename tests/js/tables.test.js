@@ -456,7 +456,7 @@ test('блок проблем появляется только когда он�
   assert.doesNotMatch(tables.stateDetail(stateRow(), q()), /проблемы/);
   var out = tables.stateDetail(
     stateRow({ problems: ['gitlab: нет ветки'] }), q());
-  assert.match(out, /class="prob error"/, out);
+  assert.match(out, /class="prob lvl-error"/, out);
   assert.match(out, /class="pkind">GitLab</, out);
   assert.match(out, /class="ptext">нет ветки</, out);
 });
