@@ -1,11 +1,12 @@
 import unittest
 
 from dashboard.classify import Classifier
-from dashboard.collect import _completed, collect_tag, problem_summary
+from dashboard.collect import (_completed, collect_tag, error_builds,
+                               problem_summary)
 from dashboard.config import Config, GitlabHost
 from dashboard.gitlabclient import GitlabClient
 from dashboard.kojiclient import KojiClient
-from dashboard.model import Build, Snapshot
+from dashboard.model import Build, Problem, Snapshot
 from tests.fakes import FakeKojiSession, FakeTransport, Response
 
 HOST = "gitlab.example.com"
@@ -42,6 +43,12 @@ RPMS = {1: [{"name": "nginx", "version": "1.24.0", "release": "3.el9",
         2: [], 3: []}
 # listTags: все теги билда, а не только тот, через который он попал в выборку
 TAGS = {1: ["os-9.2", "os-9.2-candidate"], 2: ["os-9-base", "os-9.2"], 3: []}
+
+
+def texts(build):
+    """Тексты проблем билда: уровень проверяют отдельно и там, где он предмет
+    теста, а «что записано» читается короче без него."""
+    return [p.text for p in build.problems]
 
 
 def make_clients(routes):
@@ -102,7 +109,7 @@ class CommitFromKojiSourceTest(unittest.TestCase):
         build = self._nginx("git+ssh://git@internal.example.com/g/nginx#" + SHA)
         self.assertEqual(build.source.host, "gitlab.example.com")
         self.assertEqual(build.source.commit, SHA)
-        self.assertNotIn("host", " ".join(build.problems))
+        self.assertNotIn("host", " ".join(p.text for p in build.problems))
 
     def test_other_project_is_not_trusted(self):
         build = self._nginx("git+ssh://git@gitlab.example.com/g/other#" + SHA)
@@ -123,7 +130,7 @@ class CommitFromKojiSourceTest(unittest.TestCase):
         # в порядке, у него просто не добылся хеш
         build = self._nginx("cli-build/17/nginx.src.rpm")
         self.assertIsNone(build.source.commit)
-        self.assertFalse([p for p in build.problems if "source" in p])
+        self.assertFalse([p for p in build.problems if "source" in p.text])
 
 
 class CommitFromOriginalUrlTest(unittest.TestCase):
@@ -243,7 +250,7 @@ class CollectTagTest(unittest.TestCase):
         build = snap.by_name()["curl"]
         self.assertIsNone(build.source)
         self.assertIsNone(build.patch_dir_present)
-        self.assertEqual(build.problems, ["no source url"])
+        self.assertEqual(texts(build), ["no source url"])
 
     def test_missing_patch_dir_is_not_a_problem(self):
         snap, _ = self.collect()
@@ -259,7 +266,7 @@ class CollectTagTest(unittest.TestCase):
         build = snap.by_name()["vim"]
         self.assertIsNone(build.patch_dir_present)
         self.assertEqual(len(build.problems), 1)
-        self.assertIn("Project Not Found", build.problems[0])
+        self.assertIn("Project Not Found", build.problems[0].text)
 
     def test_epoch_is_preserved(self):
         snap, _ = self.collect()
@@ -306,7 +313,7 @@ class CollectTagTest(unittest.TestCase):
         self.assertIsNotNone(build.source)
         self.assertEqual(build.source.raw, "not a url")
         self.assertTrue(build.problems)
-        self.assertTrue(build.problems[0].startswith("bad source url"))
+        self.assertTrue(build.problems[0].text.startswith("bad source url"))
         self.assertIsNone(build.patch_dir_present)
 
     def test_build_from_srpm_is_not_a_broken_url(self):
@@ -347,14 +354,14 @@ class CollectTagTest(unittest.TestCase):
         nginx = snap.by_name()["nginx"]
         self.assertIsNone(nginx.patch_dir_present)
         self.assertEqual(len(nginx.problems), 1)
-        self.assertIn("internal error", nginx.problems[0])
-        self.assertIn("boom", nginx.problems[0])
+        self.assertIn("internal error", nginx.problems[0].text)
+        self.assertIn("boom", nginx.problems[0].text)
         vim = snap.by_name()["vim"]
-        self.assertIn("internal error", vim.problems[0])
+        self.assertIn("internal error", vim.problems[0].text)
         # у curl нет source url, до вызова gitlab дело не доходит — билд
         # получает свою обычную проблему, а не "internal error".
         curl = snap.by_name()["curl"]
-        self.assertEqual(curl.problems, ["no source url"])
+        self.assertEqual(texts(curl), ["no source url"])
 
     def test_build_without_details_survives_as_a_placeholder(self):
         # listTagged перечислил билд, а getBuild по нему ничего не вернул:
@@ -387,7 +394,7 @@ class CollectTagTest(unittest.TestCase):
         self.assertIsNone(ghost.patch_dir_present)
         # тег известен и здесь: он пришёл из того же listTagged
         self.assertEqual(ghost.tag_name, "os-9-base")
-        self.assertEqual(ghost.problems, ["koji: нет деталей билда"])
+        self.assertEqual(texts(ghost), ["koji: нет деталей билда"])
         self.assertEqual(problem_summary(snap)["koji: нет деталей билда"], 1)
 
     def test_substituted_host_gives_both_patches_and_a_problem(self):
@@ -407,9 +414,12 @@ class CollectTagTest(unittest.TestCase):
         self.assertIs(build.patch_dir_present, True)
         self.assertEqual([p.name for p in build.patches],
                          ["CVE-2024-7347.patch", "sast-x.patch"])
-        self.assertEqual(len(build.problems), 1)
-        self.assertIn("old.example.com", build.problems[0])
-        self.assertIn(HOST, build.problems[0])
+        # автогена в этом дереве нет, и патчи дают свои предупреждения;
+        # предмет теста — запись о подменённом хосте, её и ищем
+        host_problems = [p for p in build.problems
+                         if "old.example.com" in p.text]
+        self.assertEqual(len(host_problems), 1)
+        self.assertIn(HOST, host_problems[0].text)
 
 class CompletedTimeTest(unittest.TestCase):
     """Время сборки билда. koji отдаёт его в нескольких видах, наружу нужен один."""
@@ -443,7 +453,12 @@ class CompletedTimeTest(unittest.TestCase):
 class LoggingTest(unittest.TestCase):
     def setUp(self):
         self.routes = {
+            # автоген рядом с патчем нарочно: без него билд получил бы
+            # предупреждение «патчи есть, а сводного списка нет», и «чистый
+            # билд» перестал бы быть чистым
             TREE % "g%2Fnginx": Response(200, [
+                {"name": "autogen-cve-patches.inc", "type": "blob",
+                 "path": "PATCH/autogen-cve-patches.inc"},
                 {"name": "CVE-2024-7347.patch", "type": "blob",
                  "path": "PATCH/CVE-2024-7347.patch"}], {}),
             TREE % "g%2Fvim": Response(404, {"message": "404 Tree Not Found"}, {}),
@@ -535,9 +550,41 @@ class LoggingTest(unittest.TestCase):
         self.assertEqual(len(progress_lines), 20, caught.output)
 
 
+class ErrorBuildsTest(unittest.TestCase):
+    """Что считать проблемным билдом — теперь вопрос уровня, а не наличия.
+
+    По этому счёту `--max-problems` роняет прогон, поэтому предупреждение
+    сюда попасть не должно: сбор состоялся, просто с оговоркой.
+    """
+
+    def snapshot(self, *builds):
+        return Snapshot(tag="os-9.2", generated="g", koji_hub="h",
+                        builds=list(builds))
+
+    def test_only_errors_are_counted(self):
+        snap = self.snapshot(
+            _build_with([Problem("gitlab: 500 oops")]),
+            _build_with([Problem("gitlab: сняты с ветки", "warning")]),
+            _build_with([Problem("gitlab: нечего сравнивать", "note")]),
+            _build_with([]))
+        self.assertEqual(error_builds([snap]), 1)
+
+    def test_a_build_with_both_counts_once(self):
+        snap = self.snapshot(
+            _build_with([Problem("gitlab: сняты с ветки", "warning"),
+                         Problem("internal error: боль")]))
+        self.assertEqual(error_builds([snap]), 1)
+
+    def test_builds_are_counted_across_all_snapshots(self):
+        self.assertEqual(
+            error_builds([self.snapshot(_build_with(["gitlab: 500"])),
+                          self.snapshot(_build_with(["gitlab: 500"]))]), 2)
+
+
 def _build_with(problems):
     return Build(nvr="p-1-1", name="p", version="1", release="1",
-                 problems=list(problems))
+                 problems=[Problem(p) if isinstance(p, str) else p
+                           for p in problems])
 
 
 class _ExplodingGitlab:
@@ -607,7 +654,25 @@ class PatchesComeFromCommitTest(unittest.TestCase):
         })
         self.assertEqual(build.patches_ref, "br")
         self.assertEqual(len(build.patches), 1)
-        self.assertTrue(any("недоступен" in p for p in build.problems))
+        self.assertTrue(any("недоступен" in p.text for p in build.problems))
+
+    def test_patches_taken_from_the_branch_are_a_warning(self):
+        """Патчи прочитаны, просто не из того коммита, из которого билд собран.
+
+        Сбор состоялся, и красить такую строку как отказ значило бы ровнять
+        её с билдом, о котором мы не знаем ничего.
+        """
+        build, _ = self._nginx({
+            (NGINX_TREE, (("path", "PATCH"), ("per_page", "100"),
+                          ("recursive", "true"), ("ref", SHA))):
+                Response(404, {"message": "404 Tree Not Found"}, {}),
+            COMMITS % ("g%2Fnginx", SHA): Response(404, {"message": "404"}, {}),
+            (NGINX_TREE, (("path", "PATCH"), ("per_page", "100"),
+                          ("recursive", "true"), ("ref", "br"))):
+                tree(["PATCH/CVE-2026-1.patch"]),
+        })
+        gone = [p for p in build.problems if "сняты с ветки" in p.text]
+        self.assertEqual([p.level for p in gone], ["warning"])
 
     def test_vanished_commit_of_a_from_commit_build_says_no_branch(self):
         # ref_kind == "commit": билд собран прямо с коммита, original_url
@@ -634,9 +699,9 @@ class PatchesComeFromCommitTest(unittest.TestCase):
         self.assertEqual(build.source.ref_kind, "commit")
         self.assertEqual(build.patches_ref, SHA)
         self.assertEqual(build.patches, [])
-        self.assertTrue(any("недоступен" in p for p in build.problems),
+        self.assertTrue(any("недоступен" in p.text for p in build.problems),
                         build.problems)
-        self.assertFalse(any("сняты с ветки" in p for p in build.problems),
+        self.assertFalse(any("сняты с ветки" in p.text for p in build.problems),
                          build.problems)
         refs = [params.get("ref") for url, params, _ in transport.requests
                 if url == NGINX_TREE]
@@ -670,9 +735,9 @@ class PatchesComeFromCommitTest(unittest.TestCase):
         self.assertEqual(build.patches_ref, "br")
         self.assertEqual([p.name for p in build.patches],
                          ["CVE-2026-1.patch"])
-        self.assertTrue(any("недоступен" in p for p in build.problems),
+        self.assertTrue(any("недоступен" in p.text for p in build.problems),
                         build.problems)
-        self.assertTrue(any("old.example.com" in p for p in build.problems),
+        self.assertTrue(any("old.example.com" in p.text for p in build.problems),
                         build.problems)
 
     def test_network_failure_does_not_silently_read_the_branch(self):
@@ -762,7 +827,123 @@ class BranchAheadTest(unittest.TestCase):
             NGINX_COMPARE: Response(500, {"message": "boom"}, {}),
         })
         self.assertIsNone(build.source.commits_ahead)
-        self.assertTrue(any("gitlab:" in p for p in build.problems))
+        self.assertTrue(any("gitlab:" in p.text for p in build.problems))
+
+
+class AutogenGapTest(unittest.TestCase):
+    """Автоген обещает патчи класса, которых в билде нет.
+
+    Сводный список заводят там, где патчи этого класса собирают; лежит он в
+    каталоге, а ни одного такого патча рядом нет. Сбор при этом состоялся
+    полностью — отсюда предупреждение, а не ошибка.
+    """
+
+    def _nginx(self, paths, classes=None):
+        cfg = config()
+        if classes is not None:
+            cfg = Config(koji_hub=cfg.koji_hub, koji_web=cfg.koji_web,
+                         gitlab_hosts=HOSTS, patch_classes=classes)
+        koji, gitlab, _ = clients_with_source(
+            {NGINX_TREE: tree(paths)},
+            "git+ssh://git@gitlab.example.com/g/nginx?#origin/br")
+        snapshot = collect_tag("os-9.2", cfg, koji, gitlab, jobs=1)
+        return snapshot.by_name()["nginx"]
+
+    def gaps(self, build):
+        return [p for p in build.problems if p.text.startswith("autogen:")]
+
+    def test_autogen_without_its_patches_is_a_warning(self):
+        build = self._nginx(["PATCH/autogen-cve-patches.inc.new"])
+        gaps = self.gaps(build)
+        self.assertEqual([p.level for p in gaps], ["warning"])
+        self.assertIn("autogen-cve-patches.inc.new", gaps[0].text)
+        self.assertIn("CVE", gaps[0].text)
+
+    def test_patch_of_that_class_removes_the_warning(self):
+        build = self._nginx(["PATCH/autogen-cve-patches.inc.new",
+                             "PATCH/CVE-2026-3011.patch"])
+        self.assertEqual(self.gaps(build), [])
+
+    def test_every_class_is_answered_for_separately(self):
+        # SAST-патч есть, CVE-патча нет: предупреждение ровно одно
+        build = self._nginx(["PATCH/autogen-cve-patches.inc",
+                             "PATCH/autogen-sast-patches.inc",
+                             "PATCH/sast-src.core.patch"])
+        self.assertEqual([p.text for p in self.gaps(build)],
+                         ["autogen: есть autogen-cve-patches.inc, но ни "
+                          "одного патча класса CVE"])
+
+    def test_autogen_without_a_marker_says_nothing(self):
+        """Имя ни о каком классе не заявляет — и молчать не о чем."""
+        self.assertEqual(self.gaps(self._nginx(["PATCH/autogen-patches.inc"])),
+                         [])
+
+    def test_marker_is_read_by_the_rules_of_the_config(self):
+        """Маркер класса не обязан совпадать с его именем.
+
+        В конфиге по умолчанию fuzz — это DAST, и автоген с fuzz в имени
+        обещает патчи именно DAST. Правила AUTOGEN здесь нарочно нет: сводный
+        список не считается патчем своего класса при любом порядке правил.
+        """
+        build = self._nginx(["PATCH/autogen-fuzz-patches.inc"],
+                            classes=[("DAST", r"(?i)(?:dast|fuzz)"),
+                                     ("other", ".*")])
+        self.assertEqual([p.text for p in self.gaps(build)],
+                         ["autogen: есть autogen-fuzz-patches.inc, но ни "
+                          "одного патча класса DAST"])
+
+    def test_unread_directory_says_nothing(self):
+        """Каталог не прочитался: пустой список патчей — про наше незнание.
+
+        Сказать по нему «автоген есть, а патчей нет» было бы выдумкой: мы не
+        знаем даже, есть ли там автоген.
+        """
+        koji, gitlab, _ = clients_with_source(
+            {NGINX_TREE: Response(500, {"message": "boom"}, {})},
+            "git+ssh://git@gitlab.example.com/g/nginx?#origin/br")
+        build = collect_tag("os-9.2", config(), koji, gitlab,
+                            jobs=1).by_name()["nginx"]
+        self.assertEqual(self.gaps(build), [])
+
+    def test_two_autogen_files_of_one_class_warn_once(self):
+        build = self._nginx(["PATCH/autogen-cve-patches.inc",
+                             "PATCH/autogen-cve-patches.inc.new"])
+        self.assertEqual(len(self.gaps(build)), 1)
+
+    def test_patches_without_their_autogen_are_a_warning(self):
+        """Обратная сторона той же сверки: патчи применяют по-старому.
+
+        Сводный список для класса заводят там, где перешли на автоген; патчи
+        этого класса без него значат, что их применяют вручную.
+        """
+        build = self._nginx(["PATCH/CVE-2026-3011.patch"])
+        gaps = self.gaps(build)
+        self.assertEqual([p.level for p in gaps], ["warning"])
+        self.assertIn("CVE", gaps[0].text)
+        self.assertIn("старый способ", gaps[0].text)
+
+    def test_its_own_autogen_answers_for_the_class(self):
+        build = self._nginx(["PATCH/autogen-cve-patches.inc",
+                             "PATCH/CVE-2026-3011.patch"])
+        self.assertEqual(self.gaps(build), [])
+
+    def test_a_class_nobody_expects_autogen_for_says_nothing(self):
+        """Автоген заводят не для всякого класса.
+
+        SPEC и CHANGELOG сводного списка не имеют, и требовать его от них
+        значило бы предупреждать о том, чего никто не обещал. Кому автоген
+        положен, говорит autogen_classes конфига.
+        """
+        build = self._nginx(["PATCH/nginx.spec.patch"],
+                            classes=[("SPEC", r"(?i)\.spec\."),
+                                     ("other", ".*")])
+        self.assertEqual(self.gaps(build), [])
+
+    def test_each_class_is_warned_about_separately(self):
+        build = self._nginx(["PATCH/CVE-2026-3011.patch",
+                             "PATCH/sast-src.core.patch"])
+        self.assertEqual(len(self.gaps(build)), 2)
+        self.assertTrue(all("старый способ" in p.text for p in self.gaps(build)))
 
 
 class GhostPatchesTest(unittest.TestCase):
@@ -835,7 +1016,7 @@ class GhostPatchesTest(unittest.TestCase):
         build, _ = self._nginx(built, Response(500, {"message": "boom"}, {}))
         self.assertEqual(build.source.commits_ahead, 2)
         self.assertEqual(build.ghost_patches, [])
-        self.assertTrue(any("gitlab:" in p for p in build.problems))
+        self.assertTrue(any("gitlab:" in p.text for p in build.problems))
 
     def test_failed_first_read_does_not_fabricate_branch_ghosts(self):
         # Дерево коммита не прочиталось вовсе (500) — result.present is
@@ -851,7 +1032,7 @@ class GhostPatchesTest(unittest.TestCase):
         self.assertIsNone(build.patch_dir_present)
         self.assertEqual(build.ghost_patches, [])
         self.assertEqual(build.source.commits_ahead, 2)
-        self.assertTrue(any("gitlab:" in p for p in build.problems))
+        self.assertTrue(any("gitlab:" in p.text for p in build.problems))
 
 
 class PatchShaTest(unittest.TestCase):

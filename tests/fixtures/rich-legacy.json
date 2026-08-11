@@ -267,7 +267,7 @@
     "version": "2.34"
    }
   ],
-  "dashboard": "2.2.0",
+  "dashboard": "2.6.3",
   "generated": "2026-06-01T00:00:00+03:00",
   "koji_hub": "https://hub/kojihub",
   "koji_web": "https://hub/koji",
@@ -284,7 +284,7 @@
    "FILES",
    "other"
   ],
-  "schema": 1,
+  "schema": 2,
   "tag": "os-9.8"
  }
 ]

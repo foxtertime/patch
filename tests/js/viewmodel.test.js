@@ -671,3 +671,112 @@ test('эталон паритета содержит интересные слу
   assert.ok(rows.some(function (r) { return r.tagged_in === null; }));
   assert.ok(rows.some(function (r) { return r.inherited === true; }));
 });
+
+/* Уровень проблемы пишет сбор, а страница по нему красит. Разбор живёт
+   здесь: строка из снапшота прежней схемы, объект из нынешней и уровень,
+   которого страница не знает, — три случая одного правила. */
+test('проблема строкой читается как ошибка', function () {
+  var row = data([snap('os-9.2', [
+    build('nginx', { problems: ['gitlab: ref not found'] })])])
+    .snapshots[0].builds[0];
+  assert.deepStrictEqual(row.problems,
+                         [{ level: 'error', text: 'gitlab: ref not found' }]);
+  assert.strictEqual(row.level, 'error');
+});
+
+test('уровень из снапшота доезжает до строки', function () {
+  var row = data([snap('os-9.2', [
+    build('nginx', { problems: [{ level: 'warning', text: 'с ветки' }] })])])
+    .snapshots[0].builds[0];
+  assert.strictEqual(row.level, 'warning');
+});
+
+test('незнакомый уровень читается как ошибка', function () {
+  /* Снапшот собран версией новее страницы. Занизить чужую проблему хуже,
+     чем завысить: заниженная не покрасит строку и потеряется. */
+  var row = data([snap('os-9.2', [
+    build('nginx', { problems: [{ level: 'critical', text: 'бум' }] })])])
+    .snapshots[0].builds[0];
+  assert.strictEqual(row.level, 'error');
+});
+
+test('уровень строки — самый критичный из её проблем', function () {
+  var row = data([snap('os-9.2', [
+    build('nginx', { problems: [{ level: 'note', text: 'нечего сравнивать' },
+                                { level: 'warning', text: 'с ветки' },
+                                { level: 'error', text: 'нет ветки' }] })])])
+    .snapshots[0].builds[0];
+  assert.strictEqual(row.level, 'error');
+});
+
+test('без проблем у строки нет и уровня', function () {
+  var row = data([snap('os-9.2', [build('nginx')])]).snapshots[0].builds[0];
+  assert.strictEqual(row.level, null);
+});
+
+/* Счётчики карточек: каждый считает билды, у которых есть запись его
+   уровня. Билд с ошибкой и предупреждением попадает в оба, и сумма
+   карточек бывает больше числа билдов — карточка отвечает на вопрос
+   «сколько билдов с такой записью», а не «сколько билдов такого сорта». */
+test('билд с ошибкой и предупреждением считается в обеих карточках',
+  function () {
+    var counts = data([snap('os-9.2', [
+      build('nginx', { problems: [{ level: 'error', text: 'нет ветки' },
+                                  { level: 'warning', text: 'с ветки' }] }),
+      build('curl', { problems: [{ level: 'warning', text: 'с ветки' }] }),
+      build('vim', { problems: [{ level: 'note', text: 'нечего сравнивать' }] }),
+      build('zlib')])]).snapshots[0].counts;
+    assert.strictEqual(counts.problems, 1);
+    assert.strictEqual(counts.warnings, 2);
+    assert.strictEqual(counts.notes, 1);
+  });
+
+/* Метка говорит, откуда проблема, а уровень — насколько она плоха. Метку
+   ставит текст: gitlab-error у предупреждения от gitlab остаётся. */
+test('метка источника не зависит от уровня', function () {
+  var row = data([snap('os-9.2', [
+    build('nginx', { problems: [{ level: 'warning',
+                                  text: 'gitlab: патчи сняты с ветки' }] })])])
+    .snapshots[0].builds[0];
+  assert.ok(row.marks.indexOf('gitlab-error') !== -1, row.marks.join());
+});
+
+/* Считаются билды, а не записи: две заметки у одного билда — это один
+   билд с заметками, иначе карточка «сколько билдов» мерила бы длину
+   списков. */
+test('две записи одного уровня считаются одним билдом', function () {
+  var counts = data([snap('os-9.2', [
+    build('nginx', { problems: [{ level: 'error', text: 'нет ветки' }] }),
+    build('curl', { problems: [{ level: 'warning', text: 'с ветки' }] }),
+    build('vim', { problems: [{ level: 'note', text: 'нечего сравнивать' },
+                              { level: 'note', text: 'и ещё раз нечего' }] }),
+    build('zlib')])]).snapshots[0].counts;
+  assert.strictEqual(counts.problems, 1);
+  assert.strictEqual(counts.warnings, 1);
+  assert.strictEqual(counts.notes, 1);
+});
+
+test('заметка при ошибке идёт и в счёт заметок', function () {
+  var counts = data([snap('os-9.2', [
+    build('nginx', { problems: [{ level: 'note', text: 'нечего сравнивать' },
+                                { level: 'error', text: 'нет ветки' }] })])])
+    .snapshots[0].counts;
+  assert.strictEqual(counts.problems, 1);
+  assert.strictEqual(counts.notes, 1);
+});
+
+/* Уровни строки — список того, что в ней есть, и он же признак под
+   фильтр; уровень строки остался один и красит только полосу. */
+test('уровни строки перечислены от строгого к спокойному', function () {
+  var row = data([snap('os-9.2', [
+    build('nginx', { problems: [{ level: 'note', text: 'нечего сравнивать' },
+                                { level: 'error', text: 'нет ветки' }] })])])
+    .snapshots[0].builds[0];
+  assert.deepStrictEqual(row.levels, ['error', 'note']);
+  assert.strictEqual(row.level, 'error');
+});
+
+test('без проблем список уровней пуст', function () {
+  var row = data([snap('os-9.2', [build('nginx')])]).snapshots[0].builds[0];
+  assert.deepStrictEqual(row.levels, []);
+});

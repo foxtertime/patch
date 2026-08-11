@@ -174,7 +174,12 @@
      }
     ],
     "patches_ref": null,
-    "problems": [],
+    "problems": [
+     {
+      "level": "note",
+      "text": "gitlab: нечего сравнивать"
+     }
+    ],
     "release": "1.el9",
     "rpms": [
      "vim-9.0-1.el9.x86_64"
@@ -281,7 +286,10 @@
     ],
     "patches_ref": null,
     "problems": [
-     "internal error: koji не ответил за 60 с"
+     {
+      "level": "error",
+      "text": "internal error: koji не ответил за 60 с"
+     }
     ],
     "release": "620.el9",
     "rpms": [
@@ -534,8 +542,22 @@
     ],
     "patches_ref": null,
     "problems": [
-     "gitlab: 403 на каталоге PATCH",
-     "internal error: не разобрать changelog.yaml"
+     {
+      "level": "error",
+      "text": "gitlab: 403 на каталоге PATCH"
+     },
+     {
+      "level": "error",
+      "text": "internal error: не разобрать changelog.yaml"
+     },
+     {
+      "level": "warning",
+      "text": "gitlab: host mirror.example.com не описан в конфиге, запрошен gitlab.example.com"
+     },
+     {
+      "level": "note",
+      "text": "gitlab: нечего сравнивать"
+     }
     ],
     "release": "1.el9",
     "rpms": [
@@ -580,9 +602,75 @@
     ],
     "task_id": 260,
     "version": "131.0.6778.204"
+   },
+   {
+    "build_id": 161,
+    "completed": "2026-10-28 11:20:00",
+    "epoch": null,
+    "ghost_patches": [],
+    "name": "libxml2",
+    "nvr": "libxml2-2.12.5-2.el9",
+    "owner": "core",
+    "patch_dir_present": true,
+    "patches": [
+     {
+      "class": "AUTOGEN",
+      "cves": [],
+      "ghost": null,
+      "name": "autogen-cve-patches.inc",
+      "path": "PATCH/autogen-cve-patches.inc",
+      "sha": null,
+      "web_url": "https://gl/blob/PATCH/autogen-cve-patches.inc"
+     },
+     {
+      "class": "SAST",
+      "cves": [],
+      "ghost": null,
+      "name": "sast-libxml2-parser.patch",
+      "path": "PATCH/sast-libxml2-parser.patch",
+      "sha": null,
+      "web_url": "https://gl/blob/PATCH/sast-libxml2-parser.patch"
+     }
+    ],
+    "patches_ref": null,
+    "problems": [
+     {
+      "level": "warning",
+      "text": "autogen: есть autogen-cve-patches.inc, но ни одного патча класса CVE"
+     },
+     {
+      "level": "warning",
+      "text": "autogen: патчи класса SAST есть, а сводного списка нет — старый способ применения, стоит перейти на автоген"
+     }
+    ],
+    "release": "2.el9",
+    "rpms": [
+     "libxml2-2.12.5-2.el9.x86_64",
+     "libxml2-devel-2.12.5-2.el9.x86_64",
+     "libxml2-2.12.5-2.el9.src"
+    ],
+    "source": {
+     "branch_head": null,
+     "commit": null,
+     "commit_source": null,
+     "commit_url": null,
+     "commits_ahead": null,
+     "host": "gl",
+     "project": "core/libxml2",
+     "raw": "git+https://gl/core/libxml2?#os-9.6",
+     "ref": "os-9.6",
+     "ref_kind": "branch",
+     "web_url": "https://gl/core/libxml2/-/tree/os-9.6"
+    },
+    "tag_name": "os-9.6",
+    "tags": [
+     "os-9.6"
+    ],
+    "task_id": 261,
+    "version": "2.12.5"
    }
   ],
-  "dashboard": "2.2.0",
+  "dashboard": "3.2.2",
   "generated": "2026-11-01T00:00:00+03:00",
   "koji_hub": "https://hub/kojihub",
   "koji_web": "https://hub/koji",
@@ -599,7 +687,7 @@
    "FILES",
    "other"
   ],
-  "schema": 1,
+  "schema": 2,
   "tag": "os-9.6"
  }
 ]

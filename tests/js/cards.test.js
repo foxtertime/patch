@@ -12,7 +12,8 @@ function snapshot(over) {
            builds: over.builds || [{ rpms: ['a.x86_64', 'b.x86_64'] }],
            counts: Object.assign({
              builds: 1, with_patches: 1, patch_files: 3, inherited: 0,
-             direct: 1, problems: 0, without_patches: 0,
+             direct: 1, problems: 0, warnings: 0, notes: 0,
+             without_patches: 0,
              by_class: { CVE: { builds: 1, files: 3 } }
            }, over.counts || {}) };
 }
@@ -89,34 +90,6 @@ test('карточка диффа подписана «из скольких»',
   assert.match(cards.diffCards(pair()), /<span class="unit">из 2<\/span>/);
 });
 
-/* Раскладка карточек по строкам: числа здесь — произвольные аргументы
-   функции, а не число карточек на какой-то конкретной вкладке. Одиннадцать
-   при десяти влезающих дают вторую строку из одной штуки и пустоту за ней;
-   считалка делит их на строки поровну. Ширину меряет тот, у кого есть
-   раскладка, — здесь её задаёт тест. */
-test('карточки делятся на строки поровну', function () {
-  // у функции: влезает десять, аргумент одиннадцать — две строки по шесть и пять
-  assert.strictEqual(cards.columnsFor(11, 1360, 122, 10), 6);
-  // у функции: влезает десять, аргумент десять — одна строка
-  assert.strictEqual(cards.columnsFor(10, 1360, 122, 10), 10);
-  // у функции: влезает четыре, аргумент одиннадцать — три строки по четыре
-  assert.strictEqual(cards.columnsFor(11, 550, 122, 10), 4);
-});
-
-test('карточек меньше, чем влезает в строку — строка одна', function () {
-  assert.strictEqual(cards.columnsFor(3, 1360, 122, 10), 3);
-  assert.strictEqual(cards.columnsFor(1, 1360, 122, 10), 1);
-});
-
-/* Узкое окно: даже одна карточка в строку — это строка, а не деление на
-   ноль. */
-test('в узком окне остаётся один столбец', function () {
-  assert.strictEqual(cards.columnsFor(11, 100, 122, 10), 1);
-});
-
-test('без карточек столбцов нет', function () {
-  assert.strictEqual(cards.columnsFor(0, 1360, 122, 10), 0);
-});
 
 /* Итоги перехода: стороны, разница и срок. Числа сторон берём у снапшотов,
    а не по строкам таблицы: строка — это компонент перехода, и компонент,
@@ -194,4 +167,69 @@ test('срок между сборами считается как на рель
 test('нечитаемое время сбора не роняет срок', function () {
   var out = cards.pairCards(pair(), side('a', '', 1), side('b', 'никогда', 1));
   assert.match(out, /class="n">—<\/div>/, out);
+});
+
+/* Билды с оговоркой ищут ровно так же, как проблемные, — кликом по
+   карточке. Своя карточка, а не строка в чужой подсказке: смешанные, они
+   потерялись бы и те, и другие. */
+test('у предупреждений своя карточка со своим фильтром', function () {
+  var out = cards.stateCards(snapshot({ counts: { problems: 2, warnings: 5 } })).big;
+  assert.match(out, /data-filter="warning"/, out);
+  assert.match(out, /с предупреждениями/, out);
+  assert.match(out, /data-filter="problem"/, out);
+});
+
+/* Раскладку держит css, и держится она на именах блоков: ряд итогов — три
+   тематических блока, разрезы — две полосы. Числа и состав карточек при
+   этом прежние, поэтому проверяем именно обёртки. */
+test('ряд итогов разложен по трём плоскостям', function () {
+  var out = cards.stateCards(snapshot()).big;
+  assert.match(out, /<div class="cgroup lead">/, out);
+  assert.strictEqual(out.split('class="cgroup').length - 1, 3, out);
+});
+
+/* Наследование — про состав тега, а не про содержимое билдов: стоять оно
+   должно рядом с числом тега, а не с патчами. */
+test('число тега и наследование — одна группа, патчи отдельно', function () {
+  var out = cards.stateCards(snapshot()).big;
+  var lead = out.slice(out.indexOf('cgroup lead'), out.indexOf('cgroup one'));
+  assert.match(lead, /data-filter="all"/, lead);
+  assert.match(lead, /data-filter="inherited"/, lead);
+  assert.strictEqual(lead.split('class="card').length - 1, 2, lead);
+  var one = out.slice(out.indexOf('cgroup one'), out.indexOf('cgroup health'));
+  assert.match(one, /data-filter="has-patch"/, one);
+  assert.strictEqual(one.split('class="card').length - 1, 1, one);
+});
+
+/* Уровня записей сбора три, и карточек столько же: каждая считает билды,
+   у которых есть запись её уровня, а билд с записями двух уровней стоит в
+   обеих. */
+test('у каждого уровня записей своя карточка', function () {
+  var out = cards.stateCards(snapshot({ counts: { problems: 2, warnings: 1,
+                                                  notes: 3 } })).big;
+  var health = out.slice(out.indexOf('cgroup health'));
+  assert.match(health, /data-filter="problem"/, health);
+  assert.match(health, /data-filter="warning"/, health);
+  assert.match(health, /data-filter="note"/, health);
+  assert.match(health, /с заметками/, health);
+  assert.strictEqual(health.split('class="card').length - 1, 3, health);
+});
+
+test('стороны перехода и вспомогательные числа — разные группы',
+  function () {
+    var out = cards.pairCards(pair(), side('os-9.1', '', 1),
+                              side('os-9.2', '', 2));
+    assert.match(out, /<div class="cgroup major">/, out);
+    assert.strictEqual(out.split('class="cgroup').length - 1, 2, out);
+  });
+
+test('разрезы идут двумя полосами, состав и порядок прежние', function () {
+  var out = cards.diffCards(pair());
+  assert.strictEqual(out.split('class="cgroup full"').length - 1, 2, out);
+  var keys = (out.match(/data-filter="([^"]+)"/g) || [])
+    .map(function (m) { return m.slice(13, -1); });
+  assert.deepStrictEqual(keys, ['changed', 'added', 'removed', 'upgraded',
+                                'downgraded', 'unchanged', 'patches+',
+                                'patches-', 'patches~', 'repackaged',
+                                'branch-changed', 'tag-changed']);
 });

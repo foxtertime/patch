@@ -62,9 +62,10 @@ def marks_of(build, tag):
     if build.source is not None and build.source.commits_ahead:
         marks.add("branch-ahead")
     for problem in build.problems:
-        if problem.startswith("gitlab:") or problem.startswith("bad source"):
+        text = problem.text
+        if text.startswith("gitlab:") or text.startswith("bad source"):
             marks.add("gitlab-error")
-        if problem.startswith("internal error"):
+        if text.startswith("internal error"):
             marks.add("internal-error")
     return marks
 
@@ -160,6 +161,24 @@ class InterestingCasesTest(unittest.TestCase):
         self.assertGreater(len(build.source.project), 30)
         self.assertGreater(len(build.rpms), 15)
 
+    def test_the_wide_snapshot_carries_a_warning_without_an_error(self):
+        """Билд, у которого есть предупреждение и нет ни одной ошибки.
+
+        Без него ни один снапшот не показывал бы янтарную полосу отдельно от
+        красной, а правило «строка красится по самой критичной» проверялось
+        бы только тестами.
+        """
+        build = snapshot("rich-wide.json").by_name()["libxml2"]
+        self.assertEqual([p.level for p in build.problems],
+                         ["warning", "warning"])
+        texts = [p.text for p in build.problems]
+        # автоген обещает CVE, а патча этого класса в билде нет
+        self.assertIn("CVE", texts[0])
+        self.assertNotIn("CVE", [p.cls for p in build.patches])
+        # и наоборот: SAST-патч есть, а сводного списка для него нет
+        self.assertIn("SAST", texts[1])
+        self.assertIn("старый способ", texts[1])
+
     def test_the_big_snapshot_is_the_size_of_a_real_tag(self):
         many = snapshot("rich-many.json")
         self.assertGreater(len(many.builds), 100)
@@ -254,7 +273,7 @@ class DriftChainTest(unittest.TestCase):
         glibc = drift.by_name()["glibc"]
         self.assertEqual(glibc.patches_ref, glibc.source.ref)
         self.assertIsNotNone(glibc.source.commit)
-        self.assertTrue(any("недоступен" in p for p in glibc.problems))
+        self.assertTrue(any("недоступен" in p.text for p in glibc.problems))
 
     def test_catching_up_turns_a_ghost_into_a_patch(self):
         before = snapshot("rich-drift.json").by_name()

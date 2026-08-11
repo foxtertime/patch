@@ -82,7 +82,10 @@
     "patches": [],
     "patches_ref": null,
     "problems": [
-     "gitlab: 404 на дереве ветки"
+     {
+      "level": "error",
+      "text": "gitlab: 404 на дереве ветки"
+     }
     ],
     "release": "1.el9",
     "rpms": [
@@ -131,7 +134,10 @@
     ],
     "patches_ref": null,
     "problems": [
-     "internal error: boom"
+     {
+      "level": "error",
+      "text": "internal error: boom"
+     }
     ],
     "release": "1.el9",
     "rpms": [
@@ -200,7 +206,7 @@
     "version": "1.3"
    }
   ],
-  "dashboard": "2.2.0",
+  "dashboard": "2.6.3",
   "generated": "2026-07-01T00:00:00+03:00",
   "koji_hub": "https://hub/kojihub",
   "koji_web": "https://hub/koji",
@@ -215,7 +221,7 @@
    "FILES",
    "other"
   ],
-  "schema": 1,
+  "schema": 2,
   "tag": "os-9.1"
  }
 ]

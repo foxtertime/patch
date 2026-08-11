@@ -111,3 +111,52 @@ test('каждый ключ группы называется по-русски'
     });
   });
 });
+
+/* Проблема приезжает строкой «источник: что случилось», и страница режет её
+   надвое: подпись блока и текст под ней. */
+test('проблема делится по первому двоеточию, источник переводится',
+  function () {
+    var p = labels.problem('gitlab: ветка os-9.6 не найдена');
+    assert.deepStrictEqual(p, { title: 'GitLab',
+                                text: 'ветка os-9.6 не найдена',
+                                known: true });
+  });
+
+test('двоеточие внутри текста проблему не делит второй раз', function () {
+  var p = labels.problem("internal error: KeyError: 'source'");
+  assert.strictEqual(p.title, 'внутренняя ошибка');
+  assert.strictEqual(p.text, "KeyError: 'source'");
+});
+
+test('строка без двоеточия — знакомый источник целиком', function () {
+  var p = labels.problem('no source url');
+  assert.deepStrictEqual(p, { title: 'нет ссылки на источник', text: '',
+                              known: true });
+});
+
+/* Снапшот собран версией, которая знает тип проблемы, а страница — нет:
+   показать её техническим именем честнее, чем промолчать. Подписью тогда
+   идут данные, и это помечено known: false — подсвечивать поиском можно
+   только их. */
+test('незнакомый источник идёт в подпись как есть', function () {
+  var p = labels.problem('mock: сборка не воспроизводится');
+  assert.deepStrictEqual(p, { title: 'mock',
+                              text: 'сборка не воспроизводится',
+                              known: false });
+});
+
+test('строка, которую нечем назвать, целиком идёт в текст', function () {
+  var p = labels.problem('просто строка без источника');
+  assert.deepStrictEqual(p, { title: '', text: 'просто строка без источника',
+                              known: false });
+});
+
+/* Автоген обещает патчи класса, которых в билде нет: сбор пишет это
+   предупреждение с префиксом autogen, и подпись у блока своя. */
+test('автоген подписан по-русски', function () {
+  var p = labels.problem('autogen: есть autogen-cve-patches.inc, но ни одного '
+                         + 'патча класса CVE');
+  assert.strictEqual(p.title, 'автоген');
+  assert.strictEqual(p.known, true);
+  assert.match(p.text, /^есть autogen-cve-patches\.inc/);
+});

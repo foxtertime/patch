@@ -231,7 +231,12 @@
      }
     ],
     "patches_ref": null,
-    "problems": [],
+    "problems": [
+     {
+      "level": "note",
+      "text": "gitlab: нечего сравнивать"
+     }
+    ],
     "release": "1.el9",
     "rpms": [
      "vim-9.0-1.el9.x86_64"
@@ -338,7 +343,10 @@
     ],
     "patches_ref": null,
     "problems": [
-     "internal error: koji не ответил за 60 с"
+     {
+      "level": "error",
+      "text": "internal error: koji не ответил за 60 с"
+     }
     ],
     "release": "620.el9",
     "rpms": [
@@ -591,8 +599,22 @@
     ],
     "patches_ref": null,
     "problems": [
-     "gitlab: 403 на каталоге PATCH",
-     "internal error: не разобрать changelog.yaml"
+     {
+      "level": "error",
+      "text": "gitlab: 403 на каталоге PATCH"
+     },
+     {
+      "level": "error",
+      "text": "internal error: не разобрать changelog.yaml"
+     },
+     {
+      "level": "warning",
+      "text": "gitlab: host mirror.example.com не описан в конфиге, запрошен gitlab.example.com"
+     },
+     {
+      "level": "note",
+      "text": "gitlab: нечего сравнивать"
+     }
     ],
     "release": "1.el9",
     "rpms": [
@@ -669,7 +691,10 @@
     ],
     "patches_ref": null,
     "problems": [
-     "gitlab: 404 на дереве ветки"
+     {
+      "level": "error",
+      "text": "gitlab: 404 на дереве ветки"
+     }
     ],
     "release": "1.el9",
     "rpms": [
@@ -794,7 +819,12 @@
     "patch_dir_present": false,
     "patches": [],
     "patches_ref": null,
-    "problems": [],
+    "problems": [
+     {
+      "level": "warning",
+      "text": "gitlab: коммит 0f1a2b3c4d5e недоступен, патчи сняты с ветки"
+     }
+    ],
     "release": "4.el9",
     "rpms": [
      "glibc-4.3-4.el9.x86_64",
@@ -871,7 +901,10 @@
     ],
     "patches_ref": null,
     "problems": [
-     "internal error: сборка без исходников"
+     {
+      "level": "error",
+      "text": "internal error: сборка без исходников"
+     }
     ],
     "release": "2.el9",
     "rpms": [
@@ -1103,7 +1136,12 @@
     "patch_dir_present": true,
     "patches": [],
     "patches_ref": null,
-    "problems": [],
+    "problems": [
+     {
+      "level": "warning",
+      "text": "gitlab: коммит 0f1a2b3c4d5e недоступен, патчи сняты с ветки"
+     }
+    ],
     "release": "3.el9",
     "rpms": [
      "rust-4.10-3.el9.x86_64",
@@ -1144,7 +1182,10 @@
     "patches": [],
     "patches_ref": null,
     "problems": [
-     "gitlab: 404 на дереве ветки"
+     {
+      "level": "error",
+      "text": "gitlab: 404 на дереве ветки"
+     }
     ],
     "release": "4.el9",
     "rpms": [
@@ -1405,7 +1446,12 @@
      }
     ],
     "patches_ref": null,
-    "problems": [],
+    "problems": [
+     {
+      "level": "warning",
+      "text": "gitlab: коммит 0f1a2b3c4d5e недоступен, патчи сняты с ветки"
+     }
+    ],
     "release": "2.el9",
     "rpms": [
      "krb5-4.4-2.el9.x86_64",
@@ -1464,7 +1510,10 @@
     ],
     "patches_ref": null,
     "problems": [
-     "internal error: сборка без исходников"
+     {
+      "level": "error",
+      "text": "internal error: сборка без исходников"
+     }
     ],
     "release": "3.el9",
     "rpms": [
@@ -1640,7 +1689,10 @@
     "patches": [],
     "patches_ref": null,
     "problems": [
-     "gitlab: 404 на дереве ветки"
+     {
+      "level": "error",
+      "text": "gitlab: 404 на дереве ветки"
+     }
     ],
     "release": "3.el9",
     "rpms": [
@@ -1727,7 +1779,12 @@
      }
     ],
     "patches_ref": null,
-    "problems": [],
+    "problems": [
+     {
+      "level": "warning",
+      "text": "gitlab: коммит 0f1a2b3c4d5e недоступен, патчи сняты с ветки"
+     }
+    ],
     "release": "1.el9",
     "rpms": [
      "libselinux-4.11-1.el9.x86_64",
@@ -2036,7 +2093,10 @@
     "patches": [],
     "patches_ref": null,
     "problems": [
-     "internal error: сборка без исходников"
+     {
+      "level": "error",
+      "text": "internal error: сборка без исходников"
+     }
     ],
     "release": "4.el9",
     "rpms": [
@@ -2124,7 +2184,10 @@
     ],
     "patches_ref": null,
     "problems": [
-     "gitlab: 404 на дереве ветки"
+     {
+      "level": "error",
+      "text": "gitlab: 404 на дереве ветки"
+     }
     ],
     "release": "2.el9",
     "rpms": [
@@ -2346,7 +2409,12 @@
      }
     ],
     "patches_ref": null,
-    "problems": [],
+    "problems": [
+     {
+      "level": "warning",
+      "text": "gitlab: коммит 0f1a2b3c4d5e недоступен, патчи сняты с ветки"
+     }
+    ],
     "release": "3.el9",
     "rpms": [
      "openssh-4.12-3.el9.x86_64",
@@ -2608,8 +2676,14 @@
     ],
     "patches_ref": null,
     "problems": [
-     "gitlab: 404 на дереве ветки",
-     "internal error: сборка без исходников"
+     {
+      "level": "error",
+      "text": "gitlab: 404 на дереве ветки"
+     },
+     {
+      "level": "error",
+      "text": "internal error: сборка без исходников"
+     }
     ],
     "release": "1.el9",
     "rpms": [
@@ -2659,7 +2733,12 @@
      }
     ],
     "patches_ref": null,
-    "problems": [],
+    "problems": [
+     {
+      "level": "warning",
+      "text": "gitlab: коммит 0f1a2b3c4d5e недоступен, патчи сняты с ветки"
+     }
+    ],
     "release": "2.el9",
     "rpms": [
      "mariadb-4.6-2.el9.x86_64",
@@ -2948,7 +3027,12 @@
     "patch_dir_present": true,
     "patches": [],
     "patches_ref": null,
-    "problems": [],
+    "problems": [
+     {
+      "level": "warning",
+      "text": "gitlab: коммит 0f1a2b3c4d5e недоступен, патчи сняты с ветки"
+     }
+    ],
     "release": "1.el9",
     "rpms": [
      "ant-4.0-1.el9.x86_64",
@@ -3093,7 +3177,10 @@
     "patches": [],
     "patches_ref": null,
     "problems": [
-     "gitlab: 404 на дереве ветки"
+     {
+      "level": "error",
+      "text": "gitlab: 404 на дереве ветки"
+     }
     ],
     "release": "4.el9",
     "rpms": [
@@ -3194,7 +3281,10 @@
     ],
     "patches_ref": null,
     "problems": [
-     "internal error: сборка без исходников"
+     {
+      "level": "error",
+      "text": "internal error: сборка без исходников"
+     }
     ],
     "release": "2.el9",
     "rpms": [
@@ -3260,7 +3350,12 @@
     "patch_dir_present": false,
     "patches": [],
     "patches_ref": null,
-    "problems": [],
+    "problems": [
+     {
+      "level": "warning",
+      "text": "gitlab: коммит 0f1a2b3c4d5e недоступен, патчи сняты с ветки"
+     }
+    ],
     "release": "4.el9",
     "rpms": [
      "firewalld-4.7-4.el9.x86_64",
@@ -3589,7 +3684,10 @@
     ],
     "patches_ref": null,
     "problems": [
-     "gitlab: 404 на дереве ветки"
+     {
+      "level": "error",
+      "text": "gitlab: 404 на дереве ветки"
+     }
     ],
     "release": "3.el9",
     "rpms": [
@@ -3754,7 +3852,10 @@
     "patches": [],
     "patches_ref": null,
     "problems": [
-     "internal error: сборка без исходников"
+     {
+      "level": "error",
+      "text": "internal error: сборка без исходников"
+     }
     ],
     "release": "3.el9",
     "rpms": [
@@ -3890,7 +3991,12 @@
     "patch_dir_present": true,
     "patches": [],
     "patches_ref": null,
-    "problems": [],
+    "problems": [
+     {
+      "level": "warning",
+      "text": "gitlab: коммит 0f1a2b3c4d5e недоступен, патчи сняты с ветки"
+     }
+    ],
     "release": "2.el9",
     "rpms": [
      "xfsprogs-4.8-2.el9.x86_64",
@@ -4054,7 +4160,10 @@
     ],
     "patches_ref": null,
     "problems": [
-     "gitlab: 404 на дереве ветки"
+     {
+      "level": "error",
+      "text": "gitlab: 404 на дереве ветки"
+     }
     ],
     "release": "2.el9",
     "rpms": [
@@ -4203,7 +4312,12 @@
      }
     ],
     "patches_ref": null,
-    "problems": [],
+    "problems": [
+     {
+      "level": "warning",
+      "text": "gitlab: коммит 0f1a2b3c4d5e недоступен, патчи сняты с ветки"
+     }
+    ],
     "release": "1.el9",
     "rpms": [
      "xz-4.2-1.el9.x86_64",
@@ -4329,7 +4443,10 @@
     "patches": [],
     "patches_ref": null,
     "problems": [
-     "internal error: сборка без исходников"
+     {
+      "level": "error",
+      "text": "internal error: сборка без исходников"
+     }
     ],
     "release": "4.el9",
     "rpms": [
@@ -4501,7 +4618,12 @@
     "patch_dir_present": false,
     "patches": [],
     "patches_ref": null,
-    "problems": [],
+    "problems": [
+     {
+      "level": "warning",
+      "text": "gitlab: коммит 0f1a2b3c4d5e недоступен, патчи сняты с ветки"
+     }
+    ],
     "release": "4.el9",
     "rpms": [
      "less-4.9-4.el9.x86_64",
@@ -4543,7 +4665,10 @@
     "patches": [],
     "patches_ref": null,
     "problems": [
-     "gitlab: 404 на дереве ветки"
+     {
+      "level": "error",
+      "text": "gitlab: 404 на дереве ветки"
+     }
     ],
     "release": "1.el9",
     "rpms": [
@@ -4824,7 +4949,12 @@
     "patch_dir_present": null,
     "patches": [],
     "patches_ref": null,
-    "problems": [],
+    "problems": [
+     {
+      "level": "warning",
+      "text": "gitlab: коммит 0f1a2b3c4d5e недоступен, патчи сняты с ветки"
+     }
+    ],
     "release": "3.el9",
     "rpms": [
      "which-4.3-3.el9.x86_64",
@@ -4912,7 +5042,10 @@
     ],
     "patches_ref": null,
     "problems": [
-     "internal error: сборка без исходников"
+     {
+      "level": "error",
+      "text": "internal error: сборка без исходников"
+     }
     ],
     "release": "1.el9",
     "rpms": [
@@ -4940,7 +5073,7 @@
     "version": "6.5"
    }
   ],
-  "dashboard": "2.2.0",
+  "dashboard": "3.2.2",
   "generated": "2026-12-01T00:00:00+03:00",
   "koji_hub": "https://hub/kojihub",
   "koji_web": "https://hub/koji",
@@ -4957,7 +5090,7 @@
    "FILES",
    "other"
   ],
-  "schema": 1,
+  "schema": 2,
   "tag": "os-9.7"
  }
 ]

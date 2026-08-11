@@ -49,12 +49,20 @@ test('ссылка с недопустимой схемой не рисуетс�
   assert.match(markup.linkHtml('https://hub/x', 'koji'), /href="https:\/\/hub\/x"/);
 });
 
-test('колонка тега: прочерк для прямого, имя для унаследованного', function () {
-  assert.match(markup.taggedCell({ inherited: false }, q()), /—/);
-  assert.match(markup.taggedCell({ inherited: null }, q()), /\?/);
-  assert.strictEqual(markup.taggedCell({ inherited: true, tagged_in: 'os-9.1' },
-                                       q()), 'os-9.1');
-});
+test('колонка тега называет тег и у прямого билда, и у унаследованного',
+  function () {
+    assert.strictEqual(markup.taggedCell({ inherited: false,
+                                           tagged_in: 'os-9.2' }, q()),
+                       'os-9.2');
+    assert.strictEqual(markup.taggedCell({ inherited: true,
+                                           tagged_in: 'os-9.1' }, q()),
+                       'os-9.1');
+    /* Тега не записывал сам снапшот — вопросительный знак, а не имя
+       выбранного тега: «неизвестно» и «прямой» не одно и то же. */
+    assert.match(markup.taggedCell({ inherited: null }, q()), /\?/);
+    assert.match(markup.taggedCell({ inherited: null,
+                                     tagged_in: null }, q()), /\?/);
+  });
 
 /* Дата и время — два уровня одной ячейки, и пробела между ними нет: время
    встаёт блоком, а пробел висел бы в хвосте первой строки. */
@@ -326,4 +334,64 @@ test('класс патча виден и покрашен', function () {
   var html = markup.ghostsHtml([ghost('a.patch', 'branch', 'SAST')], q());
   assert.match(html, /SAST/);
   assert.match(html, /class="pcls [^"]+"/);
+});
+
+/* Блок проблемы: подпись сверху, текст под ней, полоса слева — её рисует
+   css по классу .prob. Здесь проверяется, что в разметку попало и чем
+   набрано. */
+test('проблема рисуется блоком из подписи и текста', function () {
+  var out = markup.problemHtml('gitlab: ветка os-9.6 не найдена', q());
+  assert.match(out, /class="prob lvl-error"/);
+  assert.match(out, /class="pkind">GitLab</);
+  assert.match(out, /class="ptext">ветка os-9\.6 не найдена</);
+});
+
+test('у проблемы без текста подписи хватает одной', function () {
+  var out = markup.problemHtml('no source url', q());
+  assert.match(out, /class="pkind">нет ссылки на источник</);
+  assert.doesNotMatch(out, /class="ptext"/);
+});
+
+/* Подсветка обещает «запрос нашёлся здесь». Подпись знакомого источника —
+   слово самой страницы, а не данные: подсветив её, страница обещала бы
+   найденное там, где искать нечего. Незнакомая подпись приехала из
+   снапшота, и её подсвечиваем наравне с текстом. */
+test('подсветка не трогает подпись знакомого источника', function () {
+  var out = markup.problemHtml('gitlab: gitlab не ответил', q('gitlab'));
+  assert.match(out, /class="pkind">GitLab</);
+  assert.match(out, /class="ptext"><span class="hit">gitlab<\/span> не ответил</);
+});
+
+test('незнакомая подпись подсвечивается как данные', function () {
+  var out = markup.problemHtml('mock: сборка упала', q('mock'));
+  assert.match(out, /class="pkind"><span class="hit">mock<\/span></);
+});
+
+test('разметка из проблемы экранируется', function () {
+  var out = markup.problemsHtml(['<img src=x>: <b>бум</b>'], q());
+  assert.strictEqual(out.indexOf('<img'), -1, out);
+  assert.strictEqual(out.indexOf('<b>'), -1, out);
+});
+
+/* Уровень проблемы виден в разметке классом: цвет подписи и полосы блока
+   даёт css, а не разметка, и правило у них одно.
+
+   Класс уровня носит приставку lvl-: голым словом note на странице уже
+   помечена приписка к значению («прямой», «унаследован»), и заметка,
+   надев то же имя, забирала бы себе и её отступ слева — блок заметки
+   стоял бы правее блоков ошибки и предупреждения. */
+test('уровень проблемы уезжает в класс блока', function () {
+  var warn = markup.problemHtml({ level: 'warning', text: 'gitlab: с ветки' },
+                                q());
+  assert.match(warn, /class="prob lvl-warning"/);
+  var note = markup.problemHtml({ level: 'note', text: 'gitlab: нечего' }, q());
+  assert.match(note, /class="prob lvl-note"/);
+  assert.doesNotMatch(note, /class="[^"]*(?<![-\w])note(?![-\w])/);
+});
+
+/* Проблема из снапшота прежней схемы приезжает строкой без уровня —
+   и читается как ошибка: занизить чужую проблему хуже, чем завысить. */
+test('проблема строкой читается как ошибка', function () {
+  assert.match(markup.problemHtml('koji: нет деталей билда', q()),
+               /class="prob lvl-error"/);
 });

@@ -11,10 +11,9 @@
                              require('./diff.js'), require('./text.js'),
                              require('./labels.js'), require('./markup.js'),
                              require('./tables.js'), require('./cards.js'),
-                             require('./page.js'), require('./hash.js'),
-                             require('./rail.js'), require('./files.js'),
-                             require('./tips.js'), require('./toasts.js'),
-                             require('./address.js'), require('./filters.js'),
+                             require('./page.js'), require('./rail.js'),
+                             require('./files.js'), require('./tips.js'),
+                             require('./toasts.js'), require('./filters.js'),
                              require('./search.js'), require('./copy.js'),
                              require('./viewport.js'), require('./notices.js'),
                              require('./query.js'));
@@ -23,15 +22,15 @@
     root.KP.ui = factory(root.KP.viewmodel, root.KP.store, root.KP.diff,
                          root.KP.text, root.KP.labels, root.KP.markup,
                          root.KP.tables, root.KP.cards, root.KP.page,
-                         root.KP.hash, root.KP.rail, root.KP.files,
-                         root.KP.tips, root.KP.toasts, root.KP.address,
-                         root.KP.filters, root.KP.search, root.KP.copy,
-                         root.KP.viewport, root.KP.notices, root.KP.query);
+                         root.KP.rail, root.KP.files, root.KP.tips,
+                         root.KP.toasts, root.KP.filters, root.KP.search,
+                         root.KP.copy, root.KP.viewport, root.KP.notices,
+                         root.KP.query);
   }
 }(typeof globalThis !== 'undefined' ? globalThis : this,
   function (viewmodel, store, diffmod, text, labels, markup, tables, cards,
-            pagemod, hash, railmod, filesmod, tipsmod, toastsmod, addressmod,
-            filtersmod, searchmod, copymod, viewportmod, noticesmod, querymod) {
+            pagemod, railmod, filesmod, tipsmod, toastsmod, filtersmod,
+            searchmod, copymod, viewportmod, noticesmod, querymod) {
   'use strict';
 
   /* Состояние страницы живёт в page.js: там же и всё, что из него
@@ -110,44 +109,10 @@
 
   /* ---------- карточки, селекторы, чипы ---------- */
 
-  /* Ширина карточки-среза. Браузер набивает строку под завязку и про
-     остаток не думает: двенадцать срезов при десяти влезающих дают вторую
-     строку из двух карточек. Считаем, на сколько строк они делятся поровну,
-     и задаём ширину числом — строка флексов растягивает то, что в ней стоит,
-     поэтому короткая последняя строка занята целиком.
-
-     Меряет тот, у кого есть раскладка: без неё (в тестах, у спрятанной
-     вкладки) ширина нулевая, и трогать нечего — карточки останутся при
-     своём минимуме из стилей. */
-  function fitCards(box) {
-    if (!box || !window.getComputedStyle || !box.clientWidth) return;
-    const list = box.querySelectorAll('.card');
-    if (!list.length) return;
-    const style = window.getComputedStyle(box);
-    const gap = parseFloat(style.columnGap) || 0;
-    const min = parseFloat(style.getPropertyValue('--card-min')) || 1;
-    const cols = cards.columnsFor(list.length, box.clientWidth, min, gap);
-    /* Минус пиксель: при точном делении браузер иногда не пускает последнюю
-       карточку в строку, и она уезжает вниз одна — ровно то, от чего
-       считали. */
-    const width = (box.clientWidth - (cols - 1) * gap) / cols - 1;
-    box.style.setProperty('--card-w', Math.max(min, width) + 'px');
-  }
-
-  /* Все четыре ряда карточек: итоги и срезы на обеих вкладках. Правило одно
-     на всех, и минимум своей ширины каждый ряд несёт в своих стилях. */
-  const CARD_BOXES = ['state-cards', 'class-cards', 'diff-pair', 'diff-cards'];
-
-  function fitAllCards() {
-    for (const id of CARD_BOXES) fitCards(document.getElementById(id));
-  }
-
   function renderStateCards() {
     const out = cards.stateCards(curSnap());
     document.getElementById('state-cards').innerHTML = out.big;
     document.getElementById('class-cards').innerHTML = out.classes;
-    fitCards(document.getElementById('state-cards'));
-    fitCards(document.getElementById('class-cards'));
   }
 
   function renderDiffCards() {
@@ -159,8 +124,6 @@
     document.getElementById('diff-pair').innerHTML = ends
       ? cards.pairCards(pair, snaps[ends[0]], snaps[ends[1]]) : '';
     document.getElementById('diff-cards').innerHTML = cards.diffCards(pair);
-    fitCards(document.getElementById('diff-pair'));
-    fitCards(document.getElementById('diff-cards'));
   }
 
   /* Плашка показывает все три положения признака: нажата — «есть», класс
@@ -220,20 +183,11 @@
     /* Шаблон не разобрался: строки не фильтруются, и надо сказать почему.
        Текст берём у браузера дословно — он называет место ошибки, а общий
        текст от нас не назвал бы. Подсказкой даём его целиком: в строке он
-       обрезан.
-
-       Приглашение уступает причине: обе строки о неполадке с одним и тем же
-       полем не встают разом (нажатие кнопки, которое единственно включает
-       регулярку, само гасит st.reAsked), но причина непонятого шаблона
-       важнее — она о том, что человек видит прямо сейчас, а приглашение
-       ждать может. */
+       обрезан. */
     const problem = page.matcher().problem;
-    const invite = st.reAsked && !st.regex;
     const message = problem
       ? 'регулярка не разбирается: ' + problem + ' — показаны все строки'
-      : (invite
-          ? 'ссылка просила искать регулярным выражением — включите кнопкой .*'
-          : '');
+      : '';
     qbad.hidden = !message;
     qbad.textContent = message;
     /* data-tip ставится и снимается вместе с сообщением: узел сейчас hidden
@@ -263,7 +217,6 @@
       body.innerHTML = st.tab === 'diff' ? tables.diffRows(items, rowOpts())
                                          : tables.stateRows(items, rowOpts());
     }
-    address.write();
   }
 
   /* Карточки перерисовываются только при смене вкладки, тега или пары:
@@ -301,11 +254,8 @@
     }
     stateSection.hidden = name !== 'state';
     diffSection.hidden = name !== 'diff';
-    /* У спрятанной вкладки ширины нет, и посчитанная при её отрисовке
-       ширина карточки была бы взята из нуля. Считаем, когда показали. */
-    fitAllCards();
     /* Панель поиска одна на страницу и переезжает к активной таблице:
-       два одинаковых поля с разными id путали бы и пользователя, и hash. */
+       два одинаковых поля с разными id путали бы и пользователя, и код. */
     const host = name === 'diff' ? diffSection : stateSection;
     /* Не anchor: так зовётся отмеченный узел рельса, и локальная переменная
        с тем же именем забирала бы себе его сброс строкой выше. */
@@ -438,10 +388,9 @@
     render();
   });
 
-  /* Вид кнопки считается от состояния, а не переключается на месте. Из
-     адреса режим больше не приезжает — оттуда приходит только просьба его
-     включить, — но состояние остаётся единственным источником правды, и
-     кнопка обязана показывать его, а не помнить свои нажатия отдельно. */
+  /* Вид кнопки считается от состояния, а не переключается на месте:
+     состояние — единственный источник правды, и кнопка обязана показывать
+     его, а не помнить свои нажатия отдельно. */
   function syncRe() {
     reBtn.setAttribute('aria-pressed', String(st.regex));
     reBtn.className = st.regex ? 'toggle mono on' : 'toggle mono';
@@ -449,10 +398,6 @@
 
   reBtn.addEventListener('click', () => {
     st.regex = !st.regex;
-    /* Предложение из адреса принято или отвергнуто — держать его дальше
-       незачем, а не погасить значило бы показывать приглашение и после
-       того, как человек уже на него ответил. */
-    st.reAsked = false;
     render();
   });
 
@@ -475,11 +420,6 @@
   const tips = tipsmod.create({ node: document.getElementById('tip') });
   const hideTip = tips.hide;
   const toasts = toastsmod.create({ node: document.getElementById('toasts') });
-  const address = addressmod.create({
-    page: page, hash: hash, dom: { search: search, clear: clearBtn },
-    /* Ссылка, присланная позже, — это смена всего сразу: вкладки, выбора,
-       фильтров. Что после неё перерисовать, знает корень. */
-    onExternal: () => { page.dropDeadFilters(); showTab(st.tab); rebuild(); } });
   let rail = railmod.create({ box: chainBox, page: page, store: store,
                               text: text, app: app, hideTip: hideTip });
   let files = filesmod.create({ store: store, toasts: toasts,
@@ -497,8 +437,8 @@
     rowsOf: () => sortRows(visibleRows()).map((item) => item.row) });
 
 
-  viewportmod.create({ controls: controls, toTop: document.getElementById('totop'),
-                       onResize: fitAllCards });
+  viewportmod.create({ controls: controls,
+                       toTop: document.getElementById('totop') });
 
   /* ---------- загрузка снапшотов ---------- */
 
@@ -530,18 +470,11 @@
   function applyData(pageData) {
     page.applyData(pageData);
     syncTabs();
-    /* Адрес читаем, только пока он чужой — тот, с которым страницу открыли.
-       Дальше в нём лежит наша же прошлая запись, и она вернула бы прежний
-       выбор в обход picked, снова похоронив умолчание. Ссылку, присланную
-       позже, приносит hashchange внутри address. */
-    if (!address.isOurs()) address.read();
     /* Фильтр переживает смену состава снапшотов, а его предмет — нет: класс
        патчей уходит вместе со своим снапшотом, метка строки — вместе с
-       последней такой строкой. Зовём отдельно от address.read(), который
-       выше зовут уже не всегда: иначе страница показывала бы пустую
-       таблицу под фильтр, которого не поставить и не снять — карточки с
-       ним не осталось ни одной, а в чипе вместо подписи стоял бы сам
-       ключ. */
+       последней такой строкой. Иначе страница показывала бы пустую таблицу
+       под фильтр, которого не поставить и не снять — карточки с ним не
+       осталось ни одной, а в чипе вместо подписи стоял бы сам ключ. */
     page.dropDeadFilters();
     showTab(st.tab);
     rebuild();

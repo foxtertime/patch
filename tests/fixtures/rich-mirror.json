@@ -281,7 +281,10 @@
     ],
     "patches_ref": null,
     "problems": [
-     "internal error: koji не ответил за 60 с"
+     {
+      "level": "error",
+      "text": "internal error: koji не ответил за 60 с"
+     }
     ],
     "release": "620.el9",
     "rpms": [
@@ -420,7 +423,7 @@
     "version": "3.2.1"
    }
   ],
-  "dashboard": "2.2.0",
+  "dashboard": "2.6.3",
   "generated": "2026-10-15T12:00:00+03:00",
   "koji_hub": "https://mirror/kojihub",
   "koji_web": "https://mirror/koji",
@@ -437,7 +440,7 @@
    "FILES",
    "other"
   ],
-  "schema": 1,
+  "schema": 2,
   "tag": "os-9.5"
  }
 ]

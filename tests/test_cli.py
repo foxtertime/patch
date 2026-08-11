@@ -331,7 +331,8 @@ class CollectCommandTest(TempDirTest):
         self.assertEqual(nginx.rpms, ["nginx-1.25.0-1.el9.x86_64"])
         self.assertEqual([p.name for p in nginx.patches],
                          ["CVE-2024-7347.patch"])
-        self.assertEqual(snaps[0].by_name()["curl"].problems, ["no source url"])
+        self.assertEqual([p.text for p in snaps[0].by_name()["curl"].problems],
+                         ["no source url"])
 
     def test_collect_returns_one_when_problems_exceed_the_limit(self):
         code, err = self.run_cli(self.argv("collect", "--tag", "os-9.2",

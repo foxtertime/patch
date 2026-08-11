@@ -5,7 +5,12 @@ from typing import Any, Dict, List, Optional
 
 from . import __version__
 
-SCHEMA = 1
+SCHEMA = 2
+
+# Насколько плоха проблема. Порядок здесь и есть порядок старшинства: строка
+# билда красится по самой критичной из своих проблем, и сравнивают их по
+# месту в этом кортеже.
+LEVELS = ("error", "warning", "note")
 
 
 class SnapshotError(Exception):
@@ -43,6 +48,35 @@ class Patch:
                    cves=list(data.get("cves") or []),
                    web_url=data.get("web_url"), ghost=data.get("ghost"),
                    sha=data.get("sha"))
+
+
+@dataclass
+class Problem:
+    """Что пошло не так при сборе данных по билду и насколько это плохо.
+
+    До schema 2 проблема была просто строкой, и всё, что в ней записано,
+    страница красила одинаково — красным. Уровень пишет тот, кто проблему
+    заводит: со стороны страницы его не угадать, «ветки нет» и «патчи сняты
+    с ветки» приходят от одного и того же gitlab.
+    """
+    text: str
+    level: str = "error"
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {"level": self.level, "text": self.text}
+
+    @classmethod
+    def from_dict(cls, data: Any) -> "Problem":
+        # Снапшот schema 1 несёт строку. Всё, что записано до появления
+        # уровней, считаем ошибкой: занизить чужую проблему хуже, чем
+        # завысить — заниженная не покрасит строку и потеряется.
+        if isinstance(data, str):
+            return cls(text=data)
+        if not isinstance(data, dict):
+            return cls(text=str(data))
+        level = data.get("level")
+        return cls(text=str(data.get("text") or ""),
+                   level=level if level in LEVELS else "error")
 
 
 @dataclass
@@ -121,7 +155,7 @@ class Build:
     # карточки классов и сводку не идёт: это то, чего в билде нет.
     ghost_patches: List[Patch] = field(default_factory=list)
     rpms: List[str] = field(default_factory=list)
-    problems: List[str] = field(default_factory=list)
+    problems: List[Problem] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -135,7 +169,8 @@ class Build:
             "patches_ref": self.patches_ref,
             "patches": [p.to_dict() for p in self.patches],
             "ghost_patches": [p.to_dict() for p in self.ghost_patches],
-            "rpms": list(self.rpms), "problems": list(self.problems),
+            "rpms": list(self.rpms),
+            "problems": [p.to_dict() for p in self.problems],
         }
 
     @classmethod
@@ -155,7 +190,8 @@ class Build:
             ghost_patches=[Patch.from_dict(p)
                            for p in data.get("ghost_patches") or []],
             rpms=list(data.get("rpms") or []),
-            problems=list(data.get("problems") or []),
+            problems=[Problem.from_dict(p)
+                      for p in data.get("problems") or []],
         )
 
     def evr(self):
@@ -195,7 +231,12 @@ def snapshot_from_dict(data: Dict[str, Any]) -> Snapshot:
     if not isinstance(data, dict):
         raise SnapshotError("снапшот должен быть объектом")
     schema = data.get("schema")
-    if schema != SCHEMA:
+    # Снапшоты прежней схемы читаются: от нынешней она отличается только тем,
+    # что проблема в ней — строка без уровня, а не объект, и Problem.from_dict
+    # понимает обе формы. Отказаться от таких файлов значило бы обесценить
+    # всё, что собрано до этой версии, — а сравнение с прошлым месяцем и есть
+    # то, ради чего снапшоты хранят.
+    if schema not in (SCHEMA, 1):
         raise SnapshotError("несовместимая схема снапшота: %r (нужна %d)"
                             % (schema, SCHEMA))
     try:

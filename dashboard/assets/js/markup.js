@@ -33,12 +33,18 @@
     return out || '<span class="none">—</span>';
   }
 
-  /* Колонка «тег»: прочерк — билд затегован прямо в выбранный тег, имя —
-     унаследован оттуда. Прочерк, а не повтор имени тега в каждой строке:
-     в теге на восемьсот билдов повторов было бы восемьсот. */
+  /* Колонка «тег»: имя тега, в котором билд затегован на самом деле, —
+     выбранного, если билд попал в него прямо, и родительского, если
+     унаследован. Прямые строки повторяют имя выбранного тега; зато в ячейке
+     всегда стоит ответ на вопрос «в каком теге этот билд», а не «унаследован
+     ли он», — на второй отвечает метка inherited в колонке меток.
+
+     Вопросительный знак — снапшот собран версией, которая тег ещё не
+     записывала: «неизвестно» и «прямой» намеренно не смешиваются. */
   function taggedCell(row, q) {
-    if (row.inherited === null) return '<span class="none">?</span>';
-    if (!row.inherited) return '<span class="none">—</span>';
+    if (row.inherited === null || !row.tagged_in) {
+      return '<span class="none">?</span>';
+    }
     return hl(row.tagged_in, q);
   }
 
@@ -55,6 +61,39 @@
     const date = value.slice(0, 10), time = value.slice(11);
     return hl(date, q)
          + (time ? `<span class="tm">${hl(time, q)}</span>` : '');
+  }
+
+  /* Проблемы билда: каждая — свой блок из подписи и текста, схваченный
+     полосой слева. Полоса — тот же приём, что у списка патчей: она держит
+     подпись и текст вместе и отделяет соседнюю проблему, не заводя между
+     ними пустой строки. Список, каким он был раньше, этого не умел: у
+     проблемы из двух предложений было не видно, где она кончается.
+
+     Подпись знакомого источника — слово самой страницы, и поиском она не
+     подсвечивается: подсветка обещала бы, что запрос нашёлся в данных, а
+     он нашёлся в словаре. Незнакомый источник приехал из снапшота, и его
+     подсвечиваем наравне с текстом. */
+  function problemHtml(problem, q) {
+    /* Строкой проблема приезжает из снапшота прежней схемы — там уровня
+       нет вовсе, и такая проблема считается ошибкой. Разбирает её всё равно
+       viewmodel, но markup зовут и напрямую из тестов. */
+    const item = typeof problem === 'string'
+      ? { level: 'error', text: problem } : (problem || {});
+    const level = item.level || 'error';
+    const p = labels.problem(item.text);
+    const title = p.known ? esc(p.title) : hl(p.title, q);
+    /* Приставка lvl- у класса уровня не украшение: голым словом note уже
+       помечена приписка к значению, и заметка под тем же именем забирала
+       бы себе её отступ слева. */
+    return `<div class="prob lvl-${esc(level)}">`
+      + (p.title ? `<div class="pkind">${title}</div>` : '')
+      + (p.text ? `<div class="ptext">${hl(p.text, q)}</div>` : '')
+      + '</div>';
+  }
+
+  function problemsHtml(problems, q) {
+    const out = (problems || []).map((line) => problemHtml(line, q)).join('');
+    return `<div class="probs">${out}</div>`;
   }
 
   function inheritedNote(inherited) {
@@ -395,5 +434,6 @@
            patchesHtml, patchesChangeHtml, ghostsHtml, rpmsHtml,
            rpmsChangeHtml, rpmSideList,
            taggedCell, builtHtml, inheritedNote, mainTagHtml, otherTagsHtml,
+           problemHtml, problemsHtml,
            taggedText, delta };
 }));

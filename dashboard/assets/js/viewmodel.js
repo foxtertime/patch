@@ -138,16 +138,59 @@
     return 0;
   }
 
+  /* Уровни проблемы от самого критичного к самому спокойному. Порядок и
+     есть старшинство: строка красится по первому найденному. */
+  const LEVELS = ['error', 'warning', 'note'];
+
+  /* Проблема из снапшота: у schema 2 это объект с уровнем, у прежней —
+     строка. Строка читается как ошибка: занизить чужую проблему хуже, чем
+     завысить — заниженная не покрасит строку и потеряется. Незнакомый
+     уровень (снапшот собран версией новее страницы) читается так же. */
+  function problemDict(item) {
+    if (typeof item === 'string') return { level: 'error', text: item };
+    const level = item && item.level;
+    return { level: LEVELS.indexOf(level) === -1 ? 'error' : level,
+             text: String((item && item.text) || '') };
+  }
+
+  /* Самая критичная из проблем билда, null — если проблем нет вовсе. Ею
+     красится и полоса строки, и подпись в колонке меток: одна проблема
+     уровнем выше перекрывает любое число тех, что ниже. */
+  function worstLevel(problems) {
+    for (const level of LEVELS) {
+      for (const problem of problems) {
+        if (problem.level === level) return level;
+      }
+    }
+    return null;
+  }
+
+  /* Уровни, которые в билде вообще встретились, от строгого к спокойному.
+     Ими считаются карточки и отбираются строки под фильтр: вопрос там
+     «есть ли у билда такая запись», а не «какая из них самая строгая».
+     Билд с ошибкой и заметкой разом стоит в обеих карточках — иначе
+     заметка при ошибке не считалась бы нигде и найти её было бы нечем. */
+  function presentLevels(problems) {
+    const out = [];
+    for (const level of LEVELS) {
+      for (const problem of problems) {
+        if (problem.level === level) { out.push(level); break; }
+      }
+    }
+    return out;
+  }
+
   /* Метки строки, всегда в одном и том же порядке.
 
      Порядок здесь позиционный: колонку «метки» читают по месту, а порядок
      файлов в каталоге PATCH задаёт GitLab и он разный от репозитория к
      репозиторию. Без сортировки у одной строки первым стоял бы cve, у
      соседней sast, и колонка перестала бы читаться. */
-  function buildMarks(build, tag, classOrder) {
+  function buildMarks(build, tag, classOrder, problems) {
     classOrder = classOrder || [];
-    let marks = [], patches = build.patches || [], problems = build.problems || [];
+    let marks = [], patches = build.patches || [];
     let i, key, gitlabError = false, internalError = false;
+    problems = problems || (build.problems || []).map(problemDict);
     for (i = 0; i < patches.length; i++) {
       key = slug(patches[i]['class']);
       if (marks.indexOf(key) === -1) marks.push(key);
@@ -165,9 +208,11 @@
     if (build.source && build.source.commits_ahead) marks.push('branch-ahead');
     if (build.patch_dir_present === false) marks.push('no-patch');
     for (i = 0; i < problems.length; i++) {
-      if (problems[i].indexOf('gitlab:') === 0
-          || problems[i].indexOf('bad source') === 0) gitlabError = true;
-      if (problems[i].indexOf('internal error') === 0) internalError = true;
+      /* Метка говорит, откуда проблема, а не насколько она плоха: насколько
+         — это уровень, и он красит строку сам. */
+      if (problems[i].text.indexOf('gitlab:') === 0
+          || problems[i].text.indexOf('bad source') === 0) gitlabError = true;
+      if (problems[i].text.indexOf('internal error') === 0) internalError = true;
     }
     if (gitlabError) marks.push('gitlab-error');
     if (internalError) marks.push('internal-error');
@@ -193,6 +238,7 @@
     let counts = {}, patches = build.patches || [], i;
     for (i = 0; i < patches.length; i++) bump(counts, patches[i]['class']);
     let source = build.source || null;
+    const problems = (build.problems || []).map(problemDict);
     return {
       name: orNull(build.name), nvr: orNull(build.nvr),
       version: orNull(build.version), release: orNull(build.release),
@@ -223,8 +269,15 @@
       // архитектуры и сам ничего не пересортировывает
       patch_counts: counts, rpms: rpmsmod.sortRpms(build.rpms || []),
       patch_dir_present: orNull(build.patch_dir_present),
-      problems: (build.problems || []).slice(),
-      marks: buildMarks(build, tag, classOrder)
+      problems: problems,
+      /* Уровни строки считаем здесь, а не при отрисовке: по ним красят
+         полосу, считают карточки и отбирают строки под фильтр — трижды
+         пересчитывать одно и то же незачем. Их два вида, и путать их
+         нельзя: `level` — самая строгая запись, и она одна красит полосу;
+         `levels` — всё, что в билде есть, и по нему считают и отбирают. */
+      level: worstLevel(problems),
+      levels: presentLevels(problems),
+      marks: buildMarks(build, tag, classOrder, problems)
     };
   }
 
@@ -234,14 +287,25 @@
       byClass[classNames[i]] = { builds: 0, files: 0 };
     }
     let withPatches = 0, withoutPatches = 0, problems = 0, files = 0;
-    let inherited = 0, direct = 0;
+    let inherited = 0, direct = 0, warnings = 0, notes = 0;
     for (i = 0; i < rows.length; i++) {
       row = rows[i];
       if (row.inherited === true) inherited += 1;
       else if (row.inherited === false) direct += 1;
       if (row.patches.length) withPatches += 1;
       if (row.patch_dir_present === false) withoutPatches += 1;
-      if (row.problems.length) problems += 1;
+      /* Билд считается в каждой карточке, чья запись у него есть: с
+         ошибкой и заметкой разом он встанет и в первый счётчик, и в
+         третий. Сумма трёх карточек из-за этого бывает больше числа
+         билдов, и это не сбой счёта: карточка отвечает «сколько билдов с
+         такой записью», а не делит билды на три сорта. Считая по самой
+         строгой записи, заметку при ошибке было не увидеть нигде.
+         Уровни врозь, потому что значат разное: ошибка — «данных не
+         хватает», предупреждение — «данные есть, но с оговоркой», заметка —
+         «к сведению, ничего не случилось». */
+      if (row.levels.indexOf('error') !== -1) problems += 1;
+      if (row.levels.indexOf('warning') !== -1) warnings += 1;
+      if (row.levels.indexOf('note') !== -1) notes += 1;
       files += row.patches.length;
       counts = row.patch_counts;
       for (name in counts) {
@@ -257,6 +321,7 @@
     return { builds: rows.length, with_patches: withPatches,
              inherited: inherited, direct: direct,
              without_patches: withoutPatches, problems: problems,
+             warnings: warnings, notes: notes,
              patch_files: files, by_class: byClass };
   }
 

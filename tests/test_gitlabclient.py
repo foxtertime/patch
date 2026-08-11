@@ -331,6 +331,43 @@ class _TokenLeakingTransport:
         raise ValueError("Invalid header value b'%s\\n'" % self._token)
 
 
+class ProblemLevelTest(unittest.TestCase):
+    """Насколько плоха проблема, знает тот, кто её завёл.
+
+    Со стороны страницы этого не угадать: «ветки нет» и «сравнивать нечего»
+    приходят от одного и того же gitlab и выглядят одинаково.
+    """
+
+    def test_a_failed_read_is_an_error(self):
+        cli, _ = client({TREE_URL: Response(500, {"message": "boom"}, {})})
+        self.assertEqual(cli.patch_files("gitlab.example.com", "g/r", "br").level,
+                         "error")
+
+    def test_nothing_to_compare_is_a_note(self):
+        # не отказ и даже не оговорка: сравнивать нечего, потому что нечего
+        cli, _ = client({})
+        got = cli.compare("gitlab.example.com", "g/r", None, "br")
+        self.assertEqual(got.problem, "gitlab: нечего сравнивать")
+        self.assertEqual(got.level, "note")
+
+    def test_substituted_host_alone_is_a_warning(self):
+        # дерево прочиталось, просто не на том сервере, что стоял в ссылке
+        cli, _ = client({TREE_URL: Response(200, [], {})},
+                        default_host="gitlab.example.com")
+        got = cli.patch_files("other.example.com", "g/r", "br")
+        self.assertIn("не описан в конфиге", got.problem)
+        self.assertEqual(got.level, "warning")
+
+    def test_a_failure_behind_the_substitution_stays_an_error(self):
+        # склеенная строка говорит о двух вещах сразу, и мягче из них она
+        # быть не может
+        cli, _ = client({TREE_URL: Response(500, {"message": "boom"}, {})},
+                        default_host="gitlab.example.com")
+        got = cli.patch_files("other.example.com", "g/r", "br")
+        self.assertIn("не описан в конфиге", got.problem)
+        self.assertEqual(got.level, "error")
+
+
 class UrlTest(unittest.TestCase):
     def test_urls_are_percent_encoded(self):
         # пробел или «#» в имени ветки без кодирования ломают ссылку

@@ -12,20 +12,25 @@ from urllib.parse import quote
 
 from .httpclient import HttpClient, server_message
 
-TreeResult = namedtuple("TreeResult", "present paths problem blobs")
-CompareResult = namedtuple("CompareResult", "head ahead problem")
+# Уровень проблемы стоит последним и по умолчанию «ошибка»: так старые
+# конструкции кортежа читаются без правки, а редкие места, где проблема не
+# ошибка, называют уровень сами.
+TreeResult = namedtuple("TreeResult", "present paths problem blobs level",
+                        defaults=("error",))
+CompareResult = namedtuple("CompareResult", "head ahead problem level",
+                           defaults=("error",))
 
 logger = logging.getLogger(__name__)
 
 
-def _tree_problem(problem: str) -> TreeResult:
+def _tree_problem(problem: str, level: str = "error") -> TreeResult:
     """Дерево не прочиталось: причина есть, содержимого нет.
 
     Восемь мест собирали этот кортеж вручную и позиционно. В 2.2.0
     добавление поля blobs стоило правки одиннадцати конструкций, и
     следующее поле стоило бы того же.
     """
-    return TreeResult(None, [], problem, {})
+    return TreeResult(None, [], problem, {}, level)
 
 
 class GitlabClient:
@@ -121,7 +126,13 @@ class GitlabClient:
         # остаётся тем, что вернул сервер, — билд просто получает проблему.
         problem = note if not result.problem else "%s; %s" % (note,
                                                               result.problem)
-        return TreeResult(result.present, result.paths, problem, result.blobs)
+        # Подмена хоста сама по себе не отказ: дерево прочиталось, просто не
+        # на том сервере, что стоял в ссылке билда. Но когда под заметкой
+        # лежит настоящий отказ, уровень остаётся его — склеенная строка
+        # говорит о двух вещах сразу, и мягче из них она быть не может.
+        level = result.level if result.problem else "warning"
+        return TreeResult(result.present, result.paths, problem, result.blobs,
+                          level)
 
     def _fetch_tree(self, cfg, project, ref) -> TreeResult:
         url = "%s/projects/%s/repository/tree" % (
@@ -203,7 +214,11 @@ class GitlabClient:
         считаются сравнением деревьев, а не журнала.
         """
         if not from_sha or not to_ref:
-            return CompareResult(None, None, "gitlab: нечего сравнивать")
+            # Не отказ и даже не предупреждение: сравнивать нечего, потому
+            # что нечего — у билда нет коммита или ветки. Строку билда такая
+            # запись красить не должна.
+            return CompareResult(None, None, "gitlab: нечего сравнивать",
+                                 "note")
         return self._cached(("compare", host, project, from_sha, to_ref),
                             "сравнение %s %s %s..%s" % (host, project,
                                                         from_sha, to_ref),

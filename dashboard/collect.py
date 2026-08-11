@@ -1,6 +1,7 @@
 """Сбор снапшота одного тега из koji и GitLab."""
 import logging
 import os
+import re
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -8,7 +9,7 @@ from datetime import datetime, timezone
 from typing import Dict, Optional
 
 from .classify import Classifier, find_cves
-from .model import Build, Patch, Snapshot, Source
+from .model import Build, Patch, Problem, Snapshot, Source
 from .sourceurl import ParsedSource, SourceUrlError, parse_source_url
 
 logger = logging.getLogger(__name__)
@@ -97,6 +98,10 @@ def collect_tag(tag: str, cfg, koji_client, gitlab_client, jobs: int = 8,
                 branch_check: bool = True) -> Snapshot:
     """Собирает билды тега, их патчи и RPM в один снапшот."""
     classifier = Classifier.from_config(cfg)
+    # Классы, для которых заводят сводные списки. Конфиг тестов и старые
+    # вызовы поля не знают — тогда сверка идёт только в одну сторону,
+    # от автогена к патчам.
+    autogen_classes = list(getattr(cfg, "autogen_classes", ()) or ())
     started = time.monotonic()
     tagged = koji_client.tagged_builds(tag)
     build_ids = [item["build_id"] for item in tagged]
@@ -133,7 +138,7 @@ def collect_tag(tag: str, cfg, koji_client, gitlab_client, jobs: int = 8,
         # обработчик лога не сериализовал пул.
         with progress_lock:
             done[0] += 1
-            if build.problems:
+            if _has_error(build):
                 problem_builds[0] += 1
             current, problems = done[0], problem_builds[0]
         if current % step and current != total:
@@ -154,13 +159,17 @@ def collect_tag(tag: str, cfg, koji_client, gitlab_client, jobs: int = 8,
                                  tags.get(info.get("build_id"), []))
         try:
             _attach_patches(build, info, gitlab_client, classifier,
-                            branch_check)
+                            branch_check, autogen_classes)
         except Exception as exc:
             # ни одна ошибка билда (в т.ч. неожиданная, не только
             # SourceUrlError/проблема GitLab) не должна валить весь сбор.
-            build.problems.append("internal error: %s" % exc)
+            build.problems.append(Problem("internal error: %s" % exc))
         for problem in build.problems:
-            logger.warning("%s: %s", build.name, problem)
+            # Заметка — не повод шуметь в stderr: она объясняет, почему чего-то
+            # не сделали («сравнивать нечего»), и на прогоне из тысячи билдов
+            # такие строки заслонили бы настоящие отказы. В debug они остаются.
+            say = logger.debug if problem.level == "note" else logger.warning
+            say("%s: %s", build.name, problem.text)
         report_progress(build)
         return build
 
@@ -175,7 +184,7 @@ def collect_tag(tag: str, cfg, koji_client, gitlab_client, jobs: int = 8,
     for item in missing:
         build = _placeholder_build(item, rpms.get(item.get("build_id"), []),
                                    tags.get(item.get("build_id"), []))
-        logger.warning("%s: %s", build.name, build.problems[0])
+        logger.warning("%s: %s", build.name, build.problems[0].text)
         builds.append(build)
     builds.sort(key=lambda b: b.name or "")
 
@@ -217,13 +226,14 @@ def _placeholder_build(info: dict, rpms, tags=()) -> Build:
     """
     build = _build_from_info(info, rpms, info.get("tag_name"), tags)
     build.patch_dir_present = None
-    build.problems.append("koji: нет деталей билда")
+    build.problems.append(Problem("koji: нет деталей билда"))
     return build
 
 
 def _attach_patches(build: Build, info: dict, gitlab_client,
                     classifier: Classifier,
-                    branch_check: bool = True) -> None:
+                    branch_check: bool = True,
+                    autogen_classes=()) -> None:
     """Патчи билда и всё, что о них известно.
 
     Четыре фазы подряд, и каждая может оказаться последней: разобрать
@@ -236,6 +246,11 @@ def _attach_patches(build: Build, info: dict, gitlab_client,
     commit = _describe_source(build, info, parsed, gitlab_client)
     ref, tree = _collect_patches(build, gitlab_client, parsed, commit,
                                  classifier)
+    # Только по прочитанному каталогу: у неудачного чтения список патчей пуст
+    # не потому, что патчей нет, и «автоген есть, а патчей нет» было бы про
+    # наше незнание, а не про билд.
+    if tree.present:
+        _autogen_checks(build, classifier, autogen_classes)
     if ref != commit:
         # откат на ветку: коммита в репозитории нет, и сравнивать с ним
         # ветку бессмысленно — точка отсчёта пропала вместе с коммитом
@@ -255,13 +270,13 @@ def _parse_source(build: Build, info: dict) -> Optional[ParsedSource]:
     """
     raw_url = _original_url(info)
     if not raw_url:
-        build.problems.append("no source url")
+        build.problems.append(Problem("no source url"))
         return None
     try:
         parsed = parse_source_url(raw_url)
     except SourceUrlError as exc:
         build.source = Source(raw=raw_url)
-        build.problems.append("bad source url: %s" % exc)
+        build.problems.append(Problem("bad source url: %s" % exc))
         return None
 
     # Сборка из готового SRPM: ветки нет, каталог PATCH читать негде и не у
@@ -306,7 +321,7 @@ def _collect_patches(build: Build, gitlab_client, parsed, commit,
         # проблема не обязательно означает, что читать нечего: подменённый
         # хост отдаёт и заметку, и настоящее дерево патчей. У неудачных
         # чтений paths и так пустой.
-        build.problems.append(result.problem)
+        build.problems.append(Problem(result.problem, result.level))
     for path in result.paths:
         build.patches.append(_patch(path, parsed, ref, classifier,
                                     gitlab_client,
@@ -320,7 +335,7 @@ def _branch_drift(build: Build, gitlab_client, parsed, commit, tree,
     ahead = gitlab_client.compare(parsed.host, parsed.project, commit,
                                   parsed.ref)
     if ahead.problem:
-        build.problems.append(ahead.problem)
+        build.problems.append(Problem(ahead.problem, ahead.level))
         return
     build.source.branch_head = ahead.head
     build.source.commits_ahead = ahead.ahead
@@ -345,7 +360,7 @@ def _branch_drift(build: Build, gitlab_client, parsed, commit, tree,
         return
     tip = gitlab_client.patch_files(parsed.host, parsed.project, parsed.ref)
     if tip.problem:
-        build.problems.append(tip.problem)
+        build.problems.append(Problem(tip.problem, tip.level))
         return
     build.ghost_patches = _ghosts(tree, tip, parsed, commit, classifier,
                                   gitlab_client)
@@ -388,11 +403,15 @@ def _read_patch_dir(build, gitlab_client, parsed, commit):
     if not result.problem or not result.problem.endswith(_REF_GONE):
         return commit, result
     if parsed.ref_kind == "commit":
-        build.problems.append(
-            "gitlab: коммит %s недоступен, патчей нет" % commit[:12])
+        build.problems.append(Problem(
+            "gitlab: коммит %s недоступен, патчей нет" % commit[:12]))
         return commit, result
-    build.problems.append(
-        "gitlab: коммит %s недоступен, патчи сняты с ветки" % commit[:12])
+    # Патчи всё-таки прочитаны, просто не из того коммита, из которого билд
+    # собран: список верен для ветки, а не для билда. Это предупреждение —
+    # данные есть, но отвечают на слегка другой вопрос.
+    build.problems.append(Problem(
+        "gitlab: коммит %s недоступен, патчи сняты с ветки" % commit[:12],
+        "warning"))
     return parsed.ref, gitlab_client.patch_files(parsed.host, parsed.project,
                                                  parsed.ref)
 
@@ -430,6 +449,80 @@ def _ghosts(built, tip, parsed, commit, classifier, gitlab_client):
     return out
 
 
+# Сгенерированный список патчей: autogen-cve-patches.inc и подобные. Правило
+# то же, каким их отбирает классификатор по умолчанию, но живёт оно здесь
+# отдельно: класс в конфиге можно назвать как угодно, а «это сводный список,
+# а не патч» — свойство самого имени файла.
+_AUTOGEN_RE = re.compile(r"(?i)^autogen[-_]")
+
+
+def _named_class(text: str, classifier: Classifier) -> Optional[str]:
+    """Класс, названный в имени файла: autogen-cve-… → CVE.
+
+    Сперва ищем имя класса целым словом — так подписан и сам файл. Если его
+    там нет, спрашиваем классификатор: маркер класса не обязан совпадать с
+    его именем (fuzz — это DAST), и правило об этом знает, а мы нет.
+    """
+    for name in classifier.class_names():
+        # Класс самих сводных списков заявить нельзя: «автоген обещает
+        # автоген» — не расхождение, а тавтология.
+        if _AUTOGEN_RE.search(name + "-"):
+            continue
+        if re.search(r"(?i)(?:^|[^a-z0-9])%s(?:[^a-z0-9]|$)" % re.escape(name),
+                     text):
+            return name
+    guess = classifier.classify(text)
+    # «other» — не класс, а его отсутствие; autogen внутри autogen значил бы,
+    # что мы не сняли приставку и читаем то же имя второй раз.
+    return None if guess in ("other", "AUTOGEN") or _AUTOGEN_RE.search(text) \
+        else guess
+
+
+def _autogen_checks(build: Build, classifier: Classifier,
+                    expected) -> None:
+    """Сводные списки и патчи, сверенные в обе стороны.
+
+    Автоген есть, а патчей его класса нет — список обещает то, чего в билде
+    не оказалось. Патчи есть, а автогена для них нет — их применяют старым
+    способом, вручную. Ни то, ни другое не отказ сбора: данные прочитаны
+    полностью, — но оба расхождения иначе как перебором раскрытий не
+    увидеть.
+
+    Второй проверке нужен список классов, для которых автоген заводят: у
+    SPEC или CHANGELOG сводного списка не бывает, и требовать его от них
+    значило бы предупреждать о том, чего никто не обещал. Список приходит из
+    конфига (`autogen_classes`).
+    """
+    # Сам сводный список за патч своего класса не считается: в конфиге
+    # правило AUTOGEN стоит первым и уводит такие файлы в свой класс, но
+    # порядок правил — дело того, кто пишет конфиг, а «список — не патч»
+    # верно при любом порядке.
+    present = set(p.cls for p in build.patches
+                  if not _AUTOGEN_RE.search(p.name))
+    claimed = {}
+    for patch in build.patches:
+        if not _AUTOGEN_RE.search(patch.name):
+            continue
+        cls = _named_class(_AUTOGEN_RE.sub("", patch.name), classifier)
+        # Автоген без маркера класса ни о чём не заявляет: не о чем и молчать.
+        if cls is not None and cls not in claimed:
+            claimed[cls] = patch.name
+
+    gaps = [cls for cls in claimed if cls not in present]
+    old_way = [cls for cls in expected or () if cls in present
+               and cls not in claimed]
+    for cls in sorted(set(gaps) | set(old_way)):
+        if cls in claimed:
+            build.problems.append(Problem(
+                "autogen: есть %s, но ни одного патча класса %s"
+                % (claimed[cls], cls), "warning"))
+        else:
+            build.problems.append(Problem(
+                "autogen: патчи класса %s есть, а сводного списка нет — "
+                "старый способ применения, стоит перейти на автоген" % cls,
+                "warning"))
+
+
 def _patch(path, parsed, ref, classifier, gitlab_client, ghost=None,
            sha=None):
     name = os.path.basename(path)
@@ -441,17 +534,43 @@ def _patch(path, parsed, ref, classifier, gitlab_client, ghost=None,
 
 # Проблемы, у которых после двоеточия стоит произвольный текст: в сводке их
 # группируем по префиксу, иначе одна строка stderr растёт до числа билдов.
-_GROUPED_PROBLEMS = ("gitlab:", "internal error:", "bad source url:")
+_GROUPED_PROBLEMS = ("gitlab:", "internal error:", "bad source url:",
+                     "autogen:")
+
+
+def error_builds(snapshots) -> int:
+    """Сколько билдов с ошибками во всех снапшотах прогона.
+
+    Живёт здесь, а не в cli: «что считать проблемным билдом» — правило сбора,
+    и второе его написание в другом файле разошлось бы с первым молча.
+    """
+    return sum(1 for snapshot in snapshots for build in snapshot.builds
+               if _has_error(build))
+
+
+def _has_error(build: Build) -> bool:
+    """Есть ли у билда хоть одна проблема уровня «ошибка».
+
+    Проблемным билд считается по ошибкам, а не по любой записи: с появлением
+    уровней «патчи сняты с ветки» перестало значить «сбор не удался», и
+    считать такой билд проблемным значило бы ронять прогон из-за того, что
+    прогон как раз пережил.
+    """
+    return any(p.level == "error" for p in build.problems)
 
 
 def _log_summary(snapshot: Snapshot, elapsed: float,
                  orphan_source: int = 0) -> None:
     """Итог по тегу — то, что раньше печатал CLI своим sys.stderr.write."""
     summary = problem_summary(snapshot)
-    problems = sum(1 for b in snapshot.builds if b.problems)
+    problems = sum(1 for b in snapshot.builds if _has_error(b))
+    warned = sum(1 for b in snapshot.builds
+                 if not _has_error(b)
+                 and any(p.level == "warning" for p in b.problems))
     details = ", ".join("%s: %d" % item for item in sorted(summary.items()))
-    logger.info("%s: готово, %d билдов, %d проблемных%s, за %.1f с",
-                snapshot.tag, len(snapshot.builds), problems,
+    logger.info("%s: готово, %d билдов, %d проблемных, %d с предупреждениями%s,"
+                " за %.1f с",
+                snapshot.tag, len(snapshot.builds), problems, warned,
                 (" (%s)" % details) if details else "", elapsed)
     known = sum(1 for b in snapshot.builds if b.source and b.source.commit)
     ahead = sum(1 for b in snapshot.builds
@@ -468,7 +587,8 @@ def problem_summary(snapshot: Snapshot) -> Dict[str, int]:
     counts = {}
     for build in snapshot.builds:
         for problem in build.problems:
-            key = (problem.split(":")[0]
-                   if problem.startswith(_GROUPED_PROBLEMS) else problem)
+            text = problem.text
+            key = (text.split(":")[0]
+                   if text.startswith(_GROUPED_PROBLEMS) else text)
             counts[key] = counts.get(key, 0) + 1
     return counts

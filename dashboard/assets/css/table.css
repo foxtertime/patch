@@ -34,6 +34,11 @@ tr.main-row.open > td { background: var(--card); }
    ниже, и при равной весомости выигрывает оно. */
 tr.main-row.open > td:first-child,
 tr.detail-row > td { box-shadow: inset 3px 0 0 var(--accent); }
+tr.main-row.warn > td:first-child,
+tr.detail-row.warn > td { box-shadow: inset 3px 0 0 var(--major); }
+/* Красная полоса стоит ниже янтарной и потому сильнее её: строка красится
+   по самой критичной своей проблеме, и билд, у которого есть и ошибка, и
+   предупреждение, обязан читаться как проблемный. */
 tr.main-row.bad > td:first-child,
 tr.detail-row.bad > td { box-shadow: inset 3px 0 0 var(--removed); }
 /* break-word, а не anywhere: последний рвёт версию посередине, и 'el10'
@@ -53,10 +58,18 @@ td.ver { color: var(--muted); overflow-wrap: anywhere; }
 td.ver.new { color: var(--fg); }
 td.branch, td.tagged { font-size: .85em; color: var(--muted);
   overflow-wrap: anywhere; }
+/* Ветка достаётся колонке по остаточному принципу, и с anywhere имя рвалось
+   посреди слова, едва таблице становилось тесно: «rhel-9.6.0.z-security»
+   складывалось в три куска по слогам, хотя до края окна место ещё
+   оставалось. Просим под колонку минимум в двадцать четыре знака — обычное
+   имя ветки в них укладывается. Сороказначный хеш коммита по-прежнему
+   переносится: минимум не запрещает перенос, он лишь не даёт колонке
+   сжаться до слогов. */
+td.branch { min-width: 24ch; }
 /* Имя koji-тега не переносим: разорванное посередине, оно перестаёт быть
-   именем, а искать его глазами приходится в каждой унаследованной строке.
-   Колонка при auto-раскладке возьмёт ширину самого длинного тега — а он
-   стоит не в каждой строке, у затегованных прямо здесь прочерк. */
+   именем, а искать его глазами приходится в каждой строке. Колонка при
+   auto-раскладке возьмёт ширину самого длинного тега — теги короткие, и
+   отдельного минимума ей, в отличие от ветки, не нужно. */
 td.tagged { white-space: nowrap; overflow-wrap: normal; }
 td.dir { text-align: center; font-weight: 700; white-space: nowrap; }
 tr.upgraded td.dir { color: var(--up); }
@@ -283,9 +296,33 @@ tr.detail-row > td { background: var(--card); padding: .85rem .7rem 1.1rem 2.2re
    или приехавший патч: «эта сторона потеряла» / «эта сторона получила». */
 .is-added { color: var(--added); }
 .is-removed { color: var(--removed); }
-.problems { list-style: none; margin: 0; padding: 0; }
-.problems li { color: var(--removed); font-size: .82rem; padding: .1rem 0;
-  overflow-wrap: anywhere; }
+/* Проблемы: каждая — блок из подписи и текста, схваченный красной полосой
+   слева. Полоса та же, что у списка патчей, только цветом беды: она держит
+   подпись и текст вместе и отделяет соседнюю проблему без пустой строки
+   между ними. Раньше здесь стоял список, и у проблемы в два предложения
+   было не видно, где она кончается, — а типов проблем прибавляется.
+
+   Промежуток небольшой: блоки — это один список, и разъезжаться им незачем. */
+.probs { display: grid; gap: .5rem; }
+.prob { padding-left: .6rem; border-left: 2px solid currentColor; }
+/* Цвет — уровень проблемы, и он же цвет полосы: красный у ошибки, янтарный
+   у предупреждения (тот же, что у «ветка +N» и меток-предупреждений),
+   приглушённый у заметки. Полоса берёт его через currentColor, поэтому
+   правило одно на оба.
+
+   Приставка lvl- разводит уровень заметки и приписку к значению ниже:
+   голым классом note блок заметки брал бы и её отступ слева и стоял бы
+   правее блоков ошибки и предупреждения. */
+.prob.lvl-error { color: var(--removed); }
+.prob.lvl-warning { color: var(--major); }
+.prob.lvl-note { color: var(--muted); }
+/* Подпись набрана как имя класса патчей в блоке рядом — та же величина,
+   жирность и разрядка: на странице один способ подписать кусок данных. */
+.pkind { font-size: .7rem; font-weight: 700; letter-spacing: .05em;
+  text-transform: uppercase; color: currentColor; }
+/* Текст проблемы — обычный текст, а не сигнал: цветом набраны подпись и
+   полоса, и цветная строка под цветной подписью читалась бы пятном. */
+.ptext { color: var(--fg); font-size: .82rem; overflow-wrap: anywhere; }
 .none { color: var(--muted); font-size: .82rem; }
 /* Приписка к значению: «прямой», «унаследован». */
 .note { color: var(--muted); font-size: .74rem; margin-left: .4rem; }

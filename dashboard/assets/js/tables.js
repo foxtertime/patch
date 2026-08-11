@@ -43,8 +43,8 @@
   /* Раскрытая строка — не отдельная карточка, а продолжение своей строки:
      полоса слева идёт через обе и делает из них один предмет. У билда с
      проблемой полоса красная — та же, что метит саму строку. */
-  function detailRow(cols, body, bad) {
-    return `<tr class="detail-row${bad ? ' bad' : ''}">`
+  function detailRow(cols, body, level) {
+    return `<tr class="detail-row${level ? ' ' + level : ''}">`
       + `<td colspan="${cols}">${body}</td></tr>`;
   }
 
@@ -117,10 +117,9 @@
       + `${markup.ghostsHtml(row.ghosts || [], q)}</div>`;
 
     if (row.problems.length) {
-      const items = row.problems.map((p) => `<li>${hl(p, q)}</li>`).join('');
       out += `<div class="block wide">`
            + `${blockHead('проблемы', row.problems.length)}`
-           + `<ul class="problems">${items}</ul></div>`;
+           + `${markup.problemsHtml(row.problems, q)}</div>`;
     }
     return `${out}</div>`;
   }
@@ -131,14 +130,21 @@
       const row = item.row;
       const key = opt.keyOf(row);
       const open = opt.openOf(key, item.open);
-      const bad = row.problems.length || row.marks.indexOf('no-source') !== -1;
+      /* Полоса строки — по самой критичной из её проблем: одна ошибка
+         сильнее любого числа предупреждений, и красный перекрывает янтарный.
+         Уровень посчитан в viewmodel; метка no-source остаётся запасным
+         поводом покраснеть — она бывает и у билда, чей снапшот собран до
+         появления уровней. */
+      const level = row.level === 'error'
+                    || row.marks.indexOf('no-source') !== -1 ? 'bad'
+                  : row.level === 'warning' ? 'warn' : '';
       /* Число и полоска разведены по краям ячейки, а не стоят подряд:
          подробности — у .patcell в стилях. */
       const patches = row.patches.length
         ? `<span class="patcell">${row.patches.length}${markup.meterHtml(row)}</span>`
         : '<span class="zero">0</span>';
       const main = `<tr class="main-row${open ? ' open' : ''}`
-        + `${bad ? ' bad' : ''}" data-row="${esc(key)}">`
+        + `${level ? ' ' + level : ''}" data-row="${esc(key)}">`
         + `<td class="src">${chevron(open)} ${hl(row.name, q)}</td>`
         /* Версии может не быть: снапшот приходит из файла, который выбрал
            человек, и прочерк здесь честнее пустой ячейки. */
@@ -154,7 +160,8 @@
              : '<span class="none">—</span>'}</td>`
         + `<td class="marks">${markup.marksHtml(row.marks)}</td>`
         + `${linksCell(row)}</tr>`;
-      return open ? main + detailRow(opt.cols, stateDetail(row, q), bad) : main;
+      return open ? main + detailRow(opt.cols, stateDetail(row, q), level)
+                  : main;
     }).join('');
   }
 

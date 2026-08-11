@@ -16,6 +16,7 @@
   const LABELS = {
     "all": "все",
     "has-patch": "с патчами", "problem": "с проблемами",
+    "warning": "с предупреждениями", "note": "с заметками",
     "no-patch": "нет каталога PATCH", "no-source": "нет источника",
     "from-commit": "собран с коммита", "from-srpm": "собран из SRPM",
     "branch-ahead": "ветка ушла вперёд",
@@ -30,6 +31,24 @@
     "branch-changed": "сменил ветку",
     "changed": "что-то изменилось"
   };
+  /* Источник проблемы: как он назван в снапшоте и как его читает человек.
+     Ключ — то, что стоит в строке проблемы до первого двоеточия, каким его
+     пишет collect.py; строка без двоеточия («no source url») стоит ключом
+     целиком. Новый тип проблемы добавляется сюда одной строкой, и это
+     единственное место, куда за этим ходят.
+
+     Незнакомый источник страница показывает как есть: молчать о проблеме
+     хуже, чем назвать её техническим именем, а собранную страницу читают
+     и той версией, которой в словаре ещё нет нового ключа. */
+  const PROBLEM_KINDS = {
+    "autogen": "автоген",
+    "gitlab": "GitLab",
+    "koji": "Koji",
+    "internal error": "внутренняя ошибка",
+    "bad source url": "ссылка на источник",
+    "no source url": "нет ссылки на источник"
+  };
+
   /* Подписи классов патчей живут отдельно от постоянных: классы приходят с
      данными и уходят вместе с ними, а LABELS — словарь самой страницы. */
   let CLASS_LABELS = {};
@@ -40,6 +59,7 @@
                         "coverage": 1, "distsuffix": 1, "license": 1, "spec": 1,
                         "changelog": 1, "files": 1, "other": 1 };
   const CALM_MARKS = { "from-commit": "warn", "from-srpm": "warn",
+                       "warning": "warn", "note": "calm",
                        "branch-ahead": "warn",
                        "patches~": "warn",
                        "no-patch": "calm",
@@ -50,7 +70,7 @@
 
   /* Группы фильтров: чем признак является, а не где он нарисован. Группа —
      это и заголовок в меню, и область действия переключателя «все / любой
-     из», поэтому её id уезжает в ссылку и меняться не может.
+     из».
 
      Живут они здесь, а не в page.js, по той же причине, что и подписи:
      «к чему относится этот ключ» — вопрос словаря страницы, а не её
@@ -66,8 +86,8 @@
         keys: ["has-patch", "inherited", "from-commit", "from-srpm",
                "branch-ahead"] },
       { id: "trouble", label: "проблемы",
-        keys: ["problem", "no-patch", "no-source", "gitlab-error",
-               "internal-error"] }
+        keys: ["problem", "warning", "note", "no-patch", "no-source",
+               "gitlab-error", "internal-error"] }
     ],
     diff: [
       { id: "status", label: "статус",
@@ -105,6 +125,27 @@
     return text.own(LABELS, key) || text.own(CLASS_LABELS, key) || key;
   }
 
+  /* Проблема, разобранная на подпись и текст. Режем по первому двоеточию:
+     так их и пишет collect.py, и слева от него всегда источник. Двоеточия
+     внутри текста от этого не страдают — «internal error: KeyError:
+     'source'» делится один раз, по первому.
+
+     known говорит, чья подпись получилась: у знакомого источника это слово
+     самой страницы, у незнакомого — кусок данных. Разница не косметическая:
+     подсвечивать поиском можно только второе. */
+  function problem(line) {
+    const raw = String(line === null || line === undefined ? '' : line).trim();
+    const at = raw.indexOf(':');
+    const head = at === -1 ? raw : raw.slice(0, at).trim();
+    const rest = at === -1 ? '' : raw.slice(at + 1).trim();
+    const named = text.own(PROBLEM_KINDS, head.toLowerCase());
+    if (named !== undefined) return { title: named, text: rest, known: true };
+    /* Строку вовсе без двоеточия назвать нечем: она вся и есть текст.
+       Придумывать ей заголовок значило бы выдать догадку за данные. */
+    if (at === -1) return { title: '', text: raw, known: false };
+    return { title: head, text: rest, known: false };
+  }
+
   /* Порядок классов: сначала как их перечислил классификатор, потом всё,
      что встретилось в данных, но в списке классов отсутствует.
 
@@ -138,6 +179,8 @@
 
   return { setClasses: setClasses, classes: classes, label: label,
            classCls: classCls, classOrder: classOrder, groups: groups,
+           problem: problem,
            LABELS: LABELS, ARROW: ARROW, KNOWN_CLASS: KNOWN_CLASS,
+           PROBLEM_KINDS: PROBLEM_KINDS,
            CALM_MARKS: CALM_MARKS, STATUS_MARKS: STATUS_MARKS };
 }));

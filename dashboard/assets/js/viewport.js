@@ -1,9 +1,6 @@
 /* Реакции на размер и прокрутку окна: высота липкой шапки и кнопка
    «наверх». Владеет своими слушателями; наружу не отдаёт ничего — звать
-   этот модуль неоткуда, он сам слушает окно.
-
-   Про карточки здесь не знают: пересчитать их ширину умеет только тот, у
-   кого есть узлы рядов, поэтому пересчёт приходит доводом onResize. */
+   этот модуль неоткуда, он сам слушает окно. */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
     module.exports = factory();
@@ -16,7 +13,6 @@
 
   function create(deps) {
     const controls = deps.controls, toTop = deps.toTop;
-    const onResize = deps.onResize || function () {};
 
     function syncStickyOffset() {
       if (!controls || !document.documentElement.style.setProperty) return;
@@ -36,9 +32,6 @@
     } else {
       window.addEventListener('resize', syncStickyOffset);
     }
-    /* Ширина карточки посчитана от ширины окна и переживает её изменение не
-       сама: окно сузили — в строку влезает меньше, и делить надо заново. */
-    window.addEventListener('resize', onResize);
     window.addEventListener('scroll', syncToTop);
 
     toTop.addEventListener('click', () => {

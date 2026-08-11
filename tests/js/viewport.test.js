@@ -6,10 +6,9 @@ var assert = require('node:assert');
 var domstub = require('./domstub.js');
 var viewportmod = require('../../dashboard/assets/js/viewport.js');
 
-function load(options) {
-  var dom = domstub.install(options);
-  viewportmod.create({ controls: dom.id('controls'), toTop: dom.id('totop'),
-                       onResize: function () {} });
+function load() {
+  var dom = domstub.install();
+  viewportmod.create({ controls: dom.id('controls'), toTop: dom.id('totop') });
   return dom;
 }
 
@@ -57,8 +56,8 @@ test('высота липкой шапки выставляется при со�
   controls.getBoundingClientRect = function () {
     return { top: 0, left: 0, right: 100, bottom: 42, width: 100, height: 42 };
   };
-  viewportmod.create({ controls: controls, toTop: dom.id('totop'),
-                       onResize: function () {} });
+  viewportmod.create({ controls: controls, toTop: dom.id('totop') });
+
   assert.strictEqual(calls.length, 1);
   assert.deepStrictEqual(calls[0], ['--controls-h', '42px']);
 });

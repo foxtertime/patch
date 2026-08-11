@@ -50,7 +50,9 @@
               || patchesHit(row.patches, q)
               || patchesHit(row.ghosts, q)
               || row.rpms.some((r) => has(r, q))
-              || row.problems.some((p) => has(p, q));
+              /* Ищем по тексту проблемы: уровень — это цвет, а не слово,
+                 которое человек станет набирать в поле. */
+              || row.problems.some((p) => has(p.text, q));
     return { show: shallow || deep, deep: !shallow && deep };
   }
 

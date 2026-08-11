@@ -123,6 +123,47 @@ class LoadConfigTest(unittest.TestCase):
                          CVE_RE.findall("CVE-2024-1234"))
 
 
+class AutogenClassesTest(unittest.TestCase):
+    """Классы, для которых ждут сводный список патчей.
+
+    Список нужен обратной сверке: «патчи есть, а автогена нет». У SPEC или
+    CHANGELOG автогена не бывает, и требовать его от них значило бы
+    предупреждать о том, чего никто не обещал.
+    """
+
+    def test_default_names_the_four_classes(self):
+        cfg = load_config(write(MINIMAL))
+        self.assertEqual(cfg.autogen_classes,
+                         ["CVE", "SAST", "DAST", "COVERAGE"])
+
+    def test_default_is_trimmed_to_the_classes_of_the_config(self):
+        """Умолчание не спорит с patch_classes.
+
+        В FULL описаны только CVE и SAST: требовать автоген для DAST,
+        которого в конфиге нет вовсе, значит ронять сбор из-за нашего же
+        умолчания.
+        """
+        cfg = load_config(write(FULL))
+        self.assertEqual(cfg.autogen_classes, ["CVE", "SAST"])
+
+    def test_explicit_list_wins(self):
+        cfg = load_config(write(FULL + "autogen_classes: [SAST]\n"))
+        self.assertEqual(cfg.autogen_classes, ["SAST"])
+
+    def test_empty_list_turns_the_check_off(self):
+        cfg = load_config(write(FULL + "autogen_classes: []\n"))
+        self.assertEqual(cfg.autogen_classes, [])
+
+    def test_unknown_class_is_an_error(self):
+        """Опечатка в имени класса — не выключенная проверка, а опечатка."""
+        with self.assertRaises(ConfigError):
+            load_config(write(FULL + "autogen_classes: [COVERGAE]\n"))
+
+    def test_not_a_list_is_an_error(self):
+        with self.assertRaises(ConfigError):
+            load_config(write(FULL + "autogen_classes: CVE\n"))
+
+
 class DefaultRulesOnRealNamesTest(unittest.TestCase):
     """Правила по умолчанию на именах файлов, как их называют в PATCH."""
 

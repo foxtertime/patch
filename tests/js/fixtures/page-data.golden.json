@@ -429,7 +429,10 @@
      "patch_dir_present": false,
      "patches": [],
      "problems": [
-      "gitlab: 404 на дереве ветки"
+      {
+       "level": "error",
+       "text": "gitlab: 404 на дереве ветки"
+      }
      ],
      "project": "web/httpd",
      "ref_kind": "commit",
@@ -445,7 +448,11 @@
      "commit_url": null,
      "commits_ahead": null,
      "patches_ref": null,
-     "ghosts": []
+     "ghosts": [],
+     "level": "error",
+     "levels": [
+      "error"
+     ]
     },
     {
      "branch": "os-9.1",
@@ -520,7 +527,9 @@
      "commit_url": null,
      "commits_ahead": null,
      "patches_ref": null,
-     "ghosts": []
+     "ghosts": [],
+     "level": null,
+     "levels": []
     },
     {
      "branch": null,
@@ -554,7 +563,10 @@
       }
      ],
      "problems": [
-      "internal error: boom"
+      {
+       "level": "error",
+       "text": "internal error: boom"
+      }
      ],
      "project": null,
      "ref_kind": "none",
@@ -570,7 +582,11 @@
      "commit_url": null,
      "commits_ahead": null,
      "patches_ref": null,
-     "ghosts": []
+     "ghosts": [],
+     "level": "error",
+     "levels": [
+      "error"
+     ]
     },
     {
      "branch": "os-9.1",
@@ -630,7 +646,9 @@
      "commit_url": null,
      "commits_ahead": null,
      "patches_ref": null,
-     "ghosts": []
+     "ghosts": [],
+     "level": null,
+     "levels": []
     }
    ],
    "counts": {
@@ -678,7 +696,9 @@
     "patch_files": 6,
     "problems": 2,
     "with_patches": 3,
-    "without_patches": 1
+    "without_patches": 1,
+    "warnings": 0,
+    "notes": 0
    },
    "generated": "2026-07-01T00:00:00+03:00",
    "koji_web": "https://hub/koji",
@@ -732,7 +752,9 @@
      "commit_url": null,
      "commits_ahead": null,
      "patches_ref": null,
-     "ghosts": []
+     "ghosts": [],
+     "level": null,
+     "levels": []
     },
     {
      "branch": "abc123",
@@ -756,7 +778,10 @@
      "patch_dir_present": false,
      "patches": [],
      "problems": [
-      "gitlab: 404 на дереве ветки"
+      {
+       "level": "error",
+       "text": "gitlab: 404 на дереве ветки"
+      }
      ],
      "project": "web/httpd",
      "ref_kind": "commit",
@@ -772,7 +797,11 @@
      "commit_url": null,
      "commits_ahead": null,
      "patches_ref": null,
-     "ghosts": []
+     "ghosts": [],
+     "level": "error",
+     "levels": [
+      "error"
+     ]
     },
     {
      "branch": "os-9.2",
@@ -847,7 +876,9 @@
      "commit_url": null,
      "commits_ahead": null,
      "patches_ref": null,
-     "ghosts": []
+     "ghosts": [],
+     "level": null,
+     "levels": []
     },
     {
      "branch": "os-9.1",
@@ -907,7 +938,9 @@
      "commit_url": null,
      "commits_ahead": null,
      "patches_ref": null,
-     "ghosts": []
+     "ghosts": [],
+     "level": null,
+     "levels": []
     }
    ],
    "counts": {
@@ -955,7 +988,9 @@
     "patch_files": 6,
     "problems": 1,
     "with_patches": 3,
-    "without_patches": 1
+    "without_patches": 1,
+    "warnings": 0,
+    "notes": 0
    },
    "generated": "2026-08-01T00:00:00+03:00",
    "koji_web": "https://hub/koji",
