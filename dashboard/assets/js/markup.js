@@ -63,6 +63,30 @@
          + (time ? `<span class="tm">${hl(time, q)}</span>` : '');
   }
 
+  /* Проблемы билда: каждая — свой блок из подписи и текста, схваченный
+     полосой слева. Полоса — тот же приём, что у списка патчей: она держит
+     подпись и текст вместе и отделяет соседнюю проблему, не заводя между
+     ними пустой строки. Список, каким он был раньше, этого не умел: у
+     проблемы из двух предложений было не видно, где она кончается.
+
+     Подпись знакомого источника — слово самой страницы, и поиском она не
+     подсвечивается: подсветка обещала бы, что запрос нашёлся в данных, а
+     он нашёлся в словаре. Незнакомый источник приехал из снапшота, и его
+     подсвечиваем наравне с текстом. */
+  function problemHtml(line, q) {
+    const p = labels.problem(line);
+    const title = p.known ? esc(p.title) : hl(p.title, q);
+    return '<div class="prob">'
+      + (p.title ? `<div class="pkind">${title}</div>` : '')
+      + (p.text ? `<div class="ptext">${hl(p.text, q)}</div>` : '')
+      + '</div>';
+  }
+
+  function problemsHtml(problems, q) {
+    const out = (problems || []).map((line) => problemHtml(line, q)).join('');
+    return `<div class="probs">${out}</div>`;
+  }
+
   function inheritedNote(inherited) {
     if (inherited === null) return '';
     return `<span class="note">(${inherited ? 'унаследован' : 'прямой'})</span>`;
@@ -401,5 +425,6 @@
            patchesHtml, patchesChangeHtml, ghostsHtml, rpmsHtml,
            rpmsChangeHtml, rpmSideList,
            taggedCell, builtHtml, inheritedNote, mainTagHtml, otherTagsHtml,
+           problemHtml, problemsHtml,
            taggedText, delta };
 }));

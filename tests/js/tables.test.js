@@ -406,6 +406,18 @@ test('одинаковые владелец и проект ничем не по
 
 test('блок проблем появляется только когда они есть', function () {
   assert.doesNotMatch(tables.stateDetail(stateRow(), q()), /проблемы/);
-  assert.match(tables.stateDetail(stateRow({ problems: ['нет ветки'] }), q()),
-               /<li>нет ветки<\/li>/);
+  var out = tables.stateDetail(
+    stateRow({ problems: ['gitlab: нет ветки'] }), q());
+  assert.match(out, /class="prob"/, out);
+  assert.match(out, /class="pkind">GitLab</, out);
+  assert.match(out, /class="ptext">нет ветки</, out);
+});
+
+/* Проблем бывает несколько, и каждая — свой блок: одним списком они
+   сливались, а типов проблем впереди больше. */
+test('каждая проблема — свой блок', function () {
+  var out = tables.stateDetail(
+    stateRow({ problems: ['gitlab: нет ветки', 'koji: нет деталей билда'] }),
+    q());
+  assert.strictEqual(out.split('class="prob"').length - 1, 2, out);
 });

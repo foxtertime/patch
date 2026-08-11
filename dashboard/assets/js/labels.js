@@ -30,6 +30,23 @@
     "branch-changed": "сменил ветку",
     "changed": "что-то изменилось"
   };
+  /* Источник проблемы: как он назван в снапшоте и как его читает человек.
+     Ключ — то, что стоит в строке проблемы до первого двоеточия, каким его
+     пишет collect.py; строка без двоеточия («no source url») стоит ключом
+     целиком. Новый тип проблемы добавляется сюда одной строкой, и это
+     единственное место, куда за этим ходят.
+
+     Незнакомый источник страница показывает как есть: молчать о проблеме
+     хуже, чем назвать её техническим именем, а собранную страницу читают
+     и той версией, которой в словаре ещё нет нового ключа. */
+  const PROBLEM_KINDS = {
+    "gitlab": "GitLab",
+    "koji": "Koji",
+    "internal error": "внутренняя ошибка",
+    "bad source url": "ссылка на источник",
+    "no source url": "нет ссылки на источник"
+  };
+
   /* Подписи классов патчей живут отдельно от постоянных: классы приходят с
      данными и уходят вместе с ними, а LABELS — словарь самой страницы. */
   let CLASS_LABELS = {};
@@ -105,6 +122,27 @@
     return text.own(LABELS, key) || text.own(CLASS_LABELS, key) || key;
   }
 
+  /* Проблема, разобранная на подпись и текст. Режем по первому двоеточию:
+     так их и пишет collect.py, и слева от него всегда источник. Двоеточия
+     внутри текста от этого не страдают — «internal error: KeyError:
+     'source'» делится один раз, по первому.
+
+     known говорит, чья подпись получилась: у знакомого источника это слово
+     самой страницы, у незнакомого — кусок данных. Разница не косметическая:
+     подсвечивать поиском можно только второе. */
+  function problem(line) {
+    const raw = String(line === null || line === undefined ? '' : line).trim();
+    const at = raw.indexOf(':');
+    const head = at === -1 ? raw : raw.slice(0, at).trim();
+    const rest = at === -1 ? '' : raw.slice(at + 1).trim();
+    const named = text.own(PROBLEM_KINDS, head.toLowerCase());
+    if (named !== undefined) return { title: named, text: rest, known: true };
+    /* Строку вовсе без двоеточия назвать нечем: она вся и есть текст.
+       Придумывать ей заголовок значило бы выдать догадку за данные. */
+    if (at === -1) return { title: '', text: raw, known: false };
+    return { title: head, text: rest, known: false };
+  }
+
   /* Порядок классов: сначала как их перечислил классификатор, потом всё,
      что встретилось в данных, но в списке классов отсутствует.
 
@@ -138,6 +176,8 @@
 
   return { setClasses: setClasses, classes: classes, label: label,
            classCls: classCls, classOrder: classOrder, groups: groups,
+           problem: problem,
            LABELS: LABELS, ARROW: ARROW, KNOWN_CLASS: KNOWN_CLASS,
+           PROBLEM_KINDS: PROBLEM_KINDS,
            CALM_MARKS: CALM_MARKS, STATUS_MARKS: STATUS_MARKS };
 }));

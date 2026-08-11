@@ -117,10 +117,9 @@
       + `${markup.ghostsHtml(row.ghosts || [], q)}</div>`;
 
     if (row.problems.length) {
-      const items = row.problems.map((p) => `<li>${hl(p, q)}</li>`).join('');
       out += `<div class="block wide">`
            + `${blockHead('проблемы', row.problems.length)}`
-           + `<ul class="problems">${items}</ul></div>`;
+           + `${markup.problemsHtml(row.problems, q)}</div>`;
     }
     return `${out}</div>`;
   }

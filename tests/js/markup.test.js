@@ -335,3 +335,40 @@ test('класс патча виден и покрашен', function () {
   assert.match(html, /SAST/);
   assert.match(html, /class="pcls [^"]+"/);
 });
+
+/* Блок проблемы: подпись сверху, текст под ней, полоса слева — её рисует
+   css по классу .prob. Здесь проверяется, что в разметку попало и чем
+   набрано. */
+test('проблема рисуется блоком из подписи и текста', function () {
+  var out = markup.problemHtml('gitlab: ветка os-9.6 не найдена', q());
+  assert.match(out, /class="prob"/);
+  assert.match(out, /class="pkind">GitLab</);
+  assert.match(out, /class="ptext">ветка os-9\.6 не найдена</);
+});
+
+test('у проблемы без текста подписи хватает одной', function () {
+  var out = markup.problemHtml('no source url', q());
+  assert.match(out, /class="pkind">нет ссылки на источник</);
+  assert.doesNotMatch(out, /class="ptext"/);
+});
+
+/* Подсветка обещает «запрос нашёлся здесь». Подпись знакомого источника —
+   слово самой страницы, а не данные: подсветив её, страница обещала бы
+   найденное там, где искать нечего. Незнакомая подпись приехала из
+   снапшота, и её подсвечиваем наравне с текстом. */
+test('подсветка не трогает подпись знакомого источника', function () {
+  var out = markup.problemHtml('gitlab: gitlab не ответил', q('gitlab'));
+  assert.match(out, /class="pkind">GitLab</);
+  assert.match(out, /class="ptext"><span class="hit">gitlab<\/span> не ответил</);
+});
+
+test('незнакомая подпись подсвечивается как данные', function () {
+  var out = markup.problemHtml('mock: сборка упала', q('mock'));
+  assert.match(out, /class="pkind"><span class="hit">mock<\/span></);
+});
+
+test('разметка из проблемы экранируется', function () {
+  var out = markup.problemsHtml(['<img src=x>: <b>бум</b>'], q());
+  assert.strictEqual(out.indexOf('<img'), -1, out);
+  assert.strictEqual(out.indexOf('<b>'), -1, out);
+});
