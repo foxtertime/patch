@@ -169,11 +169,15 @@ class InterestingCasesTest(unittest.TestCase):
         бы только тестами.
         """
         build = snapshot("rich-wide.json").by_name()["libxml2"]
-        self.assertEqual([p.level for p in build.problems], ["warning"])
+        self.assertEqual([p.level for p in build.problems],
+                         ["warning", "warning"])
+        texts = [p.text for p in build.problems]
         # автоген обещает CVE, а патча этого класса в билде нет
-        self.assertIn("autogen", build.problems[0].text)
-        self.assertIn("CVE", build.problems[0].text)
+        self.assertIn("CVE", texts[0])
         self.assertNotIn("CVE", [p.cls for p in build.patches])
+        # и наоборот: SAST-патч есть, а сводного списка для него нет
+        self.assertIn("SAST", texts[1])
+        self.assertIn("старый способ", texts[1])
 
     def test_the_big_snapshot_is_the_size_of_a_real_tag(self):
         many = snapshot("rich-many.json")

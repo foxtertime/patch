@@ -98,6 +98,10 @@ def collect_tag(tag: str, cfg, koji_client, gitlab_client, jobs: int = 8,
                 branch_check: bool = True) -> Snapshot:
     """Собирает билды тега, их патчи и RPM в один снапшот."""
     classifier = Classifier.from_config(cfg)
+    # Классы, для которых заводят сводные списки. Конфиг тестов и старые
+    # вызовы поля не знают — тогда сверка идёт только в одну сторону,
+    # от автогена к патчам.
+    autogen_classes = list(getattr(cfg, "autogen_classes", ()) or ())
     started = time.monotonic()
     tagged = koji_client.tagged_builds(tag)
     build_ids = [item["build_id"] for item in tagged]
@@ -155,7 +159,7 @@ def collect_tag(tag: str, cfg, koji_client, gitlab_client, jobs: int = 8,
                                  tags.get(info.get("build_id"), []))
         try:
             _attach_patches(build, info, gitlab_client, classifier,
-                            branch_check)
+                            branch_check, autogen_classes)
         except Exception as exc:
             # ни одна ошибка билда (в т.ч. неожиданная, не только
             # SourceUrlError/проблема GitLab) не должна валить весь сбор.
@@ -228,7 +232,8 @@ def _placeholder_build(info: dict, rpms, tags=()) -> Build:
 
 def _attach_patches(build: Build, info: dict, gitlab_client,
                     classifier: Classifier,
-                    branch_check: bool = True) -> None:
+                    branch_check: bool = True,
+                    autogen_classes=()) -> None:
     """Патчи билда и всё, что о них известно.
 
     Четыре фазы подряд, и каждая может оказаться последней: разобрать
@@ -245,7 +250,7 @@ def _attach_patches(build: Build, info: dict, gitlab_client,
     # не потому, что патчей нет, и «автоген есть, а патчей нет» было бы про
     # наше незнание, а не про билд.
     if tree.present:
-        _autogen_gaps(build, classifier)
+        _autogen_checks(build, classifier, autogen_classes)
     if ref != commit:
         # откат на ветку: коммита в репозитории нет, и сравнивать с ним
         # ветку бессмысленно — точка отсчёта пропала вместе с коммитом
@@ -473,13 +478,20 @@ def _named_class(text: str, classifier: Classifier) -> Optional[str]:
         else guess
 
 
-def _autogen_gaps(build: Build, classifier: Classifier) -> None:
-    """Автоген обещает патчи класса, которых в билде нет.
+def _autogen_checks(build: Build, classifier: Classifier,
+                    expected) -> None:
+    """Сводные списки и патчи, сверенные в обе стороны.
 
-    Сводный список autogen-cve-patches.inc заводят там, где патчи CVE
-    собирают; лежит он в каталоге, а ни одного патча этого класса рядом нет.
-    Это не отказ сбора — данные прочитаны полностью, — но расхождение внутри
-    ветки, и увидеть его иначе как перебором раскрытий нельзя.
+    Автоген есть, а патчей его класса нет — список обещает то, чего в билде
+    не оказалось. Патчи есть, а автогена для них нет — их применяют старым
+    способом, вручную. Ни то, ни другое не отказ сбора: данные прочитаны
+    полностью, — но оба расхождения иначе как перебором раскрытий не
+    увидеть.
+
+    Второй проверке нужен список классов, для которых автоген заводят: у
+    SPEC или CHANGELOG сводного списка не бывает, и требовать его от них
+    значило бы предупреждать о том, чего никто не обещал. Список приходит из
+    конфига (`autogen_classes`).
     """
     # Сам сводный список за патч своего класса не считается: в конфиге
     # правило AUTOGEN стоит первым и уводит такие файлы в свой класс, но
@@ -487,19 +499,28 @@ def _autogen_gaps(build: Build, classifier: Classifier) -> None:
     # верно при любом порядке.
     present = set(p.cls for p in build.patches
                   if not _AUTOGEN_RE.search(p.name))
-    seen = {}
+    claimed = {}
     for patch in build.patches:
         if not _AUTOGEN_RE.search(patch.name):
             continue
-        claimed = _named_class(_AUTOGEN_RE.sub("", patch.name), classifier)
+        cls = _named_class(_AUTOGEN_RE.sub("", patch.name), classifier)
         # Автоген без маркера класса ни о чём не заявляет: не о чем и молчать.
-        if claimed is None or claimed in present or claimed in seen:
-            continue
-        seen[claimed] = patch.name
-    for claimed in sorted(seen):
-        build.problems.append(Problem(
-            "autogen: есть %s, но ни одного патча класса %s"
-            % (seen[claimed], claimed), "warning"))
+        if cls is not None and cls not in claimed:
+            claimed[cls] = patch.name
+
+    gaps = [cls for cls in claimed if cls not in present]
+    old_way = [cls for cls in expected or () if cls in present
+               and cls not in claimed]
+    for cls in sorted(set(gaps) | set(old_way)):
+        if cls in claimed:
+            build.problems.append(Problem(
+                "autogen: есть %s, но ни одного патча класса %s"
+                % (claimed[cls], cls), "warning"))
+        else:
+            build.problems.append(Problem(
+                "autogen: патчи класса %s есть, а сводного списка нет — "
+                "старый способ применения, стоит перейти на автоген" % cls,
+                "warning"))
 
 
 def _patch(path, parsed, ref, classifier, gitlab_client, ghost=None,

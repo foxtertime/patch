@@ -414,9 +414,12 @@ class CollectTagTest(unittest.TestCase):
         self.assertIs(build.patch_dir_present, True)
         self.assertEqual([p.name for p in build.patches],
                          ["CVE-2024-7347.patch", "sast-x.patch"])
-        self.assertEqual(len(build.problems), 1)
-        self.assertIn("old.example.com", build.problems[0].text)
-        self.assertIn(HOST, build.problems[0].text)
+        # автогена в этом дереве нет, и патчи дают свои предупреждения;
+        # предмет теста — запись о подменённом хосте, её и ищем
+        host_problems = [p for p in build.problems
+                         if "old.example.com" in p.text]
+        self.assertEqual(len(host_problems), 1)
+        self.assertIn(HOST, host_problems[0].text)
 
 class CompletedTimeTest(unittest.TestCase):
     """Время сборки билда. koji отдаёт его в нескольких видах, наружу нужен один."""
@@ -450,7 +453,12 @@ class CompletedTimeTest(unittest.TestCase):
 class LoggingTest(unittest.TestCase):
     def setUp(self):
         self.routes = {
+            # автоген рядом с патчем нарочно: без него билд получил бы
+            # предупреждение «патчи есть, а сводного списка нет», и «чистый
+            # билд» перестал бы быть чистым
             TREE % "g%2Fnginx": Response(200, [
+                {"name": "autogen-cve-patches.inc", "type": "blob",
+                 "path": "PATCH/autogen-cve-patches.inc"},
                 {"name": "CVE-2024-7347.patch", "type": "blob",
                  "path": "PATCH/CVE-2024-7347.patch"}], {}),
             TREE % "g%2Fvim": Response(404, {"message": "404 Tree Not Found"}, {}),
@@ -901,6 +909,41 @@ class AutogenGapTest(unittest.TestCase):
         build = self._nginx(["PATCH/autogen-cve-patches.inc",
                              "PATCH/autogen-cve-patches.inc.new"])
         self.assertEqual(len(self.gaps(build)), 1)
+
+    def test_patches_without_their_autogen_are_a_warning(self):
+        """Обратная сторона той же сверки: патчи применяют по-старому.
+
+        Сводный список для класса заводят там, где перешли на автоген; патчи
+        этого класса без него значат, что их применяют вручную.
+        """
+        build = self._nginx(["PATCH/CVE-2026-3011.patch"])
+        gaps = self.gaps(build)
+        self.assertEqual([p.level for p in gaps], ["warning"])
+        self.assertIn("CVE", gaps[0].text)
+        self.assertIn("старый способ", gaps[0].text)
+
+    def test_its_own_autogen_answers_for_the_class(self):
+        build = self._nginx(["PATCH/autogen-cve-patches.inc",
+                             "PATCH/CVE-2026-3011.patch"])
+        self.assertEqual(self.gaps(build), [])
+
+    def test_a_class_nobody_expects_autogen_for_says_nothing(self):
+        """Автоген заводят не для всякого класса.
+
+        SPEC и CHANGELOG сводного списка не имеют, и требовать его от них
+        значило бы предупреждать о том, чего никто не обещал. Кому автоген
+        положен, говорит autogen_classes конфига.
+        """
+        build = self._nginx(["PATCH/nginx.spec.patch"],
+                            classes=[("SPEC", r"(?i)\.spec\."),
+                                     ("other", ".*")])
+        self.assertEqual(self.gaps(build), [])
+
+    def test_each_class_is_warned_about_separately(self):
+        build = self._nginx(["PATCH/CVE-2026-3011.patch",
+                             "PATCH/sast-src.core.patch"])
+        self.assertEqual(len(self.gaps(build)), 2)
+        self.assertTrue(all("старый способ" in p.text for p in self.gaps(build)))
 
 
 class GhostPatchesTest(unittest.TestCase):

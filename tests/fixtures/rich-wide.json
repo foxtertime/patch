@@ -632,6 +632,10 @@
      {
       "level": "warning",
       "text": "autogen: есть autogen-cve-patches.inc, но ни одного патча класса CVE"
+     },
+     {
+      "level": "warning",
+      "text": "autogen: патчи класса SAST есть, а сводного списка нет — старый способ применения, стоит перейти на автоген"
      }
     ],
     "release": "2.el9",
@@ -661,7 +665,7 @@
     "version": "2.12.5"
    }
   ],
-  "dashboard": "3.0.0",
+  "dashboard": "3.1.0",
   "generated": "2026-11-01T00:00:00+03:00",
   "koji_hub": "https://hub/kojihub",
   "koji_web": "https://hub/koji",
