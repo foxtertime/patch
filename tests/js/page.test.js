@@ -120,31 +120,6 @@ test('два прогона одного тега различаются име�
                         p.snapKey(p.snapshots()[1]));
 });
 
-test('короткое имя из ссылки берёт последний прогон тега', function () {
-  var p = make([snap('os-9.2', JUL), snap('os-9.3', AUG), snap('os-9.2', SEP)]);
-  assert.strictEqual(p.snapNamed(0, 'os-9.2'), true);
-  assert.strictEqual(p.snapNamed(2, 'os-9.2'), true);
-  assert.strictEqual(p.snapNamed(1, 'os-9.2'), false);
-});
-
-test('диапазон по тегам ищется парой, а не концами по отдельности',
-  function () {
-    /* На цепочке 9.2, 9.3, 9.2 самый свежий os-9.2 стоит правее os-9.3:
-       независимый поиск концов открыл бы обратное сравнение. */
-    var p = make([snap('os-9.2', JUL), snap('os-9.3', AUG),
-                  snap('os-9.2', SEP)]);
-    assert.deepStrictEqual(p.endsFromName('os-9.2..os-9.3'), [0, 1]);
-  });
-
-test('ссылка задом наперёд разворачивается по цепочке', function () {
-  var p = make([snap('os-9.1', JUL), snap('os-9.2', AUG)]);
-  assert.deepStrictEqual(p.endsFromName('os-9.2..os-9.1'), [0, 1]);
-});
-
-test('имя без разделителя — не диапазон', function () {
-  assert.strictEqual(make([snap('os-9.1', JUL)]).endsFromName('os-9.1'), null);
-});
-
 /* Имена видимых строк: почти каждая проверка фильтров смотрит именно на
    них, и разворачивать это в четыре строки на каждый тест незачем. */
 function rows(p) {
@@ -253,7 +228,7 @@ test('группы между собой складываются по И даж
 
 test('ключ вне групп складывается по И', function () {
   /* Групп на все метки хватает, но набор меток задаётся данными. Молча не
-     применять неизвестный фильтр нельзя: он приехал бы из ссылки и не
+     применять неизвестный фильтр нельзя: он стоял бы в меню и не
      действовал, ничем себя не выдав. */
   var p = make([snap('os-9.1', JUL, { builds: [build('nginx')] })]);
   p.st.filters.state = { 'выдуманная-метка': 1 };
@@ -283,31 +258,6 @@ test('счётчики считают по всем строкам вкладк�
     assert.strictEqual(counts['has-patch'], 1);
     assert.strictEqual(counts.problem, 0);
   });
-
-test('ссылка несёт минус у «нет» и режимы групп', function () {
-  var p = make([snap('os-9.1', JUL, { classes: ['CVE', 'SAST'] })]);
-  p.setFilter('cve', 1);
-  p.setFilter('sast', -1);
-  p.setGroupMode('classes', 'any');
-  var parts = p.hashParts();
-  assert.deepStrictEqual(parts.filters.slice().sort(), ['-sast', 'cve']);
-  assert.deepStrictEqual(parts.any, ['classes']);
-});
-
-test('ссылка с минусом восстанавливается как «нет»', function () {
-  var p = make([snap('os-9.1', JUL, { classes: ['CVE'] })]);
-  p.restore(parsed({ tab: 'state', filters: ['-cve'] }));
-  assert.strictEqual(p.filterState('cve'), -1);
-});
-
-test('ссылка без any= оставляет все группы в режиме «все»', function () {
-  /* Режим, оставшийся от прошлого просмотра, показал бы под присланной
-     ссылкой другой срез. */
-  var p = make([snap('os-9.1', JUL, { classes: ['CVE'] })]);
-  p.setGroupMode('classes', 'any');
-  p.restore(parsed({ tab: 'state', filters: ['cve'], any: [] }));
-  assert.strictEqual(p.groupMode('classes'), 'all');
-});
 
 test('мёртвый фильтр выбрасывается вместе со знаком', function () {
   var p = make([snap('os-9.1', JUL, { classes: ['CVE'] })]);
@@ -474,78 +424,6 @@ test('отметка узла живёт в состоянии и снимает
   assert.strictEqual(p.anchor(), null);
 });
 
-/* Разобранный адрес встречается с цепочкой ровно здесь: hash.js имён не
-   разрешает, а page — не разбирает строк. */
-function parsed(over) {
-  var out = { tab: null, tag: null, pair: null, filters: null, any: null,
-              q: null, sort: null };
-  for (var k in over) { if (over.hasOwnProperty(k)) out[k] = over[k]; }
-  return out;
-}
-
-test('ссылка на снапшот — такой же выбор, как клик по узлу', function () {
-  var p = make([snap('os-9.1', JUL), snap('os-9.2', AUG)]);
-  p.restore(parsed({ tag: 'os-9.1' }));
-  assert.strictEqual(p.curSnap().tag, 'os-9.1');
-  assert.strictEqual(p.picked.tag, true);
-});
-
-test('короткая форма tag= у двойников берёт последний прогон', function () {
-  var p = make([snap('os-9.2', JUL), snap('os-9.3', AUG), snap('os-9.2', SEP)]);
-  p.restore(parsed({ tag: 'os-9.2' }));
-  assert.strictEqual(p.st.tag, 2);
-});
-
-test('неизвестное имя в ссылке оставляет умолчание', function () {
-  var p = make([snap('os-9.1', JUL), snap('os-9.2', AUG)]);
-  p.restore(parsed({ tag: 'os-9.9' }));
-  assert.strictEqual(p.curSnap().tag, 'os-9.2');
-});
-
-test('ссылка на диапазон восстанавливает оба конца', function () {
-  var p = make([snap('os-9.1', JUL), snap('os-9.2', AUG), snap('os-9.3', SEP)]);
-  p.restore(parsed({ pair: 'os-9.1..os-9.2' }));
-  assert.deepStrictEqual(p.currentEnds(), [0, 1]);
-});
-
-test('ссылка на «Изменения» без второго снапшота уводит на состояние',
-  function () {
-    var p = make([snap('os-9.1', JUL)]);
-    p.restore(parsed({ tab: 'diff', filters: ['changed'] }));
-    assert.strictEqual(p.st.tab, 'state');
-    /* Фильтры из такой ссылки — диффовые: на вкладке состояния они дали бы
-       пустую таблицу без единого намёка почему. */
-    assert.deepStrictEqual(p.activeFilters(), {});
-  });
-
-test('фильтры из ссылки заменяют прежние, а не добавляются к ним', function () {
-  var p = make([snap('os-9.1', JUL)]);
-  p.toggleFilter('problem');
-  p.restore(parsed({ filters: ['no-patch'] }));
-  assert.deepStrictEqual(p.activeFilters(), { 'no-patch': 1 });
-});
-
-test('чего в ссылке не было, то и не трогается', function () {
-  var p = make([snap('os-9.1', JUL)]);
-  p.toggleFilter('problem');
-  p.st.q = 'nginx';
-  p.restore(parsed({ tab: 'state' }));
-  assert.deepStrictEqual(p.activeFilters(), { problem: 1 });
-  assert.strictEqual(p.st.q, 'nginx');
-});
-
-test('части для ссылки называют снапшот полным именем', function () {
-  var p = make([snap('os-9.1', JUL), snap('os-9.2', AUG)]);
-  var parts = p.hashParts();
-  assert.strictEqual(parts.tab, 'state');
-  assert.strictEqual(parts.tag, 'os-9.2@' + AUG);
-  assert.strictEqual(parts.pair, 'os-9.1@' + JUL + '..os-9.2@' + AUG);
-});
-
-test('на единственном снапшоте диапазона в ссылке нет', function () {
-  assert.strictEqual(make([snap('os-9.1', JUL)]).hashParts().pair, null);
-});
-
 /* Сводность диапазона: правило «вся цепочка, и только когда снапшотов
    больше двух». На двух снапшотах единственный переход и есть вся цепочка,
    и звать его итогом значит сообщать очевидное.
@@ -589,60 +467,6 @@ test('смена состава снапшотов заводит кэш пер�
   p.applyData(viewmodel.buildPageData(storemod.snapshots()));
   assert.strictEqual(p.pairFor([0, 2]).summary, false);
 });
-
-/* Было: «режим регулярки переживает круг через адрес» — адрес и правда
-   переносил режим через перезагрузку. Решение человека это отменило: замер
-   показал, что чужой шаблон вроде (a+)+$ способен подвесить вкладку не при
-   открытии ссылки, а позже, когда снапшоты уже в памяти. Предмет теста тот
-   же — круг через адрес, — но смысл другой: режим больше не переносится,
-   переносится только просьба его включить. */
-test('круг через адрес режим не переносит, но просьбу доносит', function () {
-  var p = make([snap('os-9.1', JUL)]);
-  p.st.q = '^ngi';
-  p.st.regex = true;
-  assert.strictEqual(p.hashParts().re, true,
-                     'адрес по-прежнему пишет re=1, пока включено кнопкой');
-  p.st.regex = false;
-  p.restore({ tab: null, tag: null, pair: null, filters: null, any: null,
-              q: '^ngi', re: '1', sort: null });
-  assert.strictEqual(p.st.regex, false,
-                     'ссылка с re=1 не имеет права включить режим сама');
-  assert.strictEqual(p.st.reAsked, true,
-                     'но и промолчать о шаблоне в ссылке нельзя');
-});
-
-/* Было: «ссылка без re= выключает режим» — раньше restore() решал за
-   кнопку и в эту сторону тоже. Теперь restore() режима не касается вовсе:
-   ни включить, ни выключить, — так что уже включённый кнопкой режим
-   переживает и такую ссылку, а сама ссылка ни о чём не просит. */
-test('ссылка без re= не трогает уже включённый режим и не считается просьбой',
-  function () {
-    var p = make([snap('os-9.1', JUL)]);
-    p.st.regex = true;
-    p.restore({ tab: null, tag: null, pair: null, filters: null, any: null,
-                q: 'nginx', re: null, sort: null });
-    assert.strictEqual(p.st.regex, true,
-                       'restore больше не решает за кнопку ни в одну сторону');
-    assert.strictEqual(p.st.reAsked, false);
-  });
-
-/* Пункт 6: любое значение re=, кроме ровно '1', не считается просьбой —
-   это разбирает re=0 отдельно от «ключа нет вовсе» (тест выше) и от
-   произвольного мусора в значении. */
-test('re=0, пустой re= и re= с посторонним значением не считаются просьбой',
-  function () {
-    var p = make([snap('os-9.1', JUL)]);
-    p.restore({ tab: null, tag: null, pair: null, filters: null, any: null,
-                q: 'nginx', re: '0', sort: null });
-    assert.strictEqual(p.st.reAsked, false, 're=0 не просьба');
-    p.restore({ tab: null, tag: null, pair: null, filters: null, any: null,
-                q: 'nginx', re: '', sort: null });
-    assert.strictEqual(p.st.reAsked, false, 'пустой re= не просьба');
-    p.restore({ tab: null, tag: null, pair: null, filters: null, any: null,
-                q: 'nginx', re: 'true', sort: null });
-    assert.strictEqual(p.st.reAsked, false,
-                       're= с посторонним значением тоже не просьба');
-  });
 
 test('матчер пересчитывается при смене режима, а не только запроса', function () {
   /* Запрос тот же, режим другой — памятка обязана это заметить, иначе

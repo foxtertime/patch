@@ -6,8 +6,8 @@ var assert = require('node:assert');
 var domstub = require('./domstub.js');
 var viewportmod = require('../../dashboard/assets/js/viewport.js');
 
-function load(options) {
-  var dom = domstub.install(options);
+function load() {
+  var dom = domstub.install();
   viewportmod.create({ controls: dom.id('controls'), toTop: dom.id('totop'),
                        onResize: function () {} });
   return dom;

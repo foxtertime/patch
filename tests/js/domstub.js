@@ -274,9 +274,8 @@ FileReader.prototype.readAsText = function (source) {
 };
 
 /* Ставит свежую страницу в глобальные переменные node: ui.js обращается к
-   document, window, location и history по именам, как в браузере. */
-function install(options) {
-  options = options || {};
+   document и window по именам, как в браузере. */
+function install() {
   var root = parse(fs.readFileSync(TEMPLATE, 'utf8'));
   var document = {
     isDocument: true,
@@ -310,22 +309,15 @@ function install(options) {
     },
     addEventListener: Node.prototype.addEventListener
   };
-  var location = { hash: options.hash || '' };
-  var history = { replaceState: function (state, title, url) {
-    location.hash = String(url).replace(/^[^#]*/, '');
-  } };
-
   global.document = document;
   global.window = window;
-  global.location = location;
-  global.history = history;
   /* navigator в node свой и только для чтения; ui.js смотрит на него
      лишь в копировании NVR, которое заглушкой не проверяется. */
   global.FileReader = FileReader;
   delete global.ResizeObserver;
 
   return {
-    document: document, window: window, location: location,
+    document: document, window: window,
     id: function (name) {
       var node = document.getElementById(name);
       if (!node) throw new Error('в шаблоне нет id="' + name + '"');

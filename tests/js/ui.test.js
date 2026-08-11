@@ -62,8 +62,8 @@ function snap(tag, generated, over) {
 
 /* Свежая страница и свежий ui.js: обработчики он вешает при загрузке, и на
    прошлом дереве они держали бы уже несуществующие узлы. */
-function load(options) {
-  var dom = domstub.install(options);
+function load() {
+  var dom = domstub.install();
   store.reset();
   delete require.cache[UI];
   require(UI);
@@ -173,8 +173,8 @@ test('перетаскивание узла разворачивает срав�
   var chain = dom.id('chain').innerHTML;
   assert.ok(chain.indexOf('os-9.2') < chain.indexOf('os-9.1'), chain);
   /* Направление сравнения задаёт порядок цепочки: «было» — тот, кто левее. */
-  assert.match(dom.location.hash, /pair=os-9\.2%40[^.]*\.\.os-9\.1/,
-               dom.location.hash);
+  pressTab(dom, 'diff');
+  assert.match(pairSide(dom, 'было'), /^os-9\.2,/, pairText(dom));
 });
 
 /* Сторону вставки задаёт курсор: у левой половины узла — перед ним, у
@@ -263,14 +263,35 @@ function openTag(html) {
 
 function chain(dom) { return dom.id('chain').innerHTML; }
 
-test('выбранный тег держится именем, а не номером', async function () {
+/* Концы выбранного диапазона так, как их показывает страница: под «было» и
+   «стало» стоят тег и время сбора того прогона. Больше о выборе спросить
+   негде — состояние живёт в page.js, а наружу от страницы виден только её
+   вид. */
+function pairSide(dom, label) {
+  var re = new RegExp('class="l">' + label + '</div>[\\s\\S]*?'
+                      + 'class="rpm">([^<]*)<');
+  var m = re.exec(dom.id('diff-pair').innerHTML);
+  return m ? m[1] : null;
+}
+
+function pairText(dom) {
+  return pairSide(dom, 'было') + ' → ' + pairSide(dom, 'стало');
+}
+
+/* Время сбора так, как оно стоит под узлом и в карточке стороны. */
+function stamp(iso) { return iso.slice(0, 10) + ' ' + iso.slice(11, 16); }
+
+/* Ожидаемая подпись концов: тег и время сбора с каждой стороны. */
+function pairIs(left, leftAt, right, rightAt) {
+  return left + ', ' + stamp(leftAt) + ' → ' + right + ', ' + stamp(rightAt);
+}
+
+test('выбранный тег держится именем, а не номером', function () {
   var dom = load();
   store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
   store.add([snap('os-9.2', '2026-08-01T00:00:00+03:00')], 'b.json');
   clickNode(dom, 1);
   assert.strictEqual(openTag(chain(dom)), 'os-9.2', chain(dom));
-  await dom.tick();
-  dom.location.hash = '';        /* выбор должен держаться и без адреса */
   store.move(1, -1);             /* теперь последний в списке — os-9.1 */
   assert.strictEqual(openTag(chain(dom)), 'os-9.2', chain(dom));
 });
@@ -305,31 +326,6 @@ test('выбор снапшота держится тегом и времене�
   assert.ok(dom.id('state-rows').innerHTML.indexOf('apache') !== -1,
             'выбор молча переехал на другой прогон того же тега: '
             + dom.id('state-rows').innerHTML);
-});
-
-test('в адресе у снапшота стоит и тег, и время сбора', function () {
-  var dom = load();
-  store.add([snap('os-9.2', JUL, { builds: [build('apache')] })], 'b.json');
-  store.add([snap('os-9.2', AUG, { builds: [build('httpd')] })], 'c.json');
-  clickNode(dom, 0);
-  assert.ok(dom.location.hash.indexOf(encodeURIComponent('os-9.2@' + JUL)) !== -1,
-            dom.location.hash);
-});
-
-test('ссылка со временем сбора открывает тот же прогон', async function () {
-  var dom = load();
-  store.add([snap('os-9.2', JUL, { builds: [build('apache')] })], 'b.json');
-  store.add([snap('os-9.2', AUG, { builds: [build('httpd')] })], 'c.json');
-  clickNode(dom, 1);                                /* открыт августовский */
-  assert.ok(dom.id('state-rows').innerHTML.indexOf('httpd') !== -1);
-  /* Свою же запись в адрес страница пропускает, и ждать её приходится
-     тику: иначе присланная ссылка была бы прочитана как эхо. */
-  await dom.tick();
-  dom.location.hash = '#tab=state&tag='
-                    + encodeURIComponent('os-9.2@' + JUL) + '&f=';
-  dom.fireWindow('hashchange');
-  assert.ok(dom.id('state-rows').innerHTML.indexOf('apache') !== -1,
-            dom.id('state-rows').innerHTML);
 });
 
 /* Снапшот — это тег в определённый момент, и время сбора стоит у каждого
@@ -409,8 +405,8 @@ test('выбор снапшота не мешает следующему выб�
   pressTab(dom, 'diff');
   clickNode(dom, 1);
   clickNode(dom, 2);
-  assert.match(dom.location.hash, /pair=os-9\.2%40[^.]*\.\.os-9\.3/,
-               dom.location.hash);
+  assert.strictEqual(pairText(dom), pairIs('os-9.2', AUG, 'os-9.3', SEP),
+                     pairText(dom));
 });
 
 /* Стороны перехода стоят над разрезами: сколько билдов в теге было и
@@ -596,7 +592,7 @@ test('единственный снапшот всё равно помечен �
   assert.match(chain(dom), /<span class="pick on"/, chain(dom));
 });
 
-test('пары одинаковых тегов различимы в адресе', function () {
+test('пары одинаковых тегов различимы на странице', function () {
   var dom = load();
   store.add([snap('os-9.2', JUL)], 'b.json');
   store.add([snap('os-9.2', AUG)], 'c.json');
@@ -604,39 +600,11 @@ test('пары одинаковых тегов различимы в адрес�
   pressTab(dom, 'diff');
   clickNode(dom, 0);
   clickNode(dom, 1);
-  var first = dom.location.hash;
+  var first = pairText(dom);
   clickNode(dom, 1);
   clickNode(dom, 2);
-  assert.notStrictEqual(first, dom.location.hash,
-                        'у двух разных переходов один и тот же адрес: ' + first);
-});
-
-test('ссылка на пару открывает тот же переход', async function () {
-  var dom = load();
-  /* Версии у прогонов разные, чтобы у двух диапазонов и таблицы были
-     разные: совпадение адреса тут ничего не значило бы — его тест сам
-     туда и присвоил. Смотреть надо на то, что страница нарисовала. */
-  store.add([snap('os-9.2', JUL, { builds: [build('nginx', { version: '1.0' })] })],
-            'b.json');
-  store.add([snap('os-9.2', AUG, { builds: [build('nginx', { version: '2.0' })] })],
-            'c.json');
-  store.add([snap('os-9.2', SEP, { builds: [build('nginx', { version: '3.0' })] })],
-            'd.json');
-  pressTab(dom, 'diff');
-  clickNode(dom, 0);
-  clickNode(dom, 1);
-  var link = dom.location.hash;
-  var narrow = dom.id('diff-rows').innerHTML;
-  clickNode(dom, 0);
-  clickNode(dom, 2);
-  assert.notStrictEqual(dom.id('diff-rows').innerHTML, narrow,
-                        'два разных диапазона дали одну таблицу, сценарий '
-                        + 'проверяет не то');
-  await dom.tick();
-  dom.location.hash = link;
-  dom.fireWindow('hashchange');
-  assert.strictEqual(dom.id('diff-rows').innerHTML, narrow,
-                     dom.id('diff-rows').innerHTML);
+  assert.notStrictEqual(first, pairText(dom),
+                        'два разных перехода показаны одинаково: ' + first);
 });
 
 function threeChain(dom) {
@@ -664,8 +632,8 @@ test('два клика по узлам задают диапазон', function
   threeChain(dom);
   clickNode(dom, 0);
   clickNode(dom, 1);
-  assert.match(dom.location.hash, /pair=os-9\.1%40[^.]*\.\.os-9\.2/,
-               dom.location.hash);
+  assert.strictEqual(pairText(dom), pairIs('os-9.1', JUL, 'os-9.2', AUG),
+                     pairText(dom));
 });
 
 /* Карточки-счётчики скрипт рисует строкой, и достать из неё число можно
@@ -692,9 +660,9 @@ test('второй клик обновляет и счётчики диффа', 
                      dom.id('diff-cards').innerHTML);
   clickNode(dom, 1);
   clickNode(dom, 2);
-  assert.match(dom.location.hash, /pair=os-9\.2%40[^.]*\.\.os-9\.3/,
-               'диапазон не выбрался, сценарий проверяет не то: '
-               + dom.location.hash);
+  assert.strictEqual(pairText(dom), pairIs('os-9.2', AUG, 'os-9.3', SEP),
+                     'диапазон не выбрался, сценарий проверяет не то: '
+                     + pairText(dom));
   /* На 9.2→9.3 версия та же: выросших не осталось ни одного. */
   assert.strictEqual(cardNumber(dom, 'diff-cards', 'upgraded'), '0',
                      dom.id('diff-cards').innerHTML);
@@ -709,8 +677,8 @@ test('порядок кликов не меняет направление пе�
   clickNode(dom, 0);
   /* Кликнули справа налево, а «было» всё равно слева: направление задаёт
      цепочка. Иначе «появился» и «исчез» поменялись бы местами. */
-  assert.match(dom.location.hash, /pair=os-9\.1%40[^.]*\.\.os-9\.3/,
-               dom.location.hash);
+  assert.strictEqual(pairText(dom), pairIs('os-9.1', JUL, 'os-9.3', SEP),
+                     pairText(dom));
 });
 
 test('первый клик только отмечает узел и таблицу не трогает', function () {
@@ -732,15 +700,15 @@ test('повторный клик по отмеченному узлу сним�
      нему, а не к умолчанию. На умолчании подмену было бы не видно. */
   clickNode(dom, 0);
   clickNode(dom, 1);
-  var link = dom.location.hash, rows = dom.id('diff-rows').innerHTML;
+  var pair = pairText(dom), rows = dom.id('diff-rows').innerHTML;
   clickNode(dom, 2);
   clickNode(dom, 2);
   assert.strictEqual(dom.id('chain').innerHTML.indexOf('anchor'), -1,
                      dom.id('chain').innerHTML);
-  /* Отмена не выбирает ничего: ни адрес, ни таблица не трогаются. Без
+  /* Отмена не выбирает ничего: ни диапазон, ни таблица не трогаются. Без
      ветки снятия второй клик задал бы пару из одного и того же узла, а
      она молча читается как «вся цепочка». */
-  assert.strictEqual(dom.location.hash, link, dom.location.hash);
+  assert.strictEqual(pairText(dom), pair, pairText(dom));
   assert.strictEqual(dom.id('diff-rows').innerHTML, rows);
 });
 
@@ -1028,27 +996,6 @@ test('призрак в конце рельса открывает файлов�
   assert.strictEqual(opened, 1);
 });
 
-test('подписи классов не переживают выгрузку снапшота', async function () {
-  /* LABELS раньше только копил подписи классов. Пока applyData звали один
-     раз, это было незаметно; теперь фильтр из ушедшего снапшота остался бы
-     «известным» и таблица молча стала бы пустой. */
-  var dom = load();
-  store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00',
-                  { classes: ['SAST'],
-                    builds: [build('nginx', { patches: [patch('s.patch', 'SAST')] })] })],
-            'a.json');
-  store.remove(0);
-  store.add([snap('os-9.2', '2026-08-01T00:00:00+03:00',
-                  { classes: ['CVE'],
-                    builds: [build('nginx', { patches: [patch('c.patch', 'CVE')] })] })],
-            'b.json');
-  await dom.tick();
-  dom.location.hash = '#tab=state&f=sast';
-  dom.fireWindow('hashchange');
-  assert.strictEqual(filterBtn(dom).textContent, 'Фильтры',
-                     'фильтр класса из выгруженного снапшота остался живым');
-});
-
 /* Карточки класса скрипт рисует через innerHTML, а заглушка разметку из
    строк не разбирает. Ставим такую же карточку настоящим узлом: проверяется
    делегированный обработчик, а не то, как браузер её отрисует. */
@@ -1060,10 +1007,11 @@ function pressCard(dom, host, key) {
   dom.fire(node, 'click', {});
 }
 
-/* Тот же отсев, но на пути applyData: снапшоты человек выгружает и
-   догружает, и класс патчей уходит вместе со своим снапшотом. Через
-   hashchange это ловится, а через applyData — нет: адрес там свой,
-   перечитывать его нельзя, и отсев без него не случался вовсе. */
+/* Отсев мёртвых фильтров на пути applyData: снапшоты человек выгружает и
+   догружает, и класс патчей уходит вместе со своим снапшотом. Без отсева
+   фильтр из ушедшего снапшота остался бы «известным», а таблица под ним
+   молча стала бы пустой — снять такой фильтр было бы нечем: плашки с ним на
+   странице уже нет. */
 test('фильтр по классу не переживает смену состава снапшотов',
      async function () {
   var dom = load();
@@ -1208,14 +1156,15 @@ test('меню и плашка правят одно и то же состоян
   assert.strictEqual(filterBtn(dom).textContent, 'Фильтры');
 });
 
-test('переключатель группы уезжает в адрес', function () {
+test('переключатель группы виден в меню нажатым', function () {
   var dom = load();
   store.add([snap('os-9.1', JUL, { classes: ['CVE'],
     builds: [build('nginx', { patches: [patch('c.patch', 'CVE')] })] })],
     'a.json');
   pressMenu(dom, 'data-fmode', 'classes:any');
-  assert.ok(dom.location.hash.indexOf('any=classes') !== -1,
-            dom.location.hash);
+  var html = dom.id('filtermenu').innerHTML;
+  assert.match(html, /data-fmode="classes:any" aria-pressed="true"/, html);
+  assert.match(html, /data-fmode="classes:all" aria-pressed="false"/, html);
 });
 
 test('«сбросить всё» снимает фильтры вкладки', function () {
@@ -1294,8 +1243,9 @@ test('снапшоты приехали по одному — открыт са�
   await dom.tick();
   assert.strictEqual(openTag(chain(dom)), 'os-9.3', chain(dom));
   /* Самый широкий переход — вся цепочка, от os-9.1 до os-9.3. */
-  assert.match(dom.location.hash, /pair=os-9\.1%40[^.]*\.\.os-9\.3/,
-               dom.location.hash);
+  pressTab(dom, 'diff');
+  assert.strictEqual(pairText(dom), pairIs('os-9.1', JUL, 'os-9.3', SEP),
+                     pairText(dom));
 });
 
 /* Тот же вид обязан открываться и с одного файла на три снапшота: applyData
@@ -1308,8 +1258,9 @@ test('три снапшота одним файлом — тот же свежи
              snap('os-9.3', SEP, { builds: [build('nginx')] })], 'all.json');
   await dom.tick();
   assert.strictEqual(openTag(chain(dom)), 'os-9.3', chain(dom));
-  assert.match(dom.location.hash, /pair=os-9\.1%40[^.]*\.\.os-9\.3/,
-               dom.location.hash);
+  pressTab(dom, 'diff');
+  assert.strictEqual(pairText(dom), pairIs('os-9.1', JUL, 'os-9.3', SEP),
+                     pairText(dom));
 });
 
 test('свежий снапшот выбирается и когда файл пришёл вторым', function () {
@@ -1346,8 +1297,8 @@ test('выбранный человеком переход переживает 
   store.add([snap('os-9.4', '2026-10-01T00:00:00+03:00',
                   { builds: [build('nginx')] })], 'd.json');
   await dom.tick();
-  assert.match(dom.location.hash, /pair=os-9\.1%40[^.]*\.\.os-9\.2/,
-               dom.location.hash);
+  assert.strictEqual(pairText(dom), pairIs('os-9.1', JUL, 'os-9.2', AUG),
+                     pairText(dom));
 });
 
 /* Конец выбранного диапазона выгрузили — выбора больше нет, и дальше снова
@@ -1369,14 +1320,15 @@ test('выгрузка конца диапазона откатывает выб
   clickNode(dom, 1);
   await dom.tick();
   store.remove(1);                                  /* конец 9.2 выгрузили */
-  assert.match(dom.location.hash, /pair=os-9\.1%40[^.]*\.\.os-9\.3/,
-               dom.location.hash);
+  assert.strictEqual(pairText(dom), pairIs('os-9.1', JUL, 'os-9.3', SEP),
+                     pairText(dom));
   await dom.tick();
   store.add([snap('os-9.4', '2026-10-01T00:00:00+03:00',
                   { builds: [build('nginx', { version: '4.0' })] })], 'd.json');
-  assert.match(dom.location.hash, /pair=os-9\.1%40[^.]*\.\.os-9\.4/,
-               'после выгрузки конца страница держится за снятый выбор: '
-               + dom.location.hash);
+  assert.strictEqual(pairText(dom),
+                     pairIs('os-9.1', JUL, 'os-9.4', OCT),
+                     'после выгрузки конца страница держится за снятый выбор: '
+                     + pairText(dom));
 });
 
 /* Снапшот выгрузили и подгрузили обратно — тот же файл, то же имя. Выбор к
@@ -1397,8 +1349,9 @@ test('вернувшийся снапшот не воскрешает сняты
   await dom.tick();
   store.add([snap('os-9.2', AUG, { builds: [build('nginx', { version: '2.0' })] })],
             'b.json');
-  assert.match(dom.location.hash, /pair=os-9\.1%40[^.]*\.\.os-9\.3/,
-               'вернувшийся файл воскресил снятый выбор: ' + dom.location.hash);
+  assert.strictEqual(pairText(dom), pairIs('os-9.1', JUL, 'os-9.3', SEP),
+                     'вернувшийся файл воскресил снятый выбор: '
+                     + pairText(dom));
 });
 
 /* Снапшоты переставляют руками, и порядок цепочки задаёт направление
@@ -1418,8 +1371,8 @@ test('перестановка цепочки переворачивает на�
   store.move(2, -1);                                /* 9.3 поднялся выше 9.2 */
   assert.deepStrictEqual(store.list().map(function (i) { return i.tag; }),
                          ['os-9.1', 'os-9.3', 'os-9.2']);
-  assert.match(dom.location.hash, /pair=os-9\.3%40[^.]*\.\.os-9\.2/,
-               dom.location.hash);
+  assert.strictEqual(pairText(dom), pairIs('os-9.3', SEP, 'os-9.2', AUG),
+                     pairText(dom));
   var html = dom.id('diff-rows').innerHTML;
   /* Сравниваются те же два конца, но теперь 3.0 → 2.0: версия упала.
      Умолчание «вся цепочка» дало бы здесь 1.0 → 2.0. */
@@ -1459,8 +1412,9 @@ test('подсветка поиска тоже экранирует, а не т�
   store.add([snap('os-9.1', JUL,
                   { builds: [build('<img src=x>')] })], 'a.json');
   await dom.tick();
-  dom.location.hash = '#tab=state&q=src&f=';
-  dom.fireWindow('hashchange');
+  dom.id('q').value = 'src';
+  dom.fire(dom.id('q'), 'input', {});
+  await wait(200);
   var html = dom.id('state-rows').innerHTML;
   assert.ok(html.indexOf('class="hit"') !== -1, 'запрос не применился: ' + html);
   assert.strictEqual(html.indexOf('<img'), -1, html);
@@ -1507,8 +1461,9 @@ test('строка «ничего не найдено» шириной во вс
   var dom = load();
   store.add([snap('os-9.1', JUL, { builds: [build('nginx')] })], 'a.json');
   await dom.tick();
-  dom.location.hash = '#tab=state&q=такого-нет&f=';
-  dom.fireWindow('hashchange');
+  dom.id('q').value = 'такого-нет';
+  dom.fire(dom.id('q'), 'input', {});
+  await wait(200);
   var cols = dom.id('state-table').querySelectorAll('th').length;
   var html = dom.id('state-rows').innerHTML;
   assert.ok(html.indexOf('class="empty" colspan="' + cols + '"') !== -1,
@@ -1607,13 +1562,11 @@ test('щелчок по крестику очищает поле и снимае
   field.value = 'такого-компонента-нет';
   dom.fire(field, 'input', {});
   await wait(200);                       /* поиск отложен на 120 мс */
-  assert.match(dom.location.hash, /q=/, 'запрос должен доехать до адреса');
   assert.match(dom.id('state-rows').innerHTML, /class="empty"/);
 
   dom.fire(dom.id('q-clear'), 'click', {});
   assert.strictEqual(field.value, '');
   assert.strictEqual(dom.id('q-clear').hidden, true);
-  assert.doesNotMatch(dom.location.hash, /q=/, 'запрос обязан уйти из адреса');
   assert.doesNotMatch(dom.id('state-rows').innerHTML, /class="empty"/);
   assert.strictEqual(dom.focused(), field, 'курсор обязан вернуться в поле');
 });
@@ -1630,7 +1583,6 @@ test('крестик, нажатый до срабатывания поиска,
     dom.fire(dom.id('q-clear'), 'click', {});
     await wait(200);                       /* переживаем отложенный вызов */
     assert.strictEqual(field.value, '');
-    assert.doesNotMatch(dom.location.hash, /q=/);
     assert.doesNotMatch(dom.id('state-rows').innerHTML, /class="empty"/);
   });
 
@@ -1718,21 +1670,22 @@ test('на «Изменениях» рельс отмечает отрезок �
 
 /* Предпосчитаны только соседние переходы и сводный. Любой другой диапазон
    должен считаться на месте, иначе «выбрать любой диапазон» означало бы
-   «увидеть пустую таблицу». Заходим через адрес: другого пути к такому
-   диапазону в этой задаче ещё нет. */
+   «увидеть пустую таблицу». */
 var OCT = '2026-10-01T00:00:00+03:00';
 
 test('переход, которого нет в предпосчитанных, считается по требованию',
   function () {
-    var want = 'os-9.2@' + AUG + '..os-9.4@' + OCT;
-    var dom = load({ hash: '#tab=diff&pair=' + encodeURIComponent(want) });
+    var dom = load();
     store.add([snap('os-9.1', JUL, { builds: [build('a', { version: '1.0' })] }),
                snap('os-9.2', AUG, { builds: [build('a', { version: '2.0' })] }),
                snap('os-9.3', SEP, { builds: [build('a', { version: '3.0' })] }),
                snap('os-9.4', OCT, { builds: [build('a', { version: '4.0' })] })],
               'a.json');
+    pressTab(dom, 'diff');
+    clickNode(dom, 1);
+    clickNode(dom, 3);
     /* Соседние переходы это 9.1→9.2, 9.2→9.3, 9.3→9.4, сводный — 9.1→9.4.
-       Запрошенный 9.2→9.4 не совпадает ни с одним. */
+       Выбранный 9.2→9.4 не совпадает ни с одним. */
     assert.doesNotMatch(dom.id('diff-rows').innerHTML, /class="empty"/,
                         dom.id('diff-rows').innerHTML);
     /* Версия выросла с 2.0 до 4.0 — значит сравнили именно эти концы, а не
@@ -1741,94 +1694,6 @@ test('переход, которого нет в предпосчитанных,
                  dom.id('diff-rows').innerHTML);
     assert.strictEqual(dom.id('diff-rows').innerHTML.indexOf('1.0'), -1,
                        dom.id('diff-rows').innerHTML);
-  });
-
-/* Короткую форму адреса пишут руками, и порядок тегов в ней — часть
-   смысла: слева «было». У двойников тега конец, найденный сам по себе,
-   уводит на другое сравнение — и молча, потому что оба конца названы
-   верно. Ссылка «os-9.2..os-9.3» на цепочке 9.2, 9.3, 9.2 обязана открыть
-   первый переход, а не последний. */
-test('короткая ссылка на переход читается в том порядке, в каком написана',
-  function () {
-    var dom = load({ hash: '#tab=diff&pair='
-                           + encodeURIComponent('os-9.2..os-9.3') });
-    store.add([snap('os-9.2', JUL, { builds: [build('nginx', { version: '1.0' })] }),
-               snap('os-9.3', AUG, { builds: [build('nginx', { version: '2.0' })] }),
-               snap('os-9.2', SEP, { builds: [build('nginx', { version: '3.0' })] })],
-              'a.json');
-    var html = dom.id('diff-rows').innerHTML;
-    /* Июльский os-9.2 против августовского os-9.3: 1.0 → 2.0. Сентябрьского
-       прогона в этом сравнении нет вовсе. */
-    assert.match(html, /1\.0/, html);
-    assert.match(html, /2\.0/, html);
-    assert.strictEqual(html.indexOf('3.0'), -1, html);
-    assert.ok(dom.location.hash.indexOf(
-                encodeURIComponent('os-9.2@' + JUL + '..os-9.3@' + AUG)) !== -1,
-              dom.location.hash);
-  });
-
-/* У двойников тега подходящих диапазонов несколько, и выбирается из них
-   последний в написанном порядке: самый свежий левый конец, у которого
-   правый ещё есть справа. Свежий прогон человек имеет в виду чаще, а
-   порядок концов при этом остаётся тем, что он написал. */
-test('короткая ссылка при двойниках тега берёт последний такой диапазон',
-  function () {
-    var dom = load({ hash: '#tab=diff&pair='
-                           + encodeURIComponent('os-9.2..os-9.3') });
-    store.add([snap('os-9.2', JUL, { builds: [build('nginx', { version: '1.0' })] }),
-               snap('os-9.2', AUG, { builds: [build('nginx', { version: '2.0' })] }),
-               snap('os-9.3', SEP, { builds: [build('nginx', { version: '3.0' })] })],
-              'a.json');
-    var html = dom.id('diff-rows').innerHTML;
-    /* Августовский os-9.2 против os-9.3, а не июльский: 2.0 → 3.0. */
-    assert.match(html, /2\.0/, html);
-    assert.match(html, /3\.0/, html);
-    assert.strictEqual(html.indexOf('1.0'), -1, html);
-    assert.ok(dom.location.hash.indexOf(
-                encodeURIComponent('os-9.2@' + AUG + '..os-9.3@' + SEP)) !== -1,
-              dom.location.hash);
-  });
-
-/* Двойник тега бывает и справа, и правило договаривает случай до конца:
-   при выбранном левом конце берётся самый свежий из подходящих правых.
-   Иначе ссылка открывала бы сравнение с прогоном, который человек уже
-   считает устаревшим, — и молча, потому что оба конца названы верно. */
-test('короткая ссылка берёт самый свежий правый конец', function () {
-  var dom = load({ hash: '#tab=diff&pair='
-                         + encodeURIComponent('os-9.1..os-9.2') });
-  store.add([snap('os-9.1', JUL, { builds: [build('nginx', { version: '1.0' })] }),
-             snap('os-9.2', AUG, { builds: [build('nginx', { version: '2.0' })] }),
-             snap('os-9.2', SEP, { builds: [build('nginx', { version: '3.0' })] })],
-            'a.json');
-  var html = dom.id('diff-rows').innerHTML;
-  /* os-9.1 против сентябрьского os-9.2, а не августовского: 1.0 → 3.0. */
-  assert.match(html, /1\.0/, html);
-  assert.match(html, /3\.0/, html);
-  assert.strictEqual(html.indexOf('2.0'), -1, html);
-  assert.ok(dom.location.hash.indexOf(
-              encodeURIComponent('os-9.1@' + JUL + '..os-9.2@' + SEP)) !== -1,
-            dom.location.hash);
-});
-
-/* Ссылку писали, когда цепочка стояла иначе: снапшоты переставляют руками,
-   и присланный адрес переживает перестановку. Прочитать его задом наперёд
-   нельзя — «было» и «стало» поменялись бы местами, — поэтому концы
-   разворачиваются по цепочке. Это запасной ход: он работает только там,
-   где в написанном порядке диапазон не читается вовсе. */
-test('ссылка, написанная против цепочки, разворачивается по ней',
-  function () {
-    var dom = load({ hash: '#tab=diff&pair='
-                           + encodeURIComponent('os-9.2@' + AUG + '..os-9.1@' + JUL) });
-    store.add([snap('os-9.1', JUL, { builds: [build('nginx', { version: '1.0' })] }),
-               snap('os-9.2', AUG, { builds: [build('nginx', { version: '2.0' })] }),
-               snap('os-9.3', SEP, { builds: [build('nginx', { version: '3.0' })] })],
-              'a.json');
-    var html = dom.id('diff-rows').innerHTML;
-    /* Названы концы 9.1 и 9.2, значит сравниваются они: 1.0 → 2.0.
-       Умолчание «вся цепочка» дало бы 1.0 → 3.0. */
-    assert.match(html, /1\.0/, html);
-    assert.match(html, /2\.0/, html);
-    assert.strictEqual(html.indexOf('3.0'), -1, html);
   });
 
 /* Предпосчитанные переходы названы тегами, а два прогона одного тега —
@@ -1874,9 +1739,9 @@ test('предпосчитанный переход берётся из кэша
       clickNode(dom, 0);
       clickNode(dom, 1);
     });
-    assert.match(dom.location.hash, /pair=os-9\.1%40[^.]*\.\.os-9\.2/,
-                 'диапазон не выбрался, сценарий проверяет не то: '
-                 + dom.location.hash);
+    assert.strictEqual(pairText(dom), pairIs('os-9.1', JUL, 'os-9.2', AUG),
+                       'диапазон не выбрался, сценарий проверяет не то: '
+                       + pairText(dom));
     assert.strictEqual(n, 0, 'соседний переход посчитан заново, расчётов: ' + n);
   });
 
@@ -1955,8 +1820,7 @@ test('прокрутка настоящей страницы показывае�
 
 /* Непонятый шаблон не фильтрует и объясняет себя. Пустая таблица на каждой
    недописанной скобке была бы неотличима от «ничего не нашлось». Режим
-   включаем кнопкой сами: адрес с re=1 его больше не включает — самое
-   большее, о чём он попросит, проверено отдельными тестами про reAsked. */
+   включаем кнопкой: другого способа его включить нет. */
 test('непонятая регулярка показывает все строки и называет причину',
   function () {
     var dom = load();
@@ -2009,7 +1873,6 @@ test('кнопка режима переключает поиск на регу�
   dom.fire(dom.id('q-re'), 'click', {});
   assert.strictEqual(dom.id('q-re').getAttribute('aria-pressed'), 'true');
   assert.strictEqual(dom.id('q-re').className, 'toggle mono on');
-  assert.match(dom.location.hash, /(^|&)re=1(&|$)/);
 });
 
 test('нажатая кнопка меняет отбор строк без задержки', function () {
@@ -2068,60 +1931,6 @@ test('отжатая кнопка убирает сообщение о непо�
     assert.strictEqual(dom.id('q-bad').hidden, true);
   });
 });
-
-/* Решение человека: ссылка с re=1 больше не включает режим сама — чужой
-   шаблон вроде (a+)+$ способен подвесить вкладку позже, когда снапшоты уже
-   в памяти, — но и промолчать об этом ключе нельзя. Кнопка на этот момент
-   уже нарисована и отжата: страница обязана сказать, зачем её нажимать. */
-test('ссылка с re=1 не включает режим, но показывает приглашение',
-  function () {
-    var dom = load({ hash: '#tab=state&q=nginx&re=1&f=&sort=name' });
-    store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
-    assert.strictEqual(dom.id('q-re').getAttribute('aria-pressed'), 'false',
-                       'ссылка не имеет права включить режим сама');
-    assert.strictEqual(dom.id('q-bad').hidden, false);
-    assert.match(dom.id('q-bad').textContent, /включите кнопкой/);
-  });
-
-test('нажатие кнопки гасит приглашение независимо от того, что дальше '
-   + 'делает с режимом', function () {
-  /* Погашенным приглашение обязано остаться и после того, как режим снова
-     выключили: предложение принято или отвергнуто один раз, а не «пока
-     включено». Если бы клик не гасил st.reAsked, второй клик, вернувший
-     режим на «выключено», снова показал бы приглашение. */
-  var dom = load({ hash: '#tab=state&q=nginx&re=1&f=&sort=name' });
-  store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
-  assert.strictEqual(dom.id('q-bad').hidden, false);
-  dom.fire(dom.id('q-re'), 'click', {});               /* включили */
-  dom.fire(dom.id('q-re'), 'click', {});               /* и снова выключили */
-  assert.strictEqual(dom.id('q-re').getAttribute('aria-pressed'), 'false');
-  assert.strictEqual(dom.id('q-bad').hidden, true,
-                     'приглашение погашено кликом, а не тем, включён ли режим сейчас');
-});
-
-/* Приоритет: у непонятого шаблона причина важнее приглашения — она про то,
-   что человек видит прямо сейчас. Обычным нажатием кнопки это не собрать
-   (клик гасит reAsked), но внешняя ссылка с тем же q= и re=1 поверх уже
-   включённого режима — собирает: reAsked снова true, а st.regex остался
-   включённым и от старого шаблона. */
-test('когда шаблон не разобрался, приоритет у причины, а не у приглашения',
-  function () {
-    var dom = load();
-    store.add([snap('os-9.1', '2026-07-01T00:00:00+03:00')], 'a.json');
-    dom.fire(dom.id('q-re'), 'click', {});
-    dom.id('q').value = '^python(';
-    dom.fire(dom.id('q'), 'input', {});
-    return wait(200).then(function () {
-      assert.match(dom.id('q-bad').textContent, /не разбирается/);
-      dom.location.hash = '#tab=state&q=%5Epython(&re=1&f=&sort=name';
-      dom.fireWindow('hashchange');
-      assert.strictEqual(dom.id('q-re').getAttribute('aria-pressed'), 'true',
-                         'режим остался включённым — restore его не трогает');
-      assert.match(dom.id('q-bad').textContent, /не разбирается/,
-                   'причина обязана победить приглашение');
-      assert.doesNotMatch(dom.id('q-bad').textContent, /включите кнопкой/);
-    });
-  });
 
 /* data-tip ставится вместе с сообщением и должен уходить вместе с ним —
    иначе у скрытого узла остаётся подсказка без текста, который она
