@@ -31,8 +31,8 @@
     <button class="tab" data-tab="diff" data-tip="Что изменилось между двумя тегами: компоненты, версии, патчи, состав RPM, ветки.">Изменения</button>
   </nav>
   <section id="tab-state">
-    <div class="cards tally" id="state-cards"></div>
-    <div class="cards cuts" id="class-cards"></div>
+    <div class="cards" id="state-cards"></div>
+    <div class="cards strip" id="class-cards"></div>
     <div class="controls" id="controls">
       <div class="searchbox">
         <input type="search" id="q" placeholder="Компонент, тег, ветка, патч, CVE, RPM…" autocomplete="off">
@@ -80,7 +80,7 @@
     </table></div>
   </section>
   <section id="tab-diff" hidden>
-    <div class="cards tally" id="diff-pair"></div>
+    <div class="cards" id="diff-pair"></div>
     <div class="cards cuts" id="diff-cards"></div>
     <div class="tablewrap"><table id="diff-table">
       <thead><tr>

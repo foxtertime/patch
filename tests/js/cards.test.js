@@ -181,29 +181,26 @@ test('у предупреждений своя карточка со своим 
 /* Раскладку держит css, и держится она на именах блоков: ряд итогов — три
    тематических блока, разрезы — две полосы. Числа и состав карточек при
    этом прежние, поэтому проверяем именно обёртки. */
-test('ряд итогов разложен по трём блокам', function () {
+test('ряд итогов разложен по трём группам', function () {
   var out = cards.stateCards(snapshot()).big;
-  assert.match(out, /<div class="cgroup solo">/, out);
-  assert.match(out, /<div class="cgroup">/, out);
-  assert.match(out, /<div class="cgroup apart">/, out);
+  assert.match(out, /<div class="cgroup lead">/, out);
   assert.strictEqual(out.split('class="cgroup').length - 1, 3, out);
 });
 
-test('число тега стоит в блоке одно', function () {
-  /* Блок «solo» — тот, что css делает вдвое шире: карточка в нём должна
-     быть ровно одна, иначе ширина достанется не тому. */
+test('число тега стоит в своей группе одно', function () {
+  /* Группа «lead» — та, где css делает число крупнее прочих: ячейка в ней
+     должна быть ровно одна, иначе крупным станет не то число. */
   var out = cards.stateCards(snapshot()).big;
-  var solo = out.slice(out.indexOf('cgroup solo'), out.indexOf('cgroup"'));
-  assert.strictEqual(solo.split('class="card').length - 1, 1, solo);
-  assert.match(solo, /data-filter="all"/, solo);
+  var lead = out.slice(out.indexOf('cgroup lead'), out.indexOf('cgroup"'));
+  assert.strictEqual(lead.split('class="card').length - 1, 1, lead);
+  assert.match(lead, /data-filter="all"/, lead);
 });
 
-test('стороны перехода и вспомогательные карточки — разные блоки',
+test('стороны перехода и вспомогательные числа — разные группы',
   function () {
     var out = cards.pairCards(pair(), side('os-9.1', '', 1),
                               side('os-9.2', '', 2));
     assert.match(out, /<div class="cgroup major">/, out);
-    assert.match(out, /<div class="cgroup apart">/, out);
     assert.strictEqual(out.split('class="cgroup').length - 1, 2, out);
   });
 
