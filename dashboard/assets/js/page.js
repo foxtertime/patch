@@ -242,13 +242,13 @@
         return row.marks.indexOf(key) !== -1;
       }
       if (key === 'has-patch') return row.patches.length > 0;
-      /* Признак строки — её уровень, а не наличие записей в problems: билд
-         с одним предупреждением стоит под «с предупреждениями», а не под
-         «с проблемами», и попадает ровно в одну из двух выборок. Заметка не
-         даёт ни того, ни другого — она ни о чём не предупреждает. */
-      if (key === 'problem') return row.level === 'error';
-      if (key === 'warning') return row.level === 'warning';
-      if (key === 'note') return row.level === 'note';
+      /* Признак строки — наличие записи такого уровня, а не самая строгая
+         из них: билд с ошибкой и предупреждением разом виден и там, и там.
+         Выборка отвечает на тот же вопрос, что и карточка над ней, — иначе
+         клик по карточке показывал бы не тех, кого она сосчитала. */
+      if (key === 'problem') return row.levels.indexOf('error') !== -1;
+      if (key === 'warning') return row.levels.indexOf('warning') !== -1;
+      if (key === 'note') return row.levels.indexOf('note') !== -1;
       return row.marks.indexOf(key) !== -1;
     }
 
