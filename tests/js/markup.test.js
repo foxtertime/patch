@@ -341,7 +341,7 @@ test('класс патча виден и покрашен', function () {
    набрано. */
 test('проблема рисуется блоком из подписи и текста', function () {
   var out = markup.problemHtml('gitlab: ветка os-9.6 не найдена', q());
-  assert.match(out, /class="prob error"/);
+  assert.match(out, /class="prob lvl-error"/);
   assert.match(out, /class="pkind">GitLab</);
   assert.match(out, /class="ptext">ветка os-9\.6 не найдена</);
 });
@@ -374,18 +374,24 @@ test('разметка из проблемы экранируется', function
 });
 
 /* Уровень проблемы виден в разметке классом: цвет подписи и полосы блока
-   даёт css, а не разметка, и правило у них одно. */
+   даёт css, а не разметка, и правило у них одно.
+
+   Класс уровня носит приставку lvl-: голым словом note на странице уже
+   помечена приписка к значению («прямой», «унаследован»), и заметка,
+   надев то же имя, забирала бы себе и её отступ слева — блок заметки
+   стоял бы правее блоков ошибки и предупреждения. */
 test('уровень проблемы уезжает в класс блока', function () {
   var warn = markup.problemHtml({ level: 'warning', text: 'gitlab: с ветки' },
                                 q());
-  assert.match(warn, /class="prob warning"/);
+  assert.match(warn, /class="prob lvl-warning"/);
   var note = markup.problemHtml({ level: 'note', text: 'gitlab: нечего' }, q());
-  assert.match(note, /class="prob note"/);
+  assert.match(note, /class="prob lvl-note"/);
+  assert.doesNotMatch(note, /class="[^"]*(?<![-\w])note(?![-\w])/);
 });
 
 /* Проблема из снапшота прежней схемы приезжает строкой без уровня —
    и читается как ошибка: занизить чужую проблему хуже, чем завысить. */
 test('проблема строкой читается как ошибка', function () {
   assert.match(markup.problemHtml('koji: нет деталей билда', q()),
-               /class="prob error"/);
+               /class="prob lvl-error"/);
 });
