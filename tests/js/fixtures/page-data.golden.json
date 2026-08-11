@@ -449,7 +449,10 @@
      "commits_ahead": null,
      "patches_ref": null,
      "ghosts": [],
-     "level": "error"
+     "level": "error",
+     "levels": [
+      "error"
+     ]
     },
     {
      "branch": "os-9.1",
@@ -525,7 +528,8 @@
      "commits_ahead": null,
      "patches_ref": null,
      "ghosts": [],
-     "level": null
+     "level": null,
+     "levels": []
     },
     {
      "branch": null,
@@ -579,7 +583,10 @@
      "commits_ahead": null,
      "patches_ref": null,
      "ghosts": [],
-     "level": "error"
+     "level": "error",
+     "levels": [
+      "error"
+     ]
     },
     {
      "branch": "os-9.1",
@@ -640,7 +647,8 @@
      "commits_ahead": null,
      "patches_ref": null,
      "ghosts": [],
-     "level": null
+     "level": null,
+     "levels": []
     }
    ],
    "counts": {
@@ -745,7 +753,8 @@
      "commits_ahead": null,
      "patches_ref": null,
      "ghosts": [],
-     "level": null
+     "level": null,
+     "levels": []
     },
     {
      "branch": "abc123",
@@ -789,7 +798,10 @@
      "commits_ahead": null,
      "patches_ref": null,
      "ghosts": [],
-     "level": "error"
+     "level": "error",
+     "levels": [
+      "error"
+     ]
     },
     {
      "branch": "os-9.2",
@@ -865,7 +877,8 @@
      "commits_ahead": null,
      "patches_ref": null,
      "ghosts": [],
-     "level": null
+     "level": null,
+     "levels": []
     },
     {
      "branch": "os-9.1",
@@ -926,7 +939,8 @@
      "commits_ahead": null,
      "patches_ref": null,
      "ghosts": [],
-     "level": null
+     "level": null,
+     "levels": []
     }
    ],
    "counts": {
