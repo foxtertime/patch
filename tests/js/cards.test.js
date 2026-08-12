@@ -18,9 +18,22 @@ function snapshot(over) {
            }, over.counts || {}) };
 }
 
+/* Строка перехода несёт пять списков движения — по ним карточки «патчи» и
+   «RPM» считают, сколько файлов сдвинулось. Пустые списки, а не отсутствие
+   ключа: у настоящей строки они всегда есть, и подделка без них проверяла
+   бы стойкость к данным, которых не бывает. */
+function row(over) {
+  over = over || {};
+  return { patches_added: over.patches_added || [],
+           patches_removed: over.patches_removed || [],
+           patches_rewritten: over.patches_rewritten || [],
+           rpms_added: over.rpms_added || [],
+           rpms_removed: over.rpms_removed || [] };
+}
+
 function pair(over) {
   over = over || {};
-  return { rows: over.rows || [{}, {}],
+  return { rows: over.rows || [row(), row()],
            counts: Object.assign({
              changed: 1, added: 0, removed: 0, upgraded: 1, downgraded: 0,
              unchanged: 0, patches_added: 0, patches_removed: 0,
@@ -105,16 +118,18 @@ test('без концов перехода итогов нет', function () {
                                      side('os-9.2', '', 2)), '');
 });
 
-/* Четыре, как итоги тега на «Состоянии»: ряд из двух в ширину полосы не
+/* Шесть, как итоги тега на «Состоянии»: ряд из двух в ширину полосы не
    ложится ничем — либо узкие плашки и пустота справа, либо два числа,
-   растянутые в плакат. */
-test('итоги перехода — четыре большие карточки', function () {
+   растянутые в плакат. Счёт тот же, что на соседней вкладке, нарочно:
+   ряд, который при переключении меняет счёт, читался бы как другая
+   страница. */
+test('итоги перехода — шесть больших карточек', function () {
   var out = cards.pairCards(pair(),
     side('os-9.1', '2026-07-01T00:00:00+03:00', 4),
     side('os-9.2', '2026-08-01T00:00:00+03:00', 6));
   assert.match(out, /class="l">было<\/div><div class="n">4 /, out);
   assert.match(out, /class="l">стало<\/div><div class="n">6 /, out);
-  assert.strictEqual((out.match(/card big/g) || []).length, 4, out);
+  assert.strictEqual((out.match(/card big/g) || []).length, 6, out);
 });
 
 /* Фильтра у них нет: итог перехода — не срез таблицы, а то, между чем
@@ -220,8 +235,40 @@ test('стороны перехода и вспомогательные числ
     var out = cards.pairCards(pair(), side('os-9.1', '', 1),
                               side('os-9.2', '', 2));
     assert.match(out, /<div class="cgroup major">/, out);
-    assert.strictEqual(out.split('class="cgroup').length - 1, 2, out);
+    assert.match(out, /<div class="cgroup scale">/, out);
+    assert.match(out, /<div class="cgroup moved">/, out);
+    assert.strictEqual(out.split('class="cgroup').length - 1, 3, out);
+    var moved = out.slice(out.indexOf('cgroup moved'));
+    assert.strictEqual(moved.split('class="card').length - 1, 2, moved);
   });
+
+/* Число карточки — сумма колонки под ней, поэтому считается оно по тем же
+   строкам, что стоят в таблице, и складывает все три исхода: пришло, ушло
+   и переписано. */
+test('движение файлов считается по строкам перехода', function () {
+  var out = cards.pairCards(pair({ rows: [
+    row({ patches_added: ['a.patch', 'b.patch'], rpms_added: ['x.rpm'] }),
+    row({ patches_removed: ['c.patch'], patches_rewritten: ['d.patch'],
+          rpms_removed: ['y.rpm', 'z.rpm'] })
+  ] }), side('os-9.1', '', 1), side('os-9.2', '', 1));
+  var moved = out.slice(out.indexOf('cgroup moved'));
+  assert.match(moved, /class="n">4 <span class="unit">файла</, moved);
+  assert.match(moved, /class="rpm">\+2 −1 ~1</, moved);
+  assert.match(moved, /class="n">3 <span class="unit">пакета</, moved);
+  assert.match(moved, /class="rpm">\+1 −2</, moved);
+});
+
+/* Ноль в знаках не пишется: три слота из нулей читаются как данные, а не
+   сообщают ничего. Когда не двигалось ничего, остаётся прочерк — пустая
+   строка выглядела бы недорисованной. */
+test('неподвижный переход показывает прочерк, а не нули', function () {
+  var out = cards.pairCards(pair(), side('os-9.1', '', 1),
+                            side('os-9.2', '', 1));
+  var moved = out.slice(out.indexOf('cgroup moved'));
+  assert.strictEqual(moved.split('class="rpm">—<').length - 1, 2, moved);
+  assert.strictEqual(moved.indexOf('+0'), -1, moved);
+  assert.strictEqual(moved.indexOf('−0'), -1, moved);
+});
 
 /* Разрезы разложены по вопросам, на которые отвечают: что стало с самим
    компонентом, что стало с его версией, что с патчами, что со сборкой.
